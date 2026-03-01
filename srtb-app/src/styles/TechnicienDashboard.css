@@ -1,273 +1,244 @@
 /* ============================================ */
-/* TECHNICIEN DASHBOARD - DESIGN
+/* TECHNICIEN DASHBOARD - SIMPLE & ÉLÉGANT
 /* ============================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+/* ============================================ */
+/* VARIABLES
+/* ============================================ */
 
 .technicien-dashboard {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 1.5rem;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-  font-family: 'Inter', sans-serif;
-  position: relative;
+  --primary: #f59e0b;
+  --primary-light: #fbbf24;
+  --primary-dark: #d97706;
+  --primary-soft: #fef3c7;
+  
+  --success: #10b981;
+  --success-soft: #d1fae5;
+  --danger: #ef4444;
+  --danger-soft: #fee2e2;
+  --warning: #f59e0b;
+  --warning-soft: #fef3c7;
+  
+  --text-dark: #1e293b;
+  --text-medium: #475569;
+  --text-light: #64748b;
+  --bg-white: #ffffff;
+  --bg-soft: #f8fafc;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-danger: 0 4px 12px rgba(239, 68, 68, 0.2);
+  --radius: 12px;
+  --radius-full: 9999px;
+  
+  --transition: all 0.2s ease;
 }
 
-/* ===== HEADER ===== */
-.dashboard-header {
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  padding: 1.2rem 1.5rem;
+/* ============================================ */
+/* BASE
+/* ============================================ */
+
+.technicien-dashboard {
+  min-height: 100vh;
+  background: var(--bg-soft);
+  padding: 1.5rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--text-dark);
+}
+
+/* ============================================ */
+/* HEADER
+/* ============================================ */
+
+.technicien-dashboard .dashboard-header {
+  background: var(--bg-white);
+  border-radius: var(--radius);
+  padding: 1rem 1.5rem;
   margin-bottom: 1.5rem;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  border: 1px solid rgba(37, 99, 235, 0.1);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+  justify-content: space-between;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
 }
 
-.header-left {
+.technicien-dashboard .header-left {
   display: flex;
   align-items: center;
-  gap: 1.2rem;
+  gap: 1rem;
 }
 
-.logo-icon {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, #2563eb, #1e40af);
-  border-radius: 12px;
+.technicien-dashboard .logo-icon {
+  width: 2.8rem;
+  height: 2.8rem;
+  background: var(--primary);
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+  color: white;
 }
 
-.logo-icon svg {
-  color: white !important;
-}
-
-.header-left h1 {
-  font-size: 1.3rem;
+.technicien-dashboard .header-left h1 {
+  font-size: 1.2rem;
   font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 4px;
+  color: var(--text-dark);
+  margin-bottom: 0.2rem;
 }
 
-.header-left p {
-  color: #64748b;
+.technicien-dashboard .header-greeting {
+  font-size: 0.85rem;
+  color: var(--text-light);
+}
+
+.technicien-dashboard .header-greeting strong {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.technicien-dashboard .header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.technicien-dashboard .datetime {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-soft);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  color: var(--text-light);
   font-size: 0.85rem;
 }
 
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+.technicien-dashboard .datetime svg {
+  color: var(--primary);
+  width: 16px;
+  height: 16px;
 }
 
-.datetime {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 1.2rem;
-  background: #f8fafc;
-  border-radius: 30px;
-  color: #475569;
-  font-size: 0.85rem;
-  border: 1px solid #e2e8f0;
-}
-
-.btn-icon {
-  width: 40px;
-  height: 40px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: white;
-  color: #64748b;
+.technicien-dashboard .btn-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-white);
+  color: var(--text-light);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: var(--transition);
 }
 
-.btn-icon:hover {
-  background: #f3f4f6;
-  color: #2563eb;
-  border-color: #2563eb;
-  transform: translateY(-2px);
+.technicien-dashboard .btn-icon:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary);
 }
 
-/* ===== NOTIFICATIONS ===== */
-.notifications-wrapper {
+.technicien-dashboard .logout-btn:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+/* ============================================ */
+/* NOTIFICATIONS
+/* ============================================ */
+
+.technicien-dashboard .notifications-wrapper {
   position: relative;
 }
 
-.notification-btn {
-  position: relative;
+.technicien-dashboard .notification-btn.has-notifications {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
-.notification-btn.has-notifications {
-  color: #2563eb;
-  border-color: #2563eb;
-}
-
-.notification-badge {
+.technicien-dashboard .notification-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 18px;
-  height: 18px;
-  background: #2563eb;
+  top: -5px;
+  right: -5px;
+  background: var(--danger);
   color: white;
-  font-size: 0.6rem;
+  font-size: 0.65rem;
   font-weight: 600;
+  min-width: 1.2rem;
+  height: 1.2rem;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: pulse 2s infinite;
 }
 
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-}
-
-.notifications-dropdown {
+.technicien-dashboard .notifications-dropdown {
   position: absolute;
-  top: 50px;
+  top: 3rem;
   right: 0;
-  width: 360px;
-  background: white;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  width: 350px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
   z-index: 100;
   overflow: hidden;
 }
 
-.notifications-header {
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid #e2e8f0;
+.technicien-dashboard .notifications-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f8fafc;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-soft);
 }
 
-.notifications-header h3 {
-  font-size: 0.95rem;
+.technicien-dashboard .notifications-header h3 {
+  font-size: 0.9rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-dark);
 }
 
-.notifications-header button {
+.technicien-dashboard .notifications-header button {
   background: none;
   border: none;
-  color: #64748b;
+  color: var(--text-light);
   cursor: pointer;
-  padding: 4px;
-  border-radius: 8px;
+  padding: 0.25rem;
+  border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.notifications-header button:hover {
-  background: #f1f5f9;
-  color: #ef4444;
+.technicien-dashboard .notifications-header button:hover {
+  background: var(--bg-white);
+  color: var(--text-dark);
 }
 
-.notifications-list {
+.technicien-dashboard .notifications-list {
   max-height: 400px;
   overflow-y: auto;
 }
 
-.notification-item {
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid #f1f5f9;
-  display: flex;
-  gap: 1rem;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.notification-item:hover {
-  background: #f8fafc;
-}
-
-.notification-item.unread {
-  background: #eff6ff;
-  border-left: 3px solid #2563eb;
-}
-
-.notification-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: #f1f5f9;
-  color: #2563eb;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.notification-content {
-  flex: 1;
-}
-
-.notification-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 4px;
-}
-
-.notification-message {
-  font-size: 0.75rem;
-  color: #64748b;
-  margin-bottom: 4px;
-  line-height: 1.4;
-}
-
-.notification-time {
-  font-size: 0.65rem;
-  color: #94a3b8;
-}
-
-.notification-dot {
-  width: 8px;
-  height: 8px;
-  background: #2563eb;
-  border-radius: 50%;
-  align-self: center;
-}
-
-.notifications-empty {
-  padding: 2rem;
-  text-align: center;
-  color: #94a3b8;
-}
-
-.notifications-empty svg {
-  margin-bottom: 0.5rem;
-  opacity: 0.5;
-}
-
-.notifications-loading {
+.technicien-dashboard .notifications-loading {
   padding: 2rem;
   text-align: center;
 }
 
-.spinner {
-  width: 30px;
-  height: 30px;
-  border: 2px solid #f1f5f9;
-  border-top-color: #2563eb;
+.technicien-dashboard .spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
   margin: 0 auto;
@@ -277,439 +248,820 @@
   to { transform: rotate(360deg); }
 }
 
-.view-all-btn {
+.technicien-dashboard .notifications-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-light);
+}
+
+.technicien-dashboard .notifications-empty svg {
+  margin-bottom: 0.5rem;
+  opacity: 0.5;
+}
+
+.technicien-dashboard .notification-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+
+.technicien-dashboard .notification-item:hover {
+  background: var(--bg-soft);
+}
+
+.technicien-dashboard .notification-item.unread {
+  background: var(--primary-soft);
+}
+
+.technicien-dashboard .notification-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.technicien-dashboard .notification-content {
+  flex: 1;
+}
+
+.technicien-dashboard .notification-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 0.25rem;
+}
+
+.technicien-dashboard .notification-message {
+  font-size: 0.75rem;
+  color: var(--text-medium);
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
+}
+
+.technicien-dashboard .notification-time {
+  font-size: 0.65rem;
+  color: var(--text-light);
+}
+
+.technicien-dashboard .notification-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--primary);
+  border-radius: 50%;
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+}
+
+.technicien-dashboard .view-all-btn {
   width: 100%;
   padding: 0.75rem;
-  background: #f8fafc;
+  background: var(--bg-soft);
   border: none;
-  border-top: 1px solid #e2e8f0;
-  color: #2563eb;
+  border-top: 1px solid var(--border);
+  color: var(--primary);
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s ease;
 }
 
-.view-all-btn:hover {
-  background: #f1f5f9;
+.technicien-dashboard .view-all-btn:hover {
+  background: var(--primary-soft);
 }
 
-/* ===== STATS ===== */
-.stats-grid {
+/* ============================================ */
+/* STATS CARDS
+/* ============================================ */
+
+.technicien-dashboard .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 1.2rem;
+  gap: 1rem;
   margin-bottom: 1.5rem;
 }
 
-.stat-card {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 1.5rem;
+.technicien-dashboard .stat-card {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
   display: flex;
   align-items: center;
   gap: 1rem;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  transition: var(--transition);
 }
 
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.1);
-  border-color: #2563eb;
+.technicien-dashboard .stat-card:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow);
 }
 
-.stat-card svg {
-  color: #2563eb;
-}
-
-.stat-label {
-  display: block;
-  color: #64748b;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-}
-
-.stat-value {
-  display: block;
-  color: #1e293b;
-  font-size: 1.5rem;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-/* ===== CONTENU PRINCIPAL ===== */
-.dashboard-content {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 20px;
-  padding: 2rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
-}
-
-.dashboard-content h2 {
-  color: #1e293b;
-  font-size: 1.4rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.dashboard-content p {
-  color: #64748b;
-  margin-bottom: 2rem;
-}
-
-/* ===== NOTIFICATIONS RÉCENTES ===== */
-.recent-notifications {
-  margin-top: 2rem;
-  border-top: 1px solid #e2e8f0;
-  padding-top: 1.5rem;
-}
-
-.recent-notifications h3 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 1.2rem;
-}
-
-.unread-badge {
-  background: #2563eb;
-  color: white;
-  padding: 0.2rem 0.5rem;
-  border-radius: 30px;
-  font-size: 0.65rem;
-  font-weight: 600;
-  margin-left: 0.5rem;
-}
-
-.recent-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.recent-item {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem;
-  background: #f8fafc;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.recent-item:hover {
-  background: white;
-  border-color: #2563eb;
-  transform: translateX(4px);
-}
-
-.recent-item.unread {
-  background: #eff6ff;
-  border-left: 3px solid #2563eb;
-}
-
-.recent-icon {
-  width: 40px;
-  height: 40px;
+.technicien-dashboard .stat-icon {
+  width: 3rem;
+  height: 3rem;
   border-radius: 10px;
-  background: white;
-  color: #2563eb;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.recent-content {
+.technicien-dashboard .stat-content {
   flex: 1;
 }
 
-.recent-title {
+.technicien-dashboard .stat-label {
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 0.25rem;
+}
+
+.technicien-dashboard .stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  line-height: 1.2;
+}
+
+/* ============================================ */
+/* CONTENU PRINCIPAL
+/* ============================================ */
+
+.technicien-dashboard .dashboard-content {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+.technicien-dashboard .dashboard-content h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 0.25rem;
+}
+
+.technicien-dashboard .dashboard-content > p {
+  color: var(--text-light);
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+/* ============================================ */
+/* NOTIFICATIONS RÉCENTES
+/* ============================================ */
+
+.technicien-dashboard .recent-notifications {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+}
+
+.technicien-dashboard .recent-notifications h3 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 0.25rem;
+  color: var(--text-dark);
+  margin-bottom: 1rem;
 }
 
-.new-badge {
-  background: #2563eb;
+.technicien-dashboard .unread-badge {
+  background: var(--danger);
   color: white;
-  padding: 0.15rem 0.4rem;
-  border-radius: 30px;
-  font-size: 0.6rem;
-  font-weight: 600;
-}
-
-.recent-reason {
-  font-size: 0.8rem;
-  color: #64748b;
-  margin-bottom: 0.25rem;
-}
-
-.recent-date {
   font-size: 0.65rem;
-  color: #94a3b8;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-full);
+  margin-left: 0.5rem;
 }
 
-/* ===== MODALE ===== */
-.modal-overlay {
+.technicien-dashboard .recent-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.technicien-dashboard .recent-item {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  gap: 0.75rem;
+}
+
+.technicien-dashboard .recent-item:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow);
+}
+
+.technicien-dashboard .recent-item.unread {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.technicien-dashboard .recent-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.technicien-dashboard .recent-content {
+  flex: 1;
+}
+
+.technicien-dashboard .recent-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.technicien-dashboard .new-badge {
+  background: var(--primary);
+  color: white;
+  font-size: 0.6rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: var(--radius-full);
+}
+
+.technicien-dashboard .recent-reason {
+  font-size: 0.75rem;
+  color: var(--text-medium);
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.technicien-dashboard .recent-date {
+  font-size: 0.65rem;
+  color: var(--text-light);
+}
+
+/* ============================================ */
+/* MODALE
+/* ============================================ */
+
+.technicien-dashboard .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 1rem;
 }
 
-.modal-content {
-  width: 90%;
+.technicien-dashboard .modal-content {
+  width: 100%;
   max-width: 550px;
-  background: white;
-  border-radius: 24px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  max-height: 90vh;
+  background: var(--bg-white);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  max-height: 85vh;
   overflow-y: auto;
 }
 
-.modal-header {
-  padding: 1.5rem 2rem;
-  border-bottom: 1px solid #e2e8f0;
+.technicien-dashboard .modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  background: linear-gradient(135deg, #f8fafc, white);
+  gap: 1rem;
   position: sticky;
   top: 0;
+  background: var(--bg-white);
   z-index: 10;
-  border-radius: 24px 24px 0 0;
 }
 
-.modal-header h2 {
+.technicien-dashboard .header-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #1e293b;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
 }
 
-.modal-close {
-  width: 36px;
-  height: 36px;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: white;
-  color: #64748b;
+.technicien-dashboard .modal-header h2 {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.technicien-dashboard .modal-close {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-white);
+  color: var(--text-light);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: var(--transition);
+  flex-shrink: 0;
 }
 
-.modal-close:hover {
-  background: #fee2e2;
-  color: #ef4444;
-  border-color: #ef4444;
-  transform: rotate(90deg);
+.technicien-dashboard .modal-close:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
-.modal-body {
-  padding: 2rem;
+.technicien-dashboard .modal-body {
+  padding: 1.5rem;
 }
 
-.modal-footer {
-  padding: 1.5rem 2rem;
-  border-top: 1px solid #e2e8f0;
+.technicien-dashboard .modal-footer {
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid var(--border);
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
-  background: #f8fafc;
+  background: var(--bg-soft);
   position: sticky;
   bottom: 0;
   z-index: 10;
-  border-radius: 0 0 24px 24px;
 }
 
-/* ===== DÉTAIL NOTIFICATION ===== */
-.notification-detail {
+/* ============================================ */
+/* NOTIFICATION PREVIEW
+/* ============================================ */
+
+.technicien-dashboard .preview-card {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.technicien-dashboard .preview-row {
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed var(--border);
 }
 
-.detail-row {
-  display: flex;
-  padding: 0.75rem 0;
-  border-bottom: 1px dashed #e2e8f0;
-}
-
-.detail-row:last-child {
+.technicien-dashboard .preview-row:last-child {
   border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
-.detail-label {
-  width: 140px;
+.technicien-dashboard .preview-label {
+  width: 130px;
   font-size: 0.8rem;
-  color: #64748b;
-  font-weight: 500;
+  color: var(--text-light);
 }
 
-.detail-value {
+.technicien-dashboard .preview-value {
   flex: 1;
-  font-size: 0.9rem;
-  color: #1e293b;
+  font-size: 0.85rem;
+  color: var(--text-dark);
   font-weight: 500;
 }
 
-.detail-value.reason {
-  color: #2563eb;
-  font-style: italic;
-}
-
-.detail-value.password {
-  font-family: monospace;
-  background: #f1f5f9;
-  padding: 0.3rem 0.5rem;
+.technicien-dashboard .preview-value.reason {
+  background: var(--bg-white);
+  padding: 0.5rem 0.75rem;
   border-radius: 6px;
-  font-size: 0.85rem;
+  border: 1px solid var(--border);
 }
 
-.detail-value.status {
+.technicien-dashboard .password-row {
+  align-items: center;
+}
+
+.technicien-dashboard .password-display {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.technicien-dashboard .preview-value.password {
+  font-family: monospace;
+  background: var(--bg-white);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.technicien-dashboard .preview-value.password.hidden {
+  font-family: inherit;
+  letter-spacing: 2px;
+  color: var(--text-light);
+}
+
+.technicien-dashboard .password-toggle-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 2.2rem;
+  height: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.technicien-dashboard .password-toggle-btn:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.technicien-dashboard .preview-value.status {
   display: inline-block;
-  padding: 0.2rem 0.75rem;
-  border-radius: 30px;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
   font-size: 0.7rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
-.detail-value.status.read {
-  background: #d1fae5;
-  color: #059669;
+.technicien-dashboard .preview-value.status.sent {
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
-.detail-value.status.sent {
-  background: #fef3c7;
-  color: #d97706;
+.technicien-dashboard .preview-value.status.read {
+  background: var(--success-soft);
+  color: var(--success);
 }
 
-.notification-message-box {
-  margin-top: 1.5rem;
-  background: #f8fafc;
-  border-radius: 16px;
-  padding: 1.5rem;
-  border: 1px solid #e2e8f0;
+.technicien-dashboard .role-badge-small {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: white;
 }
 
-.notification-message-box h4 {
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 1rem;
+.technicien-dashboard .notification-message-box {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
 }
 
-.message-content {
+.technicien-dashboard .notification-message-box h4 {
   font-size: 0.85rem;
-  line-height: 1.6;
-  color: #334155;
-}
-
-.message-content p {
+  font-weight: 600;
+  color: var(--text-dark);
   margin-bottom: 0.75rem;
 }
 
-/* ===== BOUTONS ===== */
-.btn-delete, .btn-close {
-  padding: 0.6rem 1.2rem;
-  border-radius: 30px;
+.technicien-dashboard .message-content {
+  background: var(--bg-white);
+  border-radius: 6px;
+  padding: 1rem;
+  border: 1px solid var(--border);
   font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.technicien-dashboard .message-content p {
+  margin-bottom: 0.5rem;
+}
+
+.technicien-dashboard .password-highlight {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-weight: 600;
+}
+
+/* ============================================ */
+/* MESSAGE DE SUPPRESSION (CONFIRMATION ÉLÉGANTE)
+/* ============================================ */
+
+.technicien-dashboard .delete-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 1rem;
+}
+
+.technicien-dashboard .delete-confirm-modal {
+  background: var(--bg-white);
+  border-radius: var(--radius);
+  max-width: 400px;
+  width: 100%;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.technicien-dashboard .delete-confirm-header {
+  padding: 1.5rem 1.5rem 1rem 1.5rem;
+  text-align: center;
+}
+
+.technicien-dashboard .delete-confirm-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  background: var(--danger-soft);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem auto;
+  color: var(--danger);
+}
+
+.technicien-dashboard .delete-confirm-header h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 0.5rem;
+}
+
+.technicien-dashboard .delete-confirm-header p {
+  color: var(--text-light);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.technicien-dashboard .delete-confirm-info {
+  background: var(--bg-soft);
+  padding: 1rem;
+  margin: 1rem 1.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.technicien-dashboard .delete-confirm-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.technicien-dashboard .delete-confirm-details {
+  flex: 1;
+}
+
+.technicien-dashboard .delete-confirm-details h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 0.2rem;
+}
+
+.technicien-dashboard .delete-confirm-details p {
+  font-size: 0.75rem;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.technicien-dashboard .delete-confirm-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0 1.5rem 1.5rem 1.5rem;
+  color: var(--warning);
+}
+
+.technicien-dashboard .delete-confirm-warning svg {
+  flex-shrink: 0;
+}
+
+.technicien-dashboard .delete-confirm-warning p {
+  color: var(--text-medium);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.technicien-dashboard .delete-confirm-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  background: var(--bg-soft);
+}
+
+.technicien-dashboard .btn-cancel {
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  color: var(--text-light);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.technicien-dashboard .btn-cancel:hover {
+  background: var(--bg-soft);
+  border-color: var(--text-light);
+}
+
+.technicien-dashboard .btn-confirm-delete {
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: var(--danger);
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: var(--transition);
+}
+
+.technicien-dashboard .btn-confirm-delete:hover {
+  background: #dc2626;
+  box-shadow: var(--shadow-danger);
+  transform: translateY(-1px);
+}
+
+/* ============================================ */
+/* BOUTONS
+/* ============================================ */
+
+.technicien-dashboard .btn-secondary,
+.technicien-dashboard .btn-delete {
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: var(--transition);
   border: none;
 }
 
-.btn-delete {
-  background: #fee2e2;
-  color: #dc2626;
+.technicien-dashboard .btn-secondary {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  color: var(--text-light);
 }
 
-.btn-delete:hover {
-  background: #dc2626;
+.technicien-dashboard .btn-secondary:hover {
+  background: var(--bg-soft);
+  border-color: var(--text-light);
+}
+
+.technicien-dashboard .btn-delete {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.technicien-dashboard .btn-delete:hover {
+  background: var(--danger);
   color: white;
-  transform: translateY(-2px);
 }
 
-.btn-close {
-  background: #e2e8f0;
-  color: #475569;
-}
+/* ============================================ */
+/* RESPONSIVE
+/* ============================================ */
 
-.btn-close:hover {
-  background: #cbd5e1;
-  color: #1e293b;
-  transform: translateY(-2px);
-}
-
-/* ===== RESPONSIVE ===== */
-@media (max-width: 992px) {
-  .stats-grid {
+@media (max-width: 1024px) {
+  .technicien-dashboard .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .technicien-dashboard .recent-list {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
 @media (max-width: 768px) {
-  .dashboard-header {
+  .technicien-dashboard {
+    padding: 1rem;
+  }
+  
+  .technicien-dashboard .dashboard-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
   }
   
-  .header-right {
+  .technicien-dashboard .header-right {
     width: 100%;
     justify-content: space-between;
   }
   
-  .datetime {
+  .technicien-dashboard .datetime {
     display: none;
   }
   
-  .notifications-dropdown {
+  .technicien-dashboard .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .technicien-dashboard .recent-list {
+    grid-template-columns: 1fr;
+  }
+  
+  .technicien-dashboard .notifications-dropdown {
     width: 300px;
+    right: -50px;
+  }
+  
+  .technicien-dashboard .preview-row {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .technicien-dashboard .preview-label {
+    width: auto;
+  }
+  
+  .technicien-dashboard .modal-footer {
+    flex-direction: column;
+  }
+  
+  .technicien-dashboard .btn-secondary,
+  .technicien-dashboard .btn-delete {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .technicien-dashboard .delete-confirm-footer {
+    flex-direction: column;
+  }
+  
+  .technicien-dashboard .btn-cancel,
+  .technicien-dashboard .btn-confirm-delete {
+    width: 100%;
+    justify-content: center;
   }
 }
 
 @media (max-width: 480px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
+  .technicien-dashboard .notifications-dropdown {
+    width: 280px;
+    right: -70px;
   }
   
-  .modal-footer {
+  .technicien-dashboard .delete-confirm-info {
     flex-direction: column;
+    text-align: center;
   }
   
-  .btn-delete, .btn-close {
-    width: 100%;
+  .technicien-dashboard .delete-confirm-details p {
     justify-content: center;
   }
 }
