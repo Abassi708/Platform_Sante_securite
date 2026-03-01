@@ -1,0 +1,1136 @@
+/* Import fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+/* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Container principal */
+.prestige-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: #0A1929;
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+}
+
+/* Background profond */
+.prestige-bg {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.bg-gradient {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(ellipse at top, #1E3A8A20, #0A1929),
+              radial-gradient(ellipse at bottom, #2E7D7320, #0A1929);
+}
+
+.bg-grid {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(196, 169, 98, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(196, 169, 98, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+}
+
+.orb-1 {
+  width: 500px;
+  height: 500px;
+  background: rgba(30, 58, 138, 0.1);
+  top: -200px;
+  right: -200px;
+  animation: orbFloat 25s infinite alternate;
+}
+
+.orb-2 {
+  width: 400px;
+  height: 400px;
+  background: rgba(46, 125, 115, 0.1);
+  bottom: -150px;
+  left: -150px;
+  animation: orbFloat 30s infinite alternate-reverse;
+}
+
+.orb-3 {
+  width: 300px;
+  height: 300px;
+  background: rgba(196, 169, 98, 0.05);
+  top: 40%;
+  left: 30%;
+  animation: orbFloat 20s infinite alternate;
+}
+
+@keyframes orbFloat {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(100px, 100px); }
+}
+
+/* Monde flottant */
+.floating-world {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.floating-item {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.floating-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(5px);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(196, 169, 98, 0.1);
+  transition: all 0.3s;
+}
+
+.floating-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  border-radius: 25px;
+  opacity: 0.2;
+  z-index: -1;
+}
+
+/* Bouton retour - FLÈCHE DORÉE AMÉLIORÉE */
+.floating-back {
+  position: absolute;
+  bottom: 15%;
+  left: 8%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  z-index: 10;
+  pointer-events: auto;
+  cursor: pointer;
+  animation: floatBack 5s ease-in-out infinite;
+}
+
+.floating-back-icon {
+  width: 55px;
+  height: 55px;
+  background: rgba(10, 25, 41, 0.8);
+  backdrop-filter: blur(10px);
+  border: 2px solid #C4A962;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 5px 15px -5px rgba(196, 169, 98, 0.3);
+}
+
+.floating-back:hover .floating-back-icon {
+  background: #C4A962;
+  transform: translateX(-5px) scale(1.1);
+  box-shadow: 0 10px 25px -5px #C4A962;
+}
+
+.floating-back:hover .floating-back-icon svg {
+  color: #0A1929 !important;
+}
+
+.floating-back-text {
+  color: #C4A962;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: all 0.3s ease;
+  background: rgba(10, 25, 41, 0.8);
+  backdrop-filter: blur(5px);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(196, 169, 98, 0.3);
+}
+
+.floating-back:hover .floating-back-text {
+  opacity: 1;
+  transform: translateY(0);
+  color: #C4A962;
+}
+
+.floating-back-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 55px;
+  height: 55px;
+  border-radius: 30px;
+  background: #C4A962;
+  opacity: 0.2;
+  z-index: -1;
+  filter: blur(8px);
+}
+
+@keyframes floatBack {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-8px) translateX(-4px); }
+}
+
+/* Badges */
+.trust-orb {
+  position: absolute;
+  top: 25px;
+  left: 25px;
+  background: rgba(10, 25, 41, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(196, 169, 98, 0.2);
+  border-radius: 40px;
+  padding: 6px 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #F1F5F9;
+  font-size: 11px;
+  z-index: 20;
+  box-shadow: 0 5px 15px -5px rgba(0, 0, 0, 0.5);
+}
+
+.trust-orb svg {
+  color: #C4A962;
+  width: 12px;
+  height: 12px;
+}
+
+.cosmic-time {
+  position: absolute;
+  top: 25px;
+  right: 25px;
+  background: rgba(10, 25, 41, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(196, 169, 98, 0.2);
+  border-radius: 40px;
+  padding: 6px 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #F1F5F9;
+  font-size: 11px;
+  z-index: 20;
+  box-shadow: 0 5px 15px -5px rgba(0, 0, 0, 0.5);
+}
+
+.cosmic-time svg {
+  color: #C4A962;
+  width: 12px;
+  height: 12px;
+}
+
+.last-login-badge {
+  position: absolute;
+  bottom: 25px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 25, 41, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(196, 169, 98, 0.2);
+  border-radius: 40px;
+  padding: 6px 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #F1F5F9;
+  font-size: 10px;
+  z-index: 20;
+  box-shadow: 0 5px 15px -5px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+
+.last-login-badge svg {
+  color: #C4A962;
+  width: 12px;
+  height: 12px;
+}
+
+/* Carte principale - HATEUR MINIMISÉE */
+.prestige-card {
+  background: rgba(10, 25, 41, 0.7);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(196, 169, 98, 0.15);
+  border-radius: 35px;
+  width: 100%;
+  max-width: 440px;
+  padding: 28px; /* Padding réduit */
+  position: relative;
+  z-index: 30;
+  box-shadow: 0 30px 50px -20px rgba(0, 0, 0, 0.5);
+}
+
+/* En-tête - ESPACEMENT RÉDUIT */
+.prestige-header {
+  text-align: center;
+  margin-bottom: 18px; /* Réduit */
+}
+
+.prestige-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px; /* Réduit */
+}
+
+.prestige-logo span {
+  font-size: 18px; /* Réduit */
+  font-weight: 700;
+  color: #F1F5F9;
+}
+
+.prestige-logo span span {
+  color: #C4A962;
+}
+
+.prestige-header h1 {
+  font-size: 22px; /* Réduit */
+  font-weight: 600;
+  color: #F1F5F9;
+  margin-bottom: 3px;
+}
+
+.prestige-header p {
+  font-size: 12px; /* Réduit */
+  color: #94a3b8;
+}
+
+/* Méthodes de connexion - ESPACEMENT RÉDUIT */
+.login-methods {
+  display: flex;
+  gap: 6px; /* Réduit */
+  margin-bottom: 18px; /* Réduit */
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.method-button {
+  display: flex;
+  align-items: center;
+  gap: 4px; /* Réduit */
+  padding: 6px 12px; /* Padding réduit */
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(196, 169, 98, 0.2);
+  border-radius: 25px; /* Réduit */
+  color: #94a3b8;
+  font-size: 11px; /* Réduit */
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.method-button svg {
+  width: 14px; /* Réduit */
+  height: 14px; /* Réduit */
+  color: #C4A962;
+}
+
+/* HOVER DORÉ */
+.method-button:hover:not(.disabled) {
+  background: rgba(196, 169, 98, 0.2) !important;
+  border-color: #C4A962 !important;
+  color: #FFFFFF !important;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 12px -5px #C4A962 !important;
+}
+
+.method-button:hover:not(.disabled) svg {
+  color: #FFFFFF !important;
+}
+
+/* État actif */
+.method-button.active {
+  background: rgba(196, 169, 98, 0.25) !important;
+  border-color: #C4A962 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 5px 12px -5px #C4A962 !important;
+}
+
+.method-button.active svg {
+  color: #FFFFFF !important;
+}
+
+.method-button.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.method-button.disabled:hover {
+  background: none;
+  border-color: rgba(196, 169, 98, 0.2);
+  transform: none;
+  box-shadow: none;
+}
+
+.method-soon {
+  font-size: 7px;
+  color: #94a3b8;
+  margin-left: 2px;
+}
+
+/* Formulaire - ESPACEMENT RÉDUIT */
+.prestige-form {
+  margin-bottom: 15px; /* Réduit */
+}
+
+.prestige-field {
+  margin-bottom: 14px; /* Réduit */
+}
+
+.prestige-field label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px; /* Réduit */
+  font-weight: 500;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.3s;
+}
+
+.prestige-field.focused label {
+  color: #C4A962;
+}
+
+.field-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field-container input {
+  width: 100%;
+  height: 42px; /* Hauteur réduite de 48px à 42px */
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(196, 169, 98, 0.2);
+  border-radius: 14px; /* Réduit */
+  padding: 0 35px 0 14px;
+  font-size: 13px; /* Réduit */
+  color: #F1F5F9;
+  transition: all 0.3s;
+}
+
+.field-container input:hover {
+  border-color: rgba(196, 169, 98, 0.3);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.field-container input:focus {
+  outline: none;
+  border-color: #C4A962;
+  background: rgba(196, 169, 98, 0.02);
+  box-shadow: 0 0 0 3px rgba(196, 169, 98, 0.1);
+}
+
+.field-container input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+  font-size: 12px;
+}
+
+.field-valid {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.field-valid svg {
+  width: 14px;
+  height: 14px;
+  color: #2E7D73;
+}
+
+.field-eye {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.3s;
+}
+
+.field-eye svg {
+  width: 14px;
+  height: 14px;
+}
+
+.field-eye:hover {
+  color: #C4A962;
+}
+
+/* Options - ESPACEMENT RÉDUIT */
+.prestige-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px; /* Réduit */
+}
+
+.prestige-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 11px; /* Réduit */
+  color: #94a3b8;
+  position: relative;
+  padding-left: 18px;
+}
+
+.prestige-checkbox input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.checkbox-mark {
+  position: absolute;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(196, 169, 98, 0.3);
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.prestige-checkbox:hover .checkbox-mark {
+  border-color: #C4A962;
+}
+
+.prestige-checkbox input:checked + .checkbox-mark {
+  background: #C4A962;
+  border-color: #C4A962;
+}
+
+.checkbox-mark:after {
+  content: '';
+  position: absolute;
+  display: none;
+  left: 3px;
+  top: 0px;
+  width: 3px;
+  height: 6px;
+  border: solid #0A1929;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.prestige-checkbox input:checked + .checkbox-mark:after {
+  display: block;
+}
+
+.prestige-forgot {
+  background: none;
+  border: none;
+  color: #C4A962;
+  font-size: 11px; /* Réduit */
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  padding: 4px 8px;
+  border-radius: 16px;
+}
+
+.prestige-forgot:hover {
+  background: rgba(196, 169, 98, 0.1);
+}
+
+/* Erreur - ESPACEMENT RÉDUIT */
+.prestige-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ef4444;
+  font-size: 11px;
+}
+
+/* Bouton principal - HATEUR RÉDUITE */
+.prestige-button {
+  width: 100%;
+  height: 42px; /* Réduit de 48px à 42px */
+  background: linear-gradient(135deg, #1E3A8A, #2E7D73);
+  border: none;
+  border-radius: 21px; /* Réduit */
+  color: #F1F5F9;
+  font-size: 13px; /* Réduit */
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.3s;
+  margin-bottom: 15px; /* Réduit */
+  position: relative;
+  overflow: hidden;
+}
+
+.prestige-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(196, 169, 98, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.prestige-button:hover::before {
+  left: 100%;
+}
+
+.prestige-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px -5px #1E3A8A;
+}
+
+.prestige-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Loader - PLUS PETIT */
+.prestige-loader {
+  display: flex;
+  gap: 4px;
+}
+
+.loader-ring {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #F1F5F9;
+  animation: loaderPulse 1s infinite;
+}
+
+.loader-ring:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loader-ring:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes loaderPulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+
+/* Interface OTP - PLUS COMPACTE */
+.otp-interface {
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.otp-icon {
+  margin-bottom: 12px;
+  animation: pulse 2s infinite;
+  color: #C4A962;
+  width: 28px;
+  height: 28px;
+}
+
+.otp-interface h3 {
+  color: #F1F5F9;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.otp-interface p {
+  color: #94a3b8;
+  font-size: 12px;
+  margin-bottom: 15px;
+}
+
+.otp-inputs {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+
+.otp-digit {
+  width: 40px;
+  height: 45px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(196, 169, 98, 0.3);
+  border-radius: 10px;
+  color: #F1F5F9;
+  font-size: 20px;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.3s;
+}
+
+.otp-timer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-bottom: 15px;
+}
+
+.otp-timer svg {
+  width: 12px;
+  height: 12px;
+  color: #C4A962;
+}
+
+.otp-timer span {
+  color: #C4A962;
+  font-size: 11px;
+}
+
+.otp-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+
+.otp-resend,
+.otp-back {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.otp-success svg {
+  width: 35px;
+  height: 35px;
+}
+
+.otp-success p {
+  font-size: 13px;
+}
+
+.otp-hint {
+  margin-top: 12px;
+  font-size: 10px;
+  padding-top: 10px;
+}
+
+/* Interface QR Code - PLUS COMPACTE */
+.qrcode-interface {
+  margin-bottom: 15px;
+}
+
+.qrcode-icon {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 12px;
+}
+
+.qrcode-interface h3 {
+  font-size: 16px;
+  margin-bottom: 15px;
+}
+
+.qrcode-container {
+  padding: 20px;
+  border-radius: 22px;
+  margin-bottom: 15px;
+}
+
+.qrcode-placeholder {
+  width: 150px;
+  height: 150px;
+}
+
+.qrcode-placeholder svg:first-child {
+  width: 85px;
+  height: 85px;
+}
+
+.scan-animation {
+  width: 30px;
+  height: 30px;
+}
+
+.qrcode-value {
+  padding: 6px 10px;
+  margin: 12px 0 4px;
+}
+
+.qrcode-value code {
+  font-size: 12px;
+}
+
+.qrcode-success svg {
+  width: 45px;
+  height: 45px;
+}
+
+.qrcode-success p {
+  font-size: 14px;
+}
+
+.qrcode-back {
+  padding: 8px 25px;
+  font-size: 12px;
+}
+
+/* Interface biométrique - PLUS COMPACTE */
+.biometric-interface {
+  margin-bottom: 15px;
+}
+
+.biometric-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 12px;
+}
+
+.biometric-interface h3 {
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.biometric-scanner {
+  width: 110px;
+  height: 110px;
+  margin: 0 auto 20px;
+}
+
+.biometric-scanner svg {
+  width: 55px;
+  height: 55px;
+}
+
+.biometric-back {
+  margin-top: 15px;
+  padding: 6px 22px;
+  font-size: 11px;
+}
+
+.biometric-success svg {
+  width: 50px;
+  height: 50px;
+}
+
+.biometric-success p {
+  font-size: 14px;
+}
+
+/* Interface mot de passe oublié - PLUS COMPACTE */
+.forgot-interface {
+  margin-bottom: 15px;
+}
+
+.forgot-interface h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.forgot-interface p {
+  font-size: 12px;
+  margin-bottom: 15px;
+}
+
+.forgot-actions {
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.forgot-submit {
+  height: 40px;
+  font-size: 12px;
+  border-radius: 20px;
+}
+
+.forgot-cancel {
+  height: 40px;
+  font-size: 12px;
+  border-radius: 20px;
+}
+
+.reset-success {
+  padding: 15px;
+}
+
+.reset-success svg {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 12px;
+}
+
+.reset-success p {
+  font-size: 12px;
+  margin-bottom: 15px;
+}
+
+.reset-close {
+  padding: 6px 25px;
+  font-size: 12px;
+}
+
+/* Support - PLUS COMPACTE */
+.agent-support {
+  margin-bottom: 15px;
+}
+
+.support-button {
+  padding: 8px;
+  font-size: 11px;
+  border-radius: 22px;
+}
+
+.support-panel {
+  padding: 15px;
+}
+
+.support-panel h4 {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.support-item {
+  padding: 6px 0;
+  font-size: 11px;
+}
+
+.support-note {
+  margin-top: 10px;
+  padding-top: 10px;
+  font-size: 9px;
+}
+
+/* Sécurité - PLUS COMPACTE */
+.prestige-security {
+  padding: 12px 0;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.security-dot {
+  padding: 3px 10px;
+  font-size: 9px;
+  gap: 4px;
+}
+
+.security-dot svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Footer - PLUS PETIT */
+.prestige-footer {
+  font-size: 9px;
+}
+
+/* Particules - PLUS DISCRÈTES */
+.particle {
+  width: 1.5px;
+  height: 1.5px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .prestige-card {
+    margin: 15px;
+    padding: 22px;
+  }
+  
+  .floating-back-icon {
+    width: 45px;
+    height: 45px;
+  }
+}
+
+@media (max-width: 480px) {
+  .method-button {
+    padding: 5px 10px;
+    font-size: 10px;
+  }
+  
+  .prestige-header h1 {
+    font-size: 20px;
+  }
+  
+  .otp-digit {
+    width: 35px;
+    height: 40px;
+    font-size: 18px;
+  }
+}
+/* Historique des connexions */
+.login-history {
+  position: absolute;
+  bottom: 25px;
+  right: 25px;
+  background: rgba(10, 25, 41, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(196, 169, 98, 0.2);
+  border-radius: 16px;
+  padding: 12px;
+  width: 260px;
+  z-index: 20;
+  box-shadow: 0 5px 15px -5px rgba(0, 0, 0, 0.5);
+  animation: slideIn 0.5s ease-out;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #C4A962;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(196, 169, 98, 0.2);
+  margin-bottom: 8px;
+}
+
+.history-list {
+  max-height: 150px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #C4A962 rgba(196, 169, 98, 0.1);
+}
+
+.history-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.history-list::-webkit-scrollbar-track {
+  background: rgba(196, 169, 98, 0.1);
+  border-radius: 10px;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+  background: #C4A962;
+  border-radius: 10px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  font-size: 10px;
+  color: #94a3b8;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  transition: all 0.3s ease;
+}
+
+.history-item:hover {
+  background: rgba(196, 169, 98, 0.1);
+  color: #F1F5F9;
+  transform: translateX(-2px);
+}
+
+.history-date {
+  min-width: 60px;
+  font-weight: 500;
+}
+
+.history-time {
+  min-width: 40px;
+  color: #C4A962;
+}
+
+.history-method {
+  margin-left: auto;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 8px;
+  font-weight: 600;
+  color: white;
+  text-transform: uppercase;
+}
+
+.history-empty {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 10px;
+  padding: 12px 0;
+  font-style: italic;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Responsive pour l'historique */
+@media (max-width: 768px) {
+  .login-history {
+    width: 220px;
+    bottom: 15px;
+    right: 15px;
+    padding: 10px;
+  }
+  
+  .history-item {
+    font-size: 9px;
+  }
+  
+  .history-date {
+    min-width: 50px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-history {
+    display: none; /* Cacher sur mobile pour ne pas surcharger */
+  }
+}
