@@ -1,3 +1,4 @@
+// models/Historique.js
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 
@@ -8,44 +9,45 @@ const Historique = sequelize.define('Historique', {
     autoIncrement: true,
     field: 'id'
   },
-  user_id: {
+  id_utilisateur: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    field: 'user_id'
+    field: 'id_utilisateur'
   },
-  user_email: {
+  email_utilisateur: {
+    type: DataTypes.STRING(255),
+    allowNull: false,
+    field: 'email_utilisateur'
+  },
+  role_utilisateur: {
     type: DataTypes.STRING(100),
     allowNull: false,
-    field: 'user_email'
+    field: 'role_utilisateur'
   },
-  user_role: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    field: 'user_role'
-  },
-  timestamp: {
+  date_connexion: {
     type: DataTypes.DATE,
-    allowNull: false,
-    field: 'timestamp',
+    allowNull: true,
+    field: 'date_connexion',
     defaultValue: DataTypes.NOW
   },
-  ip_address: {
+  adresse_ip: {
     type: DataTypes.STRING(45),
-    allowNull: true,
-    field: 'ip_address'
+    allowNull: false,
+    field: 'adresse_ip'
   },
-  user_agent: {
+  navigateur: {
     type: DataTypes.TEXT,
     allowNull: true,
-    field: 'user_agent'
+    field: 'navigateur'
   },
-  success: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true,
-    field: 'success'
+  succes: {
+    type: DataTypes.TINYINT(1),
+    allowNull: true,
+    defaultValue: 1,
+    field: 'succes'
   }
 }, {
-  tableName: 'historique_connexions',
+  tableName: 'historiques_connexions',  // ← AVEC 's' !!!
   timestamps: false
 });
 
@@ -73,13 +75,13 @@ Historique.enregistrerConnexion = async (user, req, success = true) => {
     }
     
     await Historique.create({
-      user_id: userId,
-      user_email: email,
-      user_role: role,
-      timestamp: new Date(),
-      ip_address: ip,
-      user_agent: userAgent,
-      success: success
+      id_utilisateur: userId,
+      email_utilisateur: email,
+      role_utilisateur: role,
+      date_connexion: new Date(),
+      adresse_ip: ip,
+      navigateur: userAgent,
+      succes: success ? 1 : 0
     });
     
     console.log(`✅ Connexion enregistrée: ${email} (${role}) - ${success ? 'Succès' : 'Échec'}`);

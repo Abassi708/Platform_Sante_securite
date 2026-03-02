@@ -1,8 +1,9 @@
 // controllers/notificationController.js
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const { sendResetEmail } = require('../config/emailConfig');
 
-// ========== ENVOYER UNE NOTIFICATION ==========
+// ========== ENVOYER UNE NOTIFICATION + EMAIL (VERSION RAPIDE) ==========
 const sendPasswordNotification = async (req, res) => {
   try {
     const { user_id, new_password, reason } = req.body;
@@ -16,42 +17,72 @@ const sendPasswordNotification = async (req, res) => {
     
     const admin = await User.findByPk(req.user.id);
     
-    // Créer la notification (le hook va s'occuper de hasher et sauvegarder en clair)
+    // Sauvegarder le mot de passe en clair pour l'email
+    const plainPassword = new_password;
+    
+    // 1. CRÉER LA NOTIFICATION (rapide)
     const notification = await Notification.create({
-      user_id: user.Id_utilisateur,
-      user_email: user.Login,
-      user_role: user.Role,
-      user_matricule: user.matricule_agent,
-      new_password: new_password, // Sera hashé par le hook
-      reason: reason,
-      sent_by: admin.Id_utilisateur,
-      sent_by_email: admin.Login,
-      status: 'sent'
+      id_utilisateur: user.Id_utilisateur,
+      email_utilisateur: user.Login,
+      role_utilisateur: user.Role,
+      matricule_utilisateur: user.matricule_agent,
+      nouveau_motpasse: new_password,
+      raison: reason,
+      envoyer_par_email: admin.Login,
+      statut: 'envoyé'
     });
     
     console.log('✅ Notification créée avec ID:', notification.id);
     
-    // Réponse avec le mot de passe en clair pour l'admin
+    // 2. RÉPONDRE IMMÉDIATEMENT au frontend
     res.json({
       success: true,
-      message: 'Notification envoyée avec succès',
+      message: 'Notification créée avec succès (email en cours d\'envoi)',
+      emailSent: true,
       notification: {
         id: notification.id,
-        user_id: notification.user_id,
-        user_email: notification.user_email,
-        user_role: notification.user_role,
-        user_matricule: notification.user_matricule,
-        new_password: new_password, // EN CLAIR pour l'admin
-        reason: notification.reason,
-        sent_by: notification.sent_by,
-        sent_by_email: notification.sent_by_email,
-        status: notification.status,
+        user_id: notification.id_utilisateur,
+        user_email: notification.email_utilisateur,
+        user_role: notification.role_utilisateur,
+        user_matricule: notification.matricule_utilisateur,
+        new_password: plainPassword,
+        reason: notification.raison,
+        sent_by_email: notification.envoyer_par_email,
+        status: notification.statut,
         created_at: notification.created_at
+      }
+    });
+    
+    // 3. ENVOYER L'EMAIL EN ARRIÈRE-PLAN (ne bloque pas)
+    console.log('📧 Envoi de l\'email en arrière-plan à:', user.Login);
+    
+    // Utiliser setTimeout pour ne pas bloquer la réponse
+    setImmediate(async () => {
+      try {
+        const emailResult = await sendResetEmail(
+          user.Login,
+          user.Role,
+          plainPassword,
+          reason
+        );
+        
+        if (emailResult.success) {
+          console.log('✅ Email envoyé avec succès (arrière-plan)');
+        } else {
+          console.log('⚠️ Échec envoi email (arrière-plan):', emailResult.error);
+          
+          // Optionnel : Mettre à jour le statut de la notification
+          await notification.update({ statut: 'echec' });
+        }
+      } catch (emailError) {
+        console.error('❌ Erreur email en arrière-plan:', emailError);
+        await notification.update({ statut: 'echec' });
       }
     });
     
   } catch (error) {
     console.error('❌ Erreur envoi notification:', error);
+    console.error('❌ Stack trace:', error.stack);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 };
@@ -70,16 +101,26 @@ const getUserNotifications = async (req, res) => {
     }
     
     const notifications = await Notification.findAll({
-      where: { user_id: userId },
+      where: { id_utilisateur: userId },
       order: [['created_at', 'DESC']],
-      attributes: ['id', 'user_id', 'user_email', 'user_role', 'reason', 
-                   'sent_by', 'sent_by_email', 'status', 'created_at']
-      // On n'inclut PAS les mots de passe dans la liste
+      attributes: ['id', 'email_utilisateur', 'role_utilisateur', 'raison', 
+                   'envoyer_par_email', 'statut', 'created_at']
     });
+    
+    const formattedNotifications = notifications.map(n => ({
+      id: n.id,
+      user_id: n.id_utilisateur,
+      user_email: n.email_utilisateur,
+      user_role: n.role_utilisateur,
+      reason: n.raison,
+      sent_by_email: n.envoyer_par_email,
+      status: n.statut,
+      created_at: n.created_at
+    }));
     
     res.json({
       success: true,
-      notifications: notifications
+      notifications: formattedNotifications
     });
     
   } catch (error) {
@@ -94,36 +135,32 @@ const getNotificationById = async (req, res) => {
     const { id } = req.params;
     
     const notification = await Notification.findByPk(id, {
-      attributes: ['id', 'user_id', 'user_email', 'user_role', 'user_matricule',
-                   'plain_password', 'reason', 'sent_by', 'sent_by_email',
-                   'status', 'created_at']
-      // Ici on inclut plain_password pour l'affichage
+      attributes: ['id', 'id_utilisateur', 'email_utilisateur', 'role_utilisateur', 
+                   'matricule_utilisateur', 'mot_passe', 'raison', 'envoyer_par_email',
+                   'statut', 'created_at']
     });
     
     if (!notification) {
       return res.status(404).json({ message: 'Notification non trouvée' });
     }
     
-    // Vérifier que l'utilisateur ne voit que ses propres notifications
-    if (notification.user_id !== req.user.id) {
+    if (notification.id_utilisateur !== req.user.id) {
       return res.status(403).json({ 
         success: false,
         message: 'Accès non autorisé' 
       });
     }
     
-    // Renommer plain_password en new_password pour le frontend
     const notificationWithPassword = {
       id: notification.id,
-      user_id: notification.user_id,
-      user_email: notification.user_email,
-      user_role: notification.user_role,
-      user_matricule: notification.user_matricule,
-      new_password: notification.plain_password, // ← MOT DE PASSE EN CLAIR !
-      reason: notification.reason,
-      sent_by: notification.sent_by,
-      sent_by_email: notification.sent_by_email,
-      status: notification.status,
+      user_id: notification.id_utilisateur,
+      user_email: notification.email_utilisateur,
+      user_role: notification.role_utilisateur,
+      user_matricule: notification.matricule_utilisateur,
+      new_password: notification.mot_passe,
+      reason: notification.raison,
+      sent_by_email: notification.envoyer_par_email,
+      status: notification.statut,
       created_at: notification.created_at
     };
     
@@ -148,14 +185,14 @@ const markAsRead = async (req, res) => {
       return res.status(404).json({ message: 'Notification non trouvée' });
     }
     
-    if (notification.user_id !== req.user.id) {
+    if (notification.id_utilisateur !== req.user.id) {
       return res.status(403).json({ 
         success: false,
         message: 'Vous ne pouvez modifier que vos propres notifications' 
       });
     }
     
-    notification.status = 'read';
+    notification.statut = 'lu';
     await notification.save();
     
     res.json({
@@ -179,7 +216,7 @@ const deleteNotification = async (req, res) => {
       return res.status(404).json({ message: 'Notification non trouvée' });
     }
     
-    if (notification.user_id !== req.user.id) {
+    if (notification.id_utilisateur !== req.user.id) {
       return res.status(403).json({ 
         success: false,
         message: 'Vous ne pouvez supprimer que vos propres notifications' 

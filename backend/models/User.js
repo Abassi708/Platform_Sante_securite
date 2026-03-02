@@ -1,3 +1,4 @@
+// models/User.js
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const bcrypt = require('bcryptjs');
@@ -29,18 +30,16 @@ const User = sequelize.define('User', {
     allowNull: true,
     field: 'matricule_agent'
   },
-  // ========== AJOUTEZ CES 2 LIGNES ICI ==========
-  lastLogin: {
+  derniere_connexion: {  // ← SANS accent !
     type: DataTypes.DATE,
     allowNull: true,
-    field: 'lastLogin'
+    field: 'derniere_connexion'  // ← SANS accent
   },
-  loginCount: {
+  nombre_connexions: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
-    field: 'loginCount'
+    field: 'nombre_connexions'
   }
-  // =============================================
 }, {
   tableName: 'utilisateur',
   timestamps: false
@@ -51,14 +50,15 @@ User.createUser = async (email, password, role = 'agent', matricule = 1) => {
   try {
     console.log('📝 Création utilisateur:', { email, role, matricule });
     
-    const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_ROUNDS));
+    const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_ROUNDS) || 10);
     const hashedPassword = await bcrypt.hash(password, salt);
     
     const user = await User.create({
       Login: email,
       Mot_de_passe: hashedPassword,
       Role: role,
-      matricule_agent: parseInt(matricule)
+      matricule_agent: parseInt(matricule),
+      nombre_connexions: 0
     });
     
     console.log('✅ Utilisateur créé avec ID:', user.Id_utilisateur);
@@ -90,11 +90,9 @@ User.verifyCredentials = async (email, password) => {
       return null;
     }
     
-    // ========== AJOUTEZ CES 3 LIGNES ICI ==========
-    user.lastLogin = new Date();
-    user.loginCount = (user.loginCount || 0) + 1;
+    user.derniere_connexion = new Date();  // ← SANS accent
+    user.nombre_connexions = (user.nombre_connexions || 0) + 1;
     await user.save();
-    // =============================================
     
     console.log('✅ Authentification réussie pour:', email);
     return user;
@@ -111,10 +109,8 @@ User.prototype.toJSON = function() {
     email: this.Login,
     role: this.Role,
     matricule: this.matricule_agent,
-    // ========== AJOUTEZ CES 2 LIGNES ICI ==========
-    lastLogin: this.lastLogin,
-    loginCount: this.loginCount
-    // =============================================
+    derniere_connexion: this.derniere_connexion,  // ← SANS accent
+    nombre_connexions: this.nombre_connexions
   };
 };
 
