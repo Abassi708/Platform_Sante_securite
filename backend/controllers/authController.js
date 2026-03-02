@@ -1,7 +1,9 @@
+// controllers/authController.js
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Historique = require('../models/Historique');
 const { Op } = require('sequelize');
+const bcrypt = require('bcryptjs');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -34,9 +36,14 @@ const login = async (req, res, expectedRole = null) => {
     
     const token = generateToken(user.Id_utilisateur);
     
+    await user.update({
+      derniere_connexion: new Date(),
+      nombre_connexions: (user.nombre_connexions || 0) + 1
+    });
+    
     await Historique.enregistrerConnexion(
       { 
-        id: user.Id_utilisateur, 
+        id: user.Id_utilisateur,
         email: user.Login, 
         role: user.Role 
       }, 
@@ -51,7 +58,9 @@ const login = async (req, res, expectedRole = null) => {
         id: user.Id_utilisateur,
         email: user.Login,
         role: user.Role,
-        matricule: user.matricule_agent
+        matricule: user.matricule_agent,
+        derniere_connexion: user.derniere_connexion,
+        nombre_connexions: user.nombre_connexions
       }
     });
     
@@ -85,7 +94,12 @@ const registerUser = async (req, res) => {
     res.status(201).json({ 
       success: true, 
       message: 'Utilisateur créé',
-      user: user.toJSON() 
+      user: {
+        id: user.Id_utilisateur,
+        email: user.Login,
+        role: user.Role,
+        matricule: user.matricule_agent
+      }
     });
     
   } catch (error) {
@@ -96,10 +110,20 @@ const registerUser = async (req, res) => {
 
 const getUsers = async (req, res) => {
   try {
-    const users = await User.findAll();
+    const users = await User.findAll({
+      attributes: ['Id_utilisateur', 'Login', 'Role', 'matricule_agent', 'derniere_connexion', 'nombre_connexions']
+    });
+    
     res.json({
       success: true,
-      users: users.map(u => u.toJSON())
+      users: users.map(u => ({
+        id: u.Id_utilisateur,
+        email: u.Login,
+        role: u.Role,
+        matricule: u.matricule_agent,
+        derniere_connexion: u.derniere_connexion,
+        nombre_connexions: u.nombre_connexions
+      }))
     });
   } catch (error) {
     console.error('❌ Erreur récupération utilisateurs:', error);
@@ -111,7 +135,16 @@ const getUserById = async (req, res) => {
   try {
     const user = await User.findByPk(req.params.id);
     if (!user) return res.status(404).json({ message: 'Utilisateur non trouvé' });
-    res.json({ success: true, user: user.toJSON() });
+    
+    res.json({ 
+      success: true, 
+      user: {
+        id: user.Id_utilisateur,
+        email: user.Login,
+        role: user.Role,
+        matricule: user.matricule_agent
+      }
+    });
   } catch (error) {
     console.error('❌ Erreur récupération utilisateur:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -131,7 +164,16 @@ const updateUser = async (req, res) => {
     
     await user.save();
     
-    res.json({ success: true, message: 'Utilisateur modifié', user: user.toJSON() });
+    res.json({ 
+      success: true, 
+      message: 'Utilisateur modifié', 
+      user: {
+        id: user.Id_utilisateur,
+        email: user.Login,
+        role: user.Role,
+        matricule: user.matricule_agent
+      }
+    });
   } catch (error) {
     console.error('❌ Erreur modification utilisateur:', error);
     res.status(500).json({ message: 'Erreur modification' });
@@ -151,11 +193,11 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// ========== RÉINITIALISER MOT DE PASSE (POUR ADMIN - SANS VÉRIFICATION) ==========
+// ========== RÉINITIALISER MOT DE PASSE ==========
 const resetPassword = async (req, res) => {
   try {
     const { id } = req.params;
-    const { newPassword } = req.body;  // Plus besoin de oldPassword
+    const { newPassword } = req.body;
     
     console.log('🔄 Réinitialisation mot de passe pour user:', id);
     
@@ -164,12 +206,9 @@ const resetPassword = async (req, res) => {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
     }
     
-    // Hasher le nouveau mot de passe
-    const bcrypt = require('bcryptjs');
     const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_ROUNDS) || 10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
     
-    // Mettre à jour le mot de passe
     user.Mot_de_passe = hashedPassword;
     await user.save();
     
@@ -186,6 +225,7 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// ========== RÉCUPÉRER L'HISTORIQUE (AVEC FORMATAGE) ==========
 const getHistorique = async (req, res) => {
   try {
     if (req.user.role !== 'admin' && req.user.role !== 'technicien' && req.user.role !== 'social') {
@@ -199,7 +239,7 @@ const getHistorique = async (req, res) => {
     if (search) {
       whereClause = {
         [Op.or]: [
-          { user_email: { [Op.like]: `%${search}%` } }
+          { email_utilisateur: { [Op.like]: `%${search}%` } }
         ]
       };
     }
@@ -207,12 +247,30 @@ const getHistorique = async (req, res) => {
     const total = await Historique.count({ where: whereClause });
     const historique = await Historique.findAll({
       where: whereClause,
-      order: [['timestamp', 'DESC']],
+      order: [['date_connexion', 'DESC']],
       limit: parseInt(limit),
       offset: parseInt(offset)
     });
     
-    res.json({ success: true, data: historique, total, page: parseInt(page), totalPages: Math.ceil(total / limit) });
+    // 🔴 FORMATAGE POUR LE FRONTEND
+    const formattedData = historique.map(item => ({
+      id: item.id,
+      user_id: item.id_utilisateur,
+      user_email: item.email_utilisateur,
+      user_role: item.role_utilisateur,
+      timestamp: item.date_connexion,
+      ip_address: item.adresse_ip,
+      user_agent: item.navigateur,
+      success: item.succes
+    }));
+    
+    res.json({ 
+      success: true, 
+      data: formattedData, 
+      total, 
+      page: parseInt(page), 
+      totalPages: Math.ceil(total / limit) 
+    });
   } catch (error) {
     console.error('❌ Erreur récupération historique:', error);
     res.status(500).json({ message: 'Erreur serveur' });
@@ -228,14 +286,14 @@ const getHistoriqueStats = async (req, res) => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     
     const todayCount = await Historique.count({
-      where: { timestamp: { [Op.gte]: today, [Op.lt]: tomorrow } }
+      where: { date_connexion: { [Op.gte]: today, [Op.lt]: tomorrow } }
     });
     
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     
     const weekCount = await Historique.count({
-      where: { timestamp: { [Op.gte]: weekAgo } }
+      where: { date_connexion: { [Op.gte]: weekAgo } }
     });
     
     const total = await Historique.count();
@@ -250,7 +308,18 @@ const getHistoriqueStats = async (req, res) => {
 const getMe = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id);
-    res.json({ success: true, user: user.toJSON() });
+    
+    res.json({ 
+      success: true, 
+      user: {
+        id: user.Id_utilisateur,
+        email: user.Login,
+        role: user.Role,
+        matricule: user.matricule_agent,
+        derniere_connexion: user.derniere_connexion,
+        nombre_connexions: user.nombre_connexions
+      }
+    });
   } catch (error) {
     console.error('❌ Erreur getMe:', error);
     res.status(500).json({ message: 'Erreur serveur' });
