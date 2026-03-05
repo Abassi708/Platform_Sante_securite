@@ -32,7 +32,9 @@ import {
   QrCode,
   Scan,
   Copy,
-  ShieldCheck
+  ShieldCheck,
+  TrendingUp,
+  FileText
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/SocialLogin.css';
@@ -50,26 +52,33 @@ const SocialLogin = () => {
   const [focusedField, setFocusedField] = useState(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
-  // États pour les fonctionnalités avancées (gardés pour l'UI mais non fonctionnels)
+  // États pour les fonctionnalités avancées
   const [loginMethod, setLoginMethod] = useState('password');
   
   // CODE OTP
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
   const [otpTimer, setOtpTimer] = useState(60);
   const [showOtpInput, setShowOtpInput] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [generatedOtp, setGeneratedOtp] = useState('');
-  
-  // BIOMÉTRIE
-  const [biometricSupported, setBiometricSupported] = useState(false);
-  const [biometricScanning, setBiometricScanning] = useState(false);
-  const [biometricSuccess, setBiometricSuccess] = useState(false);
+  const [otpEmail, setOtpEmail] = useState('');
+  const [sendingOtp, setSendingOtp] = useState(false);
   
   // QR CODE
   const [showQrCode, setShowQrCode] = useState(false);
   const [qrScanned, setQrScanned] = useState(false);
   const [qrCodeValue, setQrCodeValue] = useState('');
+  const [qrSessionId, setQrSessionId] = useState('');
+  const [qrCheckInterval, setQrCheckInterval] = useState(null);
   
+  // Statistiques sociales
+  const [stats, setStats] = useState({
+    todayInterviews: 12,
+    pendingRequests: 8,
+    satisfactionRate: 96
+  });
+
   // Autres états
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
@@ -89,13 +98,6 @@ const SocialLogin = () => {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  // Vérifier le support biométrique
-  useEffect(() => {
-    if (window.PublicKeyCredential) {
-      setBiometricSupported(true);
-    }
-  }, []);
-
   // Timer pour OTP
   useEffect(() => {
     let interval;
@@ -107,6 +109,15 @@ const SocialLogin = () => {
     return () => clearInterval(interval);
   }, [otpTimer, showOtpInput]);
 
+  // Nettoyer l'intervalle QR code
+  useEffect(() => {
+    return () => {
+      if (qrCheckInterval) {
+        clearInterval(qrCheckInterval);
+      }
+    };
+  }, [qrCheckInterval]);
+
   // Charger la dernière connexion
   useEffect(() => {
     const saved = localStorage.getItem('lastSocialLogin');
@@ -117,42 +128,77 @@ const SocialLogin = () => {
 
   // Éléments flottants
   const floatingElements = [
-    { id: 1, icon: Heart, color: '#C4A962', size: 32, delay: 0, top: '15%', left: '10%' },
-    { id: 2, icon: Users, color: '#C4A962', size: 28, delay: 0.5, top: '70%', left: '15%' },
-    { id: 3, icon: Award, color: '#C4A962', size: 36, delay: 1, top: '25%', right: '12%' },
-    { id: 4, icon: HandHeart, color: '#C4A962', size: 30, delay: 1.5, bottom: '20%', right: '15%' },
-    { id: 5, icon: HeartPulse, color: '#C4A962', size: 24, delay: 2, top: '40%', left: '20%' },
-    { id: 6, icon: Calendar, color: '#C4A962', size: 26, delay: 2.5, bottom: '30%', left: '25%' },
-    { id: 7, icon: User, color: '#C4A962', size: 34, delay: 3, top: '60%', right: '20%' },
-    { id: 8, icon: MessageCircle, color: '#C4A962', size: 40, delay: 3.5, bottom: '40%', right: '25%' }
+    { id: 1, icon: Heart, color: '#2E7D73', size: 32, delay: 0, top: '15%', left: '10%' },
+    { id: 2, icon: Users, color: '#2E7D73', size: 28, delay: 0.5, top: '70%', left: '15%' },
+    { id: 3, icon: Award, color: '#2E7D73', size: 36, delay: 1, top: '25%', right: '12%' },
+    { id: 4, icon: HandHeart, color: '#2E7D73', size: 30, delay: 1.5, bottom: '20%', right: '15%' },
+    { id: 5, icon: HeartPulse, color: '#2E7D73', size: 24, delay: 2, top: '40%', left: '20%' },
+    { id: 6, icon: Calendar, color: '#2E7D73', size: 26, delay: 2.5, bottom: '30%', left: '25%' },
+    { id: 7, icon: User, color: '#2E7D73', size: 34, delay: 3, top: '60%', right: '20%' },
+    { id: 8, icon: MessageCircle, color: '#2E7D73', size: 40, delay: 3.5, bottom: '40%', right: '25%' }
   ];
 
   // Méthodes de connexion
   const loginMethods = [
     { id: 'password', icon: Lock, label: 'Mot de passe' },
     { id: 'otp', icon: Smartphone, label: 'Code OTP' },
-    { id: 'biometric', icon: Fingerprint, label: 'Biométrie', disabled: !biometricSupported },
     { id: 'qrcode', icon: QrCode, label: 'QR Code' }
   ];
 
-  // ===== FONCTIONNALITÉS AVANCÉES (GARDÉES POUR L'UI) =====
+  // ===== FONCTIONS OTP =====
 
-  const generateOtp = () => {
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(otp);
-    console.log(`[SIMULATION] Code OTP envoyé: ${otp}`);
-    return otp;
+  const sendOtpByEmail = async (emailAddress) => {
+    setSendingOtp(true);
+    
+    try {
+      console.log('📡 Demande OTP social pour:', emailAddress);
+      
+      const response = await fetch('http://localhost:5000/api/otp/demander', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailAddress })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        console.log('✅ OTP envoyé avec succès');
+        return true;
+      } else {
+        setError(data.message || 'Erreur lors de l\'envoi du code');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Erreur envoi OTP:', error);
+      setError('Erreur de connexion au serveur');
+      return false;
+    } finally {
+      setSendingOtp(false);
+    }
   };
 
-  const handleOtpMethod = () => {
+  const handleOtpMethod = async () => {
+    if (!email) {
+      setError('Veuillez d\'abord entrer votre email');
+      return;
+    }
+    
+    setOtpEmail(email);
     setLoginMethod('otp');
     setShowOtpInput(true);
     setOtpTimer(60);
     setOtpCode(['', '', '', '', '', '']);
     setOtpVerified(false);
     setError('');
-    const newOtp = generateOtp();
-    alert(`[SIMULATION] Code OTP envoyé: ${newOtp}`);
+    
+    const sent = await sendOtpByEmail(email);
+    if (sent) {
+      setOtpSent(true);
+      // Pour le développement, on simule un code
+      const mockOtp = '123456';
+      setGeneratedOtp(mockOtp);
+      alert(`[MODE DÉVELOPPEMENT] Code OTP: ${mockOtp}`);
+    }
   };
 
   const handleOtpChange = (index, value) => {
@@ -167,18 +213,61 @@ const SocialLogin = () => {
 
       const enteredOtp = newOtp.join('');
       if (enteredOtp.length === 6) {
-        if (enteredOtp === generatedOtp) {
-          setOtpVerified(true);
-          setTimeout(() => {
-            handleSuccessfulLogin();
-          }, 1500);
-        } else {
-          setError('Code OTP incorrect');
-          setTimeout(() => {
-            setOtpCode(['', '', '', '', '', '']);
-            document.getElementById('otp-0').focus();
-          }, 500);
-        }
+        verifyOtp(enteredOtp);
+      }
+    }
+  };
+
+  const verifyOtp = async (enteredOtp) => {
+    try {
+      console.log('📡 Vérification OTP social pour:', otpEmail);
+      
+      const response = await fetch('http://localhost:5000/api/otp/verifier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: otpEmail, 
+          code: enteredOtp 
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setOtpVerified(true);
+        
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        const loginData = {
+          timestamp: new Date().toISOString(),
+          method: 'otp',
+          email: otpEmail,
+          success: true
+        };
+        localStorage.setItem('lastSocialLogin', JSON.stringify(loginData));
+        
+        setTimeout(() => {
+          navigate('/social/dashboard');
+        }, 1500);
+      } else {
+        setError(data.message || 'Code OTP incorrect');
+        setTimeout(() => {
+          setOtpCode(['', '', '', '', '', '']);
+          document.getElementById('otp-0').focus();
+        }, 500);
+      }
+    } catch (err) {
+      console.error('❌ Erreur vérification OTP:', err);
+      
+      // Mode développement - fallback
+      if (enteredOtp === '123456') {
+        setOtpVerified(true);
+        setTimeout(() => {
+          navigate('/social/dashboard');
+        }, 1500);
+      } else {
+        setError('Erreur de connexion au serveur');
       }
     }
   };
@@ -189,39 +278,20 @@ const SocialLogin = () => {
     }
   };
 
-  const resendOtp = () => {
+  const resendOtp = async () => {
     setOtpTimer(60);
     setOtpCode(['', '', '', '', '', '']);
     setError('');
-    const newOtp = generateOtp();
-    alert(`[SIMULATION] Nouveau code OTP envoyé: ${newOtp}`);
+    await sendOtpByEmail(otpEmail);
   };
 
-  const handleBiometricMethod = () => {
-    setLoginMethod('biometric');
-    setBiometricScanning(true);
-    setError('');
-    
-    setTimeout(() => {
-      setBiometricScanning(false);
-      const success = Math.random() < 0.9;
-      if (success) {
-        setBiometricSuccess(true);
-        setTimeout(() => {
-          handleSuccessfulLogin();
-        }, 1500);
-      } else {
-        setError('Empreinte non reconnue');
-        setBiometricScanning(false);
-        setLoginMethod('password');
-      }
-    }, 3000);
-  };
+  // ===== FONCTIONS QR CODE =====
 
   const generateQrCode = () => {
-    const sessionId = Math.random().toString(36).substring(2, 15).toUpperCase();
+    const sessionId = 'qr_social_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
     const socialId = 'SOC' + Math.floor(1000 + Math.random() * 9000);
     const qrData = `SRTB-SOCIAL-${socialId}-${sessionId}`;
+    setQrSessionId(sessionId);
     setQrCodeValue(qrData);
     return qrData;
   };
@@ -248,19 +318,19 @@ const SocialLogin = () => {
     alert('Code copié dans le presse-papiers');
   };
 
-  const handleResetPassword = (e) => {
-    e.preventDefault();
-    setResetSent(true);
-    setTimeout(() => {
-      setShowForgotPassword(false);
-      setResetSent(false);
-      setResetEmail('');
-    }, 3000);
-  };
+  // ===== CONNEXION STANDARD =====
 
-  // ===== CONNEXION RÉELLE AU BACKEND =====
   const handleSuccessfulLogin = () => {
     setIsLoading(false);
+    
+    const loginData = {
+      timestamp: new Date().toISOString(),
+      method: loginMethod,
+      email: email,
+      success: true
+    };
+    localStorage.setItem('lastSocialLogin', JSON.stringify(loginData));
+    
     navigate('/social/dashboard');
   };
 
@@ -284,25 +354,12 @@ const SocialLogin = () => {
       });
 
       const data = await response.json();
-      console.log('📦 Réponse:', data);
 
       if (response.ok && data.success) {
-        // Sauvegarder le token JWT
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         
-        // Sauvegarder la dernière connexion
-        const loginData = {
-          timestamp: new Date().toISOString(),
-          method: loginMethod,
-          email: email,
-          success: true
-        };
-        localStorage.setItem('lastSocialLogin', JSON.stringify(loginData));
-        
-        // Redirection vers le dashboard
-        navigate('/social/dashboard');
-        
+        handleSuccessfulLogin();
       } else {
         setError(data.message || 'Email ou mot de passe incorrect');
       }
@@ -317,12 +374,25 @@ const SocialLogin = () => {
   const handleBackToMethods = () => {
     setShowOtpInput(false);
     setShowQrCode(false);
-    setBiometricScanning(false);
-    setBiometricSuccess(false);
     setQrScanned(false);
     setOtpCode(['', '', '', '', '', '']);
     setError('');
     setLoginMethod('password');
+    
+    if (qrCheckInterval) {
+      clearInterval(qrCheckInterval);
+      setQrCheckInterval(null);
+    }
+  };
+
+  const handleResetPassword = (e) => {
+    e.preventDefault();
+    setResetSent(true);
+    setTimeout(() => {
+      setShowForgotPassword(false);
+      setResetSent(false);
+      setResetEmail('');
+    }, 3000);
   };
 
   return (
@@ -398,7 +468,7 @@ const SocialLogin = () => {
           whileHover={{ scale: 1.1 }}
         >
           <div className="floating-back-icon">
-            <ArrowLeft size={28} color="#C4A962" />
+            <ArrowLeft size={28} color="#2E7D73" />
           </div>
           <span className="floating-back-text">Accueil</span>
           <motion.div
@@ -422,7 +492,7 @@ const SocialLogin = () => {
         animate={{ x: 0, opacity: 1 }}
         transition={{ delay: 2 }}
       >
-        <Shield size={14} color="#C4A962" />
+        <Shield size={14} color="#2E7D73" />
         <span>Service social • Accompagnement</span>
       </motion.div>
 
@@ -432,7 +502,7 @@ const SocialLogin = () => {
         animate={{ x: 0, opacity: 1 }}
         transition={{ delay: 2.2 }}
       >
-        <Clock size={14} color="#C4A962" />
+        <Clock size={14} color="#2E7D73" />
         <span>{new Date().toLocaleTimeString('fr-FR')}</span>
       </motion.div>
 
@@ -443,7 +513,7 @@ const SocialLogin = () => {
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 2.4 }}
         >
-          <RefreshCw size={14} color="#C4A962" />
+          <RefreshCw size={14} color="#2E7D73" />
           <span>Dernière connexion: {new Date(lastLogin.timestamp).toLocaleDateString('fr-FR')}</span>
         </motion.div>
       )}
@@ -455,7 +525,7 @@ const SocialLogin = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.3 }}
       >
-        {/* En-tête */}
+        {/* En-tête avec statistiques */}
         <div className="social-header">
           <motion.div 
             className="social-logo"
@@ -463,15 +533,35 @@ const SocialLogin = () => {
             animate={{ scale: 1 }}
             transition={{ type: 'spring', delay: 0.6 }}
           >
-            <Heart size={32} color="#C4A962" />
-            <span>SRTB<span>Social</span></span>
+            <Heart size={36} color="#2E7D73" />
+            <div className="logo-text">
+              <span className="logo-main">SRTB</span>
+              <span className="logo-sub">Service Social</span>
+            </div>
           </motion.div>
-          <h1>Service social</h1>
+          
+          <h1>Espace social</h1>
           <p>Accompagnement & écoute</p>
+
+          {/* Mini statistiques */}
+          <div className="stats-mini">
+            <div className="stat-mini-item">
+              <Users size={12} color="#2E7D73" />
+              <span>{stats.todayInterviews} entretiens</span>
+            </div>
+            <div className="stat-mini-item">
+              <FileText size={12} color="#2E7D73" />
+              <span>{stats.pendingRequests} demandes</span>
+            </div>
+            <div className="stat-mini-item">
+              <TrendingUp size={12} color="#2E7D73" />
+              <span>{stats.satisfactionRate}% satisfaction</span>
+            </div>
+          </div>
         </div>
 
         {/* Sélecteur de méthode de connexion */}
-        {!showOtpInput && !showQrCode && !biometricScanning && !biometricSuccess && (
+        {!showOtpInput && !showQrCode && (
           <div className="login-methods">
             {loginMethods.map((method) => {
               const Icon = method.icon;
@@ -479,20 +569,17 @@ const SocialLogin = () => {
               return (
                 <motion.button
                   key={method.id}
-                  className={`method-button ${isActive ? 'active' : ''} ${method.disabled ? 'disabled' : ''}`}
+                  className={`method-button ${isActive ? 'active' : ''}`}
                   onClick={() => {
                     if (method.id === 'otp') handleOtpMethod();
-                    else if (method.id === 'biometric' && !method.disabled) handleBiometricMethod();
                     else if (method.id === 'qrcode') handleQrCodeMethod();
                     else setLoginMethod(method.id);
                   }}
-                  whileHover={!method.disabled ? { y: -2, scale: 1.02 } : {}}
-                  whileTap={!method.disabled ? { scale: 0.98 } : {}}
-                  disabled={method.disabled}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <Icon size={16} color="#C4A962" />
+                  <Icon size={18} color="#2E7D73" />
                   <span>{method.label}</span>
-                  {method.disabled && <span className="method-soon">Bientôt</span>}
                 </motion.button>
               );
             })}
@@ -507,9 +594,9 @@ const SocialLogin = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
           >
-            <Smartphone size={32} color="#C4A962" className="otp-icon" />
-            <h3>Vérification</h3>
-            <p>Code envoyé à <strong>{email || 'votre téléphone'}</strong></p>
+            <Smartphone size={32} color="#2E7D73" className="otp-icon" />
+            <h3>Vérification à deux facteurs</h3>
+            <p>Un code à 6 chiffres a été envoyé à <strong>{otpEmail || email}</strong></p>
             
             <div className="otp-inputs">
               {otpCode.map((digit, index) => (
@@ -522,11 +609,19 @@ const SocialLogin = () => {
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
                   className="otp-digit"
-                  style={{ borderColor: otpVerified ? '#C4A962' : 'rgba(196, 169, 98, 0.3)' }}
+                  style={{ borderColor: otpVerified ? '#10b981' : 'rgba(46, 125, 115, 0.3)' }}
                   autoFocus={index === 0}
+                  disabled={sendingOtp}
                 />
               ))}
             </div>
+
+            {sendingOtp && (
+              <div className="otp-sending">
+                <div className="spinner-small"></div>
+                <p>Envoi du code en cours...</p>
+              </div>
+            )}
 
             {otpVerified && (
               <motion.div 
@@ -534,23 +629,23 @@ const SocialLogin = () => {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
               >
-                <CheckCircle size={40} color="#C4A962" />
-                <p>Code vérifié !</p>
+                <CheckCircle size={40} color="#10b981" />
+                <p>Code vérifié avec succès !</p>
               </motion.div>
             )}
 
             <div className="otp-timer">
-              <Clock size={14} color="#C4A962" />
-              <span>{otpTimer}s</span>
+              <Clock size={14} color="#2E7D73" />
+              <span>Code valable {otpTimer} secondes</span>
             </div>
 
             <div className="otp-actions">
               <button 
                 className="otp-resend"
                 onClick={resendOtp}
-                disabled={otpTimer > 0}
+                disabled={otpTimer > 0 || sendingOtp}
               >
-                Renvoyer
+                {sendingOtp ? 'Envoi...' : 'Renvoyer le code'}
               </button>
               <button 
                 className="otp-back"
@@ -559,6 +654,8 @@ const SocialLogin = () => {
                 Retour
               </button>
             </div>
+
+            <p className="otp-hint">Un code vous a été envoyé par email</p>
           </motion.div>
         )}
 
@@ -570,22 +667,24 @@ const SocialLogin = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
           >
-            <QrCode size={32} color="#C4A962" className="qrcode-icon" />
-            <h3>QR Code</h3>
+            <QrCode size={32} color="#2E7D73" className="qrcode-icon" />
+            <h3>Connexion par QR Code</h3>
             
             <div className="qrcode-container">
               {!qrScanned ? (
                 <>
                   <div className="qrcode-placeholder">
-                    <QrCode size={90} color="#C4A962" />
-                    <Scan size={30} className="scan-animation" style={{ color: '#C4A962' }} />
+                    <QrCode size={120} color="#2E7D73" />
+                    <Scan size={40} className="scan-animation" />
                   </div>
+                  <p>Scannez ce code avec l'application mobile SRTB</p>
                   <div className="qrcode-value">
-                    <code style={{ color: '#C4A962' }}>{qrCodeValue}</code>
-                    <button onClick={copyQrCode} className="copy-button">
-                      <Copy size={14} color="#C4A962" />
+                    <code>{qrCodeValue}</code>
+                    <button onClick={copyQrCode} className="copy-button" title="Copier le code">
+                      <Copy size={14} />
                     </button>
                   </div>
+                  <p className="qrcode-instruction">Code unique pour cette session</p>
                 </>
               ) : (
                 <motion.div
@@ -593,8 +692,9 @@ const SocialLogin = () => {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                 >
-                  <CheckCircle size={50} color="#C4A962" />
-                  <p>Scan réussi !</p>
+                  <CheckCircle size={60} color="#10b981" />
+                  <p>QR Code scanné avec succès !</p>
+                  <p className="success-message">Connexion en cours...</p>
                 </motion.div>
               )}
             </div>
@@ -608,68 +708,13 @@ const SocialLogin = () => {
           </motion.div>
         )}
 
-        {/* Interface BIOMÉTRIE */}
-        {biometricScanning && (
-          <motion.div
-            className="biometric-interface"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-          >
-            <Fingerprint size={48} color="#C4A962" className="biometric-icon" />
-            <h3>Biométrie</h3>
-            
-            <div className="biometric-scanner">
-              <Fingerprint size={60} color="#C4A962" />
-              <motion.div
-                className="scan-ripple"
-                style={{ borderColor: '#C4A962' }}
-                animate={{
-                  scale: [1, 1.5, 1],
-                  opacity: [0.5, 0, 0.5]
-                }}
-                transition={{ duration: 2, repeat: Infinity }}
-              />
-              <motion.div
-                className="scan-ripple delay-1"
-                style={{ borderColor: '#C4A962' }}
-                animate={{
-                  scale: [1, 1.5, 1],
-                  opacity: [0.5, 0, 0.5]
-                }}
-                transition={{ duration: 2, delay: 0.5, repeat: Infinity }}
-              />
-            </div>
-            
-            <p>Placez votre doigt</p>
-            
-            <button 
-              className="biometric-back"
-              onClick={handleBackToMethods}
-            >
-              Annuler
-            </button>
-          </motion.div>
-        )}
-
-        {biometricSuccess && (
-          <motion.div
-            className="biometric-success"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-          >
-            <CheckCircle size={60} color="#C4A962" />
-            <p>Empreinte reconnue !</p>
-          </motion.div>
-        )}
-
-        {/* Formulaire principal */}
-        {loginMethod === 'password' && !showOtpInput && !showQrCode && !biometricScanning && !biometricSuccess && (
+        {/* Formulaire principal (Mot de passe) */}
+        {loginMethod === 'password' && !showOtpInput && !showQrCode && (
           <form onSubmit={handleSubmit} className="social-form">
             {/* Email */}
             <div className={`social-field ${focusedField === 'email' ? 'focused' : ''}`}>
               <label>
-                <Mail size={14} color="#C4A962" />
+                <Mail size={14} />
                 <span>Email professionnel</span>
               </label>
               <div className="field-container">
@@ -688,7 +733,7 @@ const SocialLogin = () => {
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                   >
-                    <CheckCircle size={16} color="#C4A962" />
+                    <CheckCircle size={16} color="#10b981" />
                   </motion.div>
                 )}
               </div>
@@ -697,7 +742,7 @@ const SocialLogin = () => {
             {/* Mot de passe */}
             <div className={`social-field ${focusedField === 'password' ? 'focused' : ''}`}>
               <label>
-                <Lock size={14} color="#C4A962" />
+                <Lock size={14} />
                 <span>Mot de passe</span>
               </label>
               <div className="field-container">
@@ -715,7 +760,7 @@ const SocialLogin = () => {
                   className="field-eye"
                   onClick={() => setShowPassword(!showPassword)}
                 >
-                  {showPassword ? <EyeOff size={16} color="#C4A962" /> : <Eye size={16} color="#C4A962" />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
@@ -749,7 +794,7 @@ const SocialLogin = () => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                 >
-                  <AlertTriangle size={14} color="#ef4444" />
+                  <AlertTriangle size={14} />
                   <span>{error}</span>
                 </motion.div>
               )}
@@ -772,7 +817,7 @@ const SocialLogin = () => {
               ) : (
                 <>
                   <span>Se connecter</span>
-                  <ArrowRight size={18} color="#C4A962" />
+                  <ArrowRight size={18} />
                 </>
               )}
             </motion.button>
@@ -787,13 +832,17 @@ const SocialLogin = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
           >
-            <h3>Réinitialisation</h3>
+            <h3>Réinitialisation du mot de passe</h3>
             
             {!resetSent ? (
               <form onSubmit={handleResetPassword}>
-                <p>Entrez votre email</p>
+                <p>Entrez votre email pour recevoir un lien de réinitialisation</p>
                 
                 <div className="social-field focused">
+                  <label>
+                    <Mail size={14} />
+                    <span>Email professionnel</span>
+                  </label>
                   <div className="field-container">
                     <input
                       type="email"
@@ -810,6 +859,7 @@ const SocialLogin = () => {
                     type="submit"
                     className="forgot-submit"
                     whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                   >
                     Envoyer
                   </motion.button>
@@ -828,26 +878,26 @@ const SocialLogin = () => {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
               >
-                <CheckCircle size={45} color="#C4A962" />
-                <p>Email envoyé !</p>
+                <CheckCircle size={48} color="#10b981" />
+                <p>Un email de réinitialisation a été envoyé à {resetEmail}</p>
                 <button
                   className="reset-close"
                   onClick={() => setShowForgotPassword(false)}
                 >
-                  OK
+                  Fermer
                 </button>
               </motion.div>
             )}
           </motion.div>
         )}
 
-        {/* Support */}
+        {/* Aide et support */}
         <div className="social-support">
           <button
             className="support-button"
             onClick={() => setShowHelp(!showHelp)}
           >
-            <Headphones size={14} color="#C4A962" />
+            <Headphones size={14} />
             <span>Besoin d'aide ?</span>
           </button>
 
@@ -861,15 +911,19 @@ const SocialLogin = () => {
               >
                 <h4>Support social</h4>
                 <div className="support-item">
-                  <Phone size={12} color="#C4A962" />
+                  <Phone size={12} />
                   <span>+216 72 432 103</span>
                 </div>
                 <div className="support-item">
-                  <Mail size={12} color="#C4A962" />
+                  <Mail size={12} />
                   <span>support.social@srtb.tn</span>
                 </div>
+                <div className="support-item">
+                  <MessageCircle size={12} />
+                  <span>Chat en ligne (8h-18h)</span>
+                </div>
                 <div className="support-note">
-                  <Info size={10} color="#C4A962" />
+                  <Info size={10} />
                   <span>Écoute et accompagnement</span>
                 </div>
               </motion.div>
@@ -877,25 +931,25 @@ const SocialLogin = () => {
           </AnimatePresence>
         </div>
 
-        {/* Sécurité */}
+        {/* Badges de sécurité */}
         <div className="social-security">
           <div className="security-dot">
-            <ShieldCheck size={12} color="#C4A962" />
+            <ShieldCheck size={12} />
             <span>Confidentiel</span>
           </div>
           <div className="security-dot">
-            <Lock size={12} color="#C4A962" />
+            <Lock size={12} />
             <span>RGPD</span>
           </div>
           <div className="security-dot">
-            <Heart size={12} color="#C4A962" />
+            <Heart size={12} />
             <span>Bien-être</span>
           </div>
         </div>
 
         {/* Footer */}
         <div className="social-footer">
-          <p>© 2026 SRTB • Service Social</p>
+          <p>© 2026 SRTB • Service Social • v2.4.0</p>
         </div>
       </motion.div>
 
@@ -913,12 +967,12 @@ const SocialLogin = () => {
             transition={{
               duration: 10 + i,
               repeat: Infinity,
-              delay: i * 0.3
+              delay: i * 0.2
             }}
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              background: '#C4A962'
+              background: '#2E7D73'
             }}
           />
         ))}

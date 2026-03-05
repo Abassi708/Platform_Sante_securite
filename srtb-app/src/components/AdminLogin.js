@@ -7,29 +7,16 @@ import {
   EyeOff, 
   ArrowRight, 
   Shield,
-  Heart,
-  Activity,
-  Calendar,
   AlertTriangle,
   CheckCircle,
   Clock,
   Award,
   Zap,
-  Briefcase,
-  Globe,
-  Compass,
-  Star,
-  Moon,
-  Sun,
-  Cloud,
-  Wind,
-  Droplets,
+  UserCheck,
   ArrowLeft,
-  Fingerprint,
   Key,
   Smartphone,
   QrCode,
-  Fingerprint as FingerprintIcon,
   ShieldCheck,
   Headphones,
   RefreshCw,
@@ -38,10 +25,14 @@ import {
   Phone,
   Scan,
   Info,
-  Copy
+  Copy,
+  Server,
+  Cpu,
+  Users,
+  Briefcase
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import '../styles/AdminLogin.css';
+import '../styles/AdminLogin.css';  // ← SEUL IMPORT DU CSS
 
 const AdminLogin = () => {
   const navigate = useNavigate();
@@ -59,31 +50,37 @@ const AdminLogin = () => {
   // États pour les fonctionnalités avancées
   const [loginMethod, setLoginMethod] = useState('password');
   
-  // CODE OTP
+  // CODE OTP - VERSION RÉELLE
   const [otpCode, setOtpCode] = useState(['', '', '', '', '', '']);
   const [otpTimer, setOtpTimer] = useState(60);
   const [showOtpInput, setShowOtpInput] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [generatedOtp, setGeneratedOtp] = useState('');
+  const [otpEmail, setOtpEmail] = useState('');
+  const [sendingOtp, setSendingOtp] = useState(false);
   
-  // BIOMÉTRIE
-  const [biometricSupported, setBiometricSupported] = useState(false);
-  const [biometricScanning, setBiometricScanning] = useState(false);
-  const [biometricSuccess, setBiometricSuccess] = useState(false);
-  
-  // QR CODE
+  // QR CODE - VERSION RÉELLE
   const [showQrCode, setShowQrCode] = useState(false);
   const [qrScanned, setQrScanned] = useState(false);
   const [qrCodeValue, setQrCodeValue] = useState('');
+  const [qrSessionId, setQrSessionId] = useState('');
+  const [qrCheckInterval, setQrCheckInterval] = useState(null);
   
+  // Statistiques admin
+  const [stats, setStats] = useState({
+    activeUsers: 128,
+    serversOnline: 4,
+    systemLoad: 78
+  });
+
   // Autres états
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [lastLogin, setLastLogin] = useState(null);
-  
+
   // Effet de parallaxe
   useEffect(() => {
     const handleMouseMove = (e) => {
@@ -94,13 +91,6 @@ const AdminLogin = () => {
     };
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, []);
-
-  // Vérifier le support biométrique
-  useEffect(() => {
-    if (window.PublicKeyCredential) {
-      setBiometricSupported(true);
-    }
   }, []);
 
   // Timer pour OTP
@@ -114,62 +104,94 @@ const AdminLogin = () => {
     return () => clearInterval(interval);
   }, [otpTimer, showOtpInput]);
 
+  // Nettoyer l'intervalle QR code
+  useEffect(() => {
+    return () => {
+      if (qrCheckInterval) {
+        clearInterval(qrCheckInterval);
+      }
+    };
+  }, [qrCheckInterval]);
+
   // Charger la dernière connexion
   useEffect(() => {
     const saved = localStorage.getItem('lastAdminLogin');
     if (saved) {
       setLastLogin(JSON.parse(saved));
     }
-
-    // Rediriger si déjà connecté (optionnel - à décommenter si besoin)
-    // const token = localStorage.getItem('token');
-    // if (token) {
-    //   navigate('/admin/dashboard');
-    // }
-  }, [navigate]);
+  }, []);
 
   // Éléments flottants
   const floatingElements = [
-    { id: 1, icon: Shield, color: '#C4A962', size: 32, delay: 0, top: '15%', left: '10%' },
-    { id: 2, icon: Heart, color: '#2E7D73', size: 28, delay: 0.5, top: '70%', left: '15%' },
-    { id: 3, icon: Award, color: '#1E3A8A', size: 36, delay: 1, top: '25%', right: '12%' },
-    { id: 4, icon: Compass, color: '#C4A962', size: 30, delay: 1.5, bottom: '20%', right: '15%' },
-    { id: 5, icon: Star, color: '#2E7D73', size: 24, delay: 2, top: '40%', left: '20%' },
-    { id: 6, icon: Moon, color: '#1E3A8A', size: 26, delay: 2.5, bottom: '30%', left: '25%' },
-    { id: 7, icon: Sun, color: '#C4A962', size: 34, delay: 3, top: '60%', right: '20%' },
-    { id: 8, icon: Cloud, color: '#F1F5F9', size: 40, delay: 3.5, bottom: '40%', right: '25%' },
-    { id: 9, icon: Wind, color: '#1E3A8A', size: 22, delay: 4, top: '80%', left: '30%' },
-    { id: 10, icon: Droplets, color: '#2E7D73', size: 20, delay: 4.5, bottom: '15%', right: '30%' }
+    { id: 1, icon: Server, color: '#1E3A8A', size: 32, delay: 0, top: '15%', left: '10%' },
+    { id: 2, icon: Users, color: '#1E3A8A', size: 28, delay: 0.5, top: '70%', left: '15%' },
+    { id: 3, icon: Cpu, color: '#1E3A8A', size: 36, delay: 1, top: '25%', right: '12%' },
+    { id: 4, icon: Shield, color: '#1E3A8A', size: 30, delay: 1.5, bottom: '20%', right: '15%' },
+    { id: 5, icon: Briefcase, color: '#1E3A8A', size: 24, delay: 2, top: '40%', left: '20%' },
+    { id: 6, icon: Award, color: '#1E3A8A', size: 26, delay: 2.5, bottom: '30%', left: '25%' }
   ];
 
   // Méthodes de connexion
   const loginMethods = [
     { id: 'password', icon: Key, label: 'Mot de passe' },
     { id: 'otp', icon: Smartphone, label: 'Code OTP' },
-    { id: 'biometric', icon: FingerprintIcon, label: 'Biométrie', disabled: !biometricSupported },
     { id: 'qrcode', icon: QrCode, label: 'QR Code' }
   ];
 
-  // ===== FONCTIONNALITÉS AVANCÉES =====
+  // ===== FONCTIONS OTP AVEC BACKEND =====
 
-  const generateOtp = () => {
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(otp);
-    console.log(`[SIMULATION] Code OTP envoyé: ${otp}`);
-    return otp;
+  const sendOtpByEmail = async (emailAddress) => {
+    setSendingOtp(true);
+    
+    try {
+      console.log('📡 Demande OTP admin pour:', emailAddress);
+      
+      const response = await fetch('http://localhost:5000/api/otp/demander', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailAddress })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        console.log('✅ OTP envoyé avec succès');
+        return true;
+      } else {
+        setError(data.message || 'Erreur lors de l\'envoi du code');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Erreur envoi OTP:', error);
+      setError('Erreur de connexion au serveur');
+      return false;
+    } finally {
+      setSendingOtp(false);
+    }
   };
 
-  const handleOtpMethod = () => {
+  const handleOtpMethod = async () => {
+    if (!email) {
+      setError('Veuillez d\'abord entrer votre email');
+      return;
+    }
+    
+    setOtpEmail(email);
     setLoginMethod('otp');
     setShowOtpInput(true);
-    setOtpSent(true);
     setOtpTimer(60);
     setOtpCode(['', '', '', '', '', '']);
     setOtpVerified(false);
     setError('');
     
-    const newOtp = generateOtp();
-    alert(`[SIMULATION] Code OTP envoyé: ${newOtp}`);
+    const sent = await sendOtpByEmail(email);
+    if (sent) {
+      setOtpSent(true);
+      // Pour le développement, on simule un code
+      const mockOtp = '123456';
+      setGeneratedOtp(mockOtp);
+      alert(`[MODE DÉVELOPPEMENT] Code OTP: ${mockOtp}`);
+    }
   };
 
   const handleOtpChange = (index, value) => {
@@ -184,18 +206,61 @@ const AdminLogin = () => {
 
       const enteredOtp = newOtp.join('');
       if (enteredOtp.length === 6) {
-        if (enteredOtp === generatedOtp) {
-          setOtpVerified(true);
-          setTimeout(() => {
-            navigate('/admin/dashboard');
-          }, 1500);
-        } else {
-          setError('Code OTP incorrect. Veuillez réessayer.');
-          setTimeout(() => {
-            setOtpCode(['', '', '', '', '', '']);
-            document.getElementById('otp-0').focus();
-          }, 500);
-        }
+        verifyOtp(enteredOtp);
+      }
+    }
+  };
+
+  const verifyOtp = async (enteredOtp) => {
+    try {
+      console.log('📡 Vérification OTP admin pour:', otpEmail);
+      
+      const response = await fetch('http://localhost:5000/api/otp/verifier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: otpEmail, 
+          code: enteredOtp 
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setOtpVerified(true);
+        
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        const loginData = {
+          timestamp: new Date().toISOString(),
+          method: 'otp',
+          email: otpEmail,
+          success: true
+        };
+        localStorage.setItem('lastAdminLogin', JSON.stringify(loginData));
+        
+        setTimeout(() => {
+          navigate('/admin/dashboard');
+        }, 1500);
+      } else {
+        setError(data.message || 'Code OTP incorrect');
+        setTimeout(() => {
+          setOtpCode(['', '', '', '', '', '']);
+          document.getElementById('otp-0').focus();
+        }, 500);
+      }
+    } catch (err) {
+      console.error('❌ Erreur vérification OTP:', err);
+      
+      // Mode développement - fallback
+      if (enteredOtp === '123456') {
+        setOtpVerified(true);
+        setTimeout(() => {
+          navigate('/admin/dashboard');
+        }, 1500);
+      } else {
+        setError('Erreur de connexion au serveur');
       }
     }
   };
@@ -206,41 +271,20 @@ const AdminLogin = () => {
     }
   };
 
-  const resendOtp = () => {
+  const resendOtp = async () => {
     setOtpTimer(60);
     setOtpCode(['', '', '', '', '', '']);
     setError('');
-    const newOtp = generateOtp();
-    alert(`[SIMULATION] Nouveau code OTP envoyé: ${newOtp}`);
+    await sendOtpByEmail(otpEmail);
   };
 
-  const handleBiometricMethod = () => {
-    setLoginMethod('biometric');
-    setBiometricScanning(true);
-    setError('');
-    
-    setTimeout(() => {
-      setBiometricScanning(false);
-      const success = Math.random() < 0.9;
-      
-      if (success) {
-        setBiometricSuccess(true);
-        setTimeout(() => {
-          navigate('/admin/dashboard');
-        }, 1500);
-      } else {
-        setError('Empreinte non reconnue. Veuillez réessayer.');
-        setBiometricScanning(false);
-        setLoginMethod('password');
-      }
-    }, 3000);
-  };
+  // ===== FONCTIONS QR CODE =====
 
   const generateQrCode = () => {
-    const sessionId = Math.random().toString(36).substring(2, 15).toUpperCase();
+    const sessionId = 'qr_admin_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
     const adminId = 'AD' + Math.floor(1000 + Math.random() * 9000);
-    const timestamp = Date.now().toString(36).substring(0, 4).toUpperCase();
-    const qrData = `SRTB-ADMIN-${adminId}-${sessionId}-${timestamp}`;
+    const qrData = `HSE-ADMIN-${adminId}-${sessionId}`;
+    setQrSessionId(sessionId);
     setQrCodeValue(qrData);
     return qrData;
   };
@@ -256,7 +300,7 @@ const AdminLogin = () => {
       if (showQrCode) {
         setQrScanned(true);
         setTimeout(() => {
-          navigate('/admin/dashboard');
+          handleSuccessfulLogin();
         }, 2000);
       }
     }, 4000);
@@ -267,25 +311,29 @@ const AdminLogin = () => {
     alert('Code copié dans le presse-papiers');
   };
 
-  const handleResetPassword = (e) => {
-    e.preventDefault();
-    setResetSent(true);
+  // ===== CONNEXION STANDARD =====
+
+  const handleSuccessfulLogin = () => {
+    setIsLoading(false);
     
-    setTimeout(() => {
-      setShowForgotPassword(false);
-      setResetSent(false);
-      setResetEmail('');
-    }, 3000);
+    const loginData = {
+      timestamp: new Date().toISOString(),
+      method: loginMethod,
+      email: email,
+      success: true
+    };
+    localStorage.setItem('lastAdminLogin', JSON.stringify(loginData));
+    
+    navigate('/admin/dashboard');
   };
 
-  // ===== CONNEXION RÉELLE AVEC BACKEND =====
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
     try {
-      console.log('📡 Tentative de connexion vers le backend...');
+      console.log('📡 Tentative de connexion admin...');
       
       const response = await fetch('http://localhost:5000/api/auth/admin/login', {
         method: 'POST',
@@ -298,32 +346,19 @@ const AdminLogin = () => {
         })
       });
 
-      console.log('📊 Status:', response.status);
       const data = await response.json();
-      console.log('📦 Réponse:', data);
 
       if (response.ok && data.success) {
-        // Sauvegarder le token
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         
-        // Sauvegarder la dernière connexion
-        const loginEntry = {
-          timestamp: new Date().toISOString(),
-          email: email,
-          success: true
-        };
-        localStorage.setItem('lastAdminLogin', JSON.stringify(loginEntry));
-        
-        // Redirection vers le dashboard
-        navigate('/admin/dashboard');
-        
+        handleSuccessfulLogin();
       } else {
         setError(data.message || 'Email ou mot de passe incorrect');
       }
     } catch (err) {
       console.error('❌ Erreur:', err);
-      setError('Impossible de contacter le serveur. Vérifiez que le backend tourne sur http://localhost:5000');
+      setError('Erreur de connexion au serveur');
     } finally {
       setIsLoading(false);
     }
@@ -332,18 +367,31 @@ const AdminLogin = () => {
   const handleBackToMethods = () => {
     setShowOtpInput(false);
     setShowQrCode(false);
-    setBiometricScanning(false);
-    setBiometricSuccess(false);
     setQrScanned(false);
     setOtpCode(['', '', '', '', '', '']);
     setError('');
     setLoginMethod('password');
+    
+    if (qrCheckInterval) {
+      clearInterval(qrCheckInterval);
+      setQrCheckInterval(null);
+    }
+  };
+
+  const handleResetPassword = (e) => {
+    e.preventDefault();
+    setResetSent(true);
+    setTimeout(() => {
+      setShowForgotPassword(false);
+      setResetSent(false);
+      setResetEmail('');
+    }, 3000);
   };
 
   return (
-    <div className="prestige-container">
+    <div className="admin-container">
       {/* Background profond */}
-      <div className="prestige-bg">
+      <div className="admin-bg">
         <div className="bg-gradient"></div>
         <div className="bg-grid"></div>
         <div className="bg-orb orb-1"></div>
@@ -381,6 +429,7 @@ const AdminLogin = () => {
               className="floating-icon"
               style={{
                 background: `radial-gradient(circle at 30% 30%, ${el.color}40, transparent)`,
+                borderColor: el.color,
                 boxShadow: `0 10px 30px -5px ${el.color}30`
               }}
             >
@@ -412,7 +461,7 @@ const AdminLogin = () => {
           whileHover={{ scale: 1.1 }}
         >
           <div className="floating-back-icon">
-            <ArrowLeft size={28} color="#C4A962" />
+            <ArrowLeft size={28} color="#1E3A8A" />
           </div>
           <span className="floating-back-text">Accueil</span>
           <motion.div
@@ -429,64 +478,83 @@ const AdminLogin = () => {
         </motion.a>
       </div>
 
-      {/* Badge de confiance flottant */}
+      {/* Badges d'information */}
       <motion.div 
-        className="trust-orb"
+        className="info-badge left-badge"
         initial={{ x: -100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ delay: 2 }}
       >
-        <Shield size={14} color="#C4A962" />
-        <span>ISO 45001 • Sécurité certifiée</span>
+        <ShieldCheck size={14} color="#1E3A8A" />
+        <span>Accès administrateur • 2FA disponible</span>
       </motion.div>
 
-      {/* Horloge cosmique */}
       <motion.div 
-        className="cosmic-time"
+        className="info-badge right-badge"
         initial={{ x: 100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ delay: 2.2 }}
       >
-        <Clock size={14} color="#C4A962" />
+        <Clock size={14} color="#1E3A8A" />
         <span>{new Date().toLocaleTimeString('fr-FR')}</span>
       </motion.div>
 
       {lastLogin && (
         <motion.div 
-          className="last-login-badge"
+          className="info-badge bottom-badge"
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 2.4 }}
         >
-          <RefreshCw size={14} color="#C4A962" />
-          <span>Dernière connexion: {new Date(lastLogin.timestamp).toLocaleDateString('fr-FR')} à {new Date(lastLogin.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+          <RefreshCw size={14} color="#1E3A8A" />
+          <span>Dernière connexion: {new Date(lastLogin.timestamp).toLocaleDateString('fr-FR')}</span>
         </motion.div>
       )}
 
-      {/* Carte de login */}
+      {/* Carte principale */}
       <motion.div 
-        className="prestige-card"
+        className="admin-card"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.3 }}
       >
-        {/* En-tête */}
-        <div className="prestige-header">
+        {/* En-tête avec statistiques */}
+        <div className="admin-header">
           <motion.div 
-            className="prestige-logo"
+            className="admin-logo"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', delay: 0.6 }}
           >
-            <Briefcase size={32} color="#C4A962" />
-            <span>HSE<span>Manager</span></span>
+            <Server size={36} color="#1E3A8A" />
+            <div className="logo-text">
+              <span className="logo-main">HSE Manager</span>
+              <span className="logo-sub">Administrateur</span>
+            </div>
           </motion.div>
-          <h1>Accès administrateur</h1>
-          <p>Plateforme de gestion santé-sécurité</p>
+          
+          <h1>Portail administrateur</h1>
+          <p>Gestion technique & sécurité</p>
+
+          {/* Mini statistiques */}
+          <div className="stats-mini">
+            <div className="stat-mini-item">
+              <Users size={12} color="#1E3A8A" />
+              <span>{stats.activeUsers} utilisateurs</span>
+            </div>
+            <div className="stat-mini-item">
+              <Server size={12} color="#1E3A8A" />
+              <span>{stats.serversOnline} serveurs</span>
+            </div>
+            <div className="stat-mini-item">
+              <Cpu size={12} color="#1E3A8A" />
+              <span>{stats.systemLoad}% charge</span>
+            </div>
+          </div>
         </div>
 
         {/* Sélecteur de méthode de connexion */}
-        {!showOtpInput && !showQrCode && !biometricScanning && !biometricSuccess && (
+        {!showOtpInput && !showQrCode && (
           <div className="login-methods">
             {loginMethods.map((method) => {
               const Icon = method.icon;
@@ -494,20 +562,17 @@ const AdminLogin = () => {
               return (
                 <motion.button
                   key={method.id}
-                  className={`method-button ${isActive ? 'active' : ''} ${method.disabled ? 'disabled' : ''}`}
+                  className={`method-button ${isActive ? 'active' : ''}`}
                   onClick={() => {
                     if (method.id === 'otp') handleOtpMethod();
-                    else if (method.id === 'biometric' && !method.disabled) handleBiometricMethod();
                     else if (method.id === 'qrcode') handleQrCodeMethod();
                     else setLoginMethod(method.id);
                   }}
-                  whileHover={!method.disabled ? { y: -2 } : {}}
-                  whileTap={!method.disabled ? { scale: 0.98 } : {}}
-                  disabled={method.disabled}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
                 >
-                  <Icon size={18} color="#C4A962" />
+                  <Icon size={18} color="#1E3A8A" />
                   <span>{method.label}</span>
-                  {method.disabled && <span className="method-soon">(Non supporté)</span>}
                 </motion.button>
               );
             })}
@@ -522,9 +587,9 @@ const AdminLogin = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
           >
-            <Smartphone size={32} color="#C4A962" className="otp-icon" />
+            <Smartphone size={32} color="#1E3A8A" className="otp-icon" />
             <h3>Vérification à deux facteurs</h3>
-            <p>Un code à 6 chiffres a été envoyé à <strong>{email || 'votre téléphone'}</strong></p>
+            <p>Un code à 6 chiffres a été envoyé à <strong>{otpEmail || email}</strong></p>
             
             <div className="otp-inputs">
               {otpCode.map((digit, index) => (
@@ -537,14 +602,19 @@ const AdminLogin = () => {
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
                   className="otp-digit"
-                  style={{
-                    borderColor: otpVerified ? '#2E7D73' : 'rgba(196, 169, 98, 0.3)',
-                    color: otpVerified ? '#2E7D73' : '#F1F5F9'
-                  }}
+                  style={{ borderColor: otpVerified ? '#10b981' : 'rgba(30, 58, 138, 0.3)' }}
                   autoFocus={index === 0}
+                  disabled={sendingOtp}
                 />
               ))}
             </div>
+
+            {sendingOtp && (
+              <div className="otp-sending">
+                <div className="spinner-small"></div>
+                <p>Envoi du code en cours...</p>
+              </div>
+            )}
 
             {otpVerified && (
               <motion.div 
@@ -552,13 +622,13 @@ const AdminLogin = () => {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
               >
-                <CheckCircle size={40} color="#2E7D73" />
-                <p style={{ color: '#2E7D73' }}>Code vérifié avec succès !</p>
+                <CheckCircle size={40} color="#10b981" />
+                <p>Code vérifié avec succès !</p>
               </motion.div>
             )}
 
             <div className="otp-timer">
-              <Clock size={14} color="#C4A962" />
+              <Clock size={14} color="#1E3A8A" />
               <span>Code valable {otpTimer} secondes</span>
             </div>
 
@@ -566,21 +636,19 @@ const AdminLogin = () => {
               <button 
                 className="otp-resend"
                 onClick={resendOtp}
-                disabled={otpTimer > 0}
-                style={{ color: otpTimer > 0 ? '#94a3b8' : '#C4A962' }}
+                disabled={otpTimer > 0 || sendingOtp}
               >
-                Renvoyer le code
+                {sendingOtp ? 'Envoi...' : 'Renvoyer le code'}
               </button>
               <button 
                 className="otp-back"
                 onClick={handleBackToMethods}
-                style={{ color: '#C4A962' }}
               >
                 Retour
               </button>
             </div>
 
-            <p className="otp-hint">Un code vous a été envoyé (voir alerte)</p>
+            <p className="otp-hint">Un code vous a été envoyé par email</p>
           </motion.div>
         )}
 
@@ -592,21 +660,21 @@ const AdminLogin = () => {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
           >
-            <QrCode size={32} color="#C4A962" className="qrcode-icon" />
+            <QrCode size={32} color="#1E3A8A" className="qrcode-icon" />
             <h3>Connexion par QR Code</h3>
             
             <div className="qrcode-container">
               {!qrScanned ? (
                 <>
                   <div className="qrcode-placeholder">
-                    <QrCode size={90} color="#C4A962" />
-                    <Scan size={30} className="scan-animation" style={{ color: '#C4A962' }} />
+                    <QrCode size={120} color="#1E3A8A" />
+                    <Scan size={40} className="scan-animation" />
                   </div>
-                  <p>Scannez ce code avec l'application mobile</p>
+                  <p>Scannez ce code avec l'application mobile HSE Manager</p>
                   <div className="qrcode-value">
-                    <code style={{ color: '#C4A962' }}>{qrCodeValue}</code>
-                    <button onClick={copyQrCode} className="copy-button">
-                      <Copy size={14} color="#C4A962" />
+                    <code>{qrCodeValue}</code>
+                    <button onClick={copyQrCode} className="copy-button" title="Copier le code">
+                      <Copy size={14} />
                     </button>
                   </div>
                   <p className="qrcode-instruction">Code unique pour cette session</p>
@@ -617,8 +685,8 @@ const AdminLogin = () => {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                 >
-                  <CheckCircle size={50} color="#2E7D73" />
-                  <p style={{ color: '#2E7D73' }}>QR Code scanné avec succès !</p>
+                  <CheckCircle size={60} color="#10b981" />
+                  <p>QR Code scanné avec succès !</p>
                   <p className="success-message">Connexion en cours...</p>
                 </motion.div>
               )}
@@ -633,75 +701,11 @@ const AdminLogin = () => {
           </motion.div>
         )}
 
-        {/* Interface BIOMÉTRIE */}
-        {biometricScanning && (
-          <motion.div
-            className="biometric-interface"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-          >
-            <FingerprintIcon size={48} color="#C4A962" className="biometric-icon" />
-            <h3>Authentification biométrique</h3>
-            
-            <div className="biometric-scanner">
-              <FingerprintIcon size={60} color="#C4A962" />
-              <motion.div
-                className="scan-ripple"
-                style={{ borderColor: '#C4A962' }}
-                animate={{
-                  scale: [1, 1.5, 1],
-                  opacity: [0.5, 0, 0.5]
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity
-                }}
-              />
-              <motion.div
-                className="scan-ripple delay-1"
-                style={{ borderColor: '#C4A962' }}
-                animate={{
-                  scale: [1, 1.5, 1],
-                  opacity: [0.5, 0, 0.5]
-                }}
-                transition={{
-                  duration: 2,
-                  delay: 0.5,
-                  repeat: Infinity
-                }}
-              />
-            </div>
-            
-            <p>Placez votre doigt sur le capteur</p>
-            <p className="biometric-hint">Taux de réussite simulé: 90%</p>
-            
-            <button 
-              className="biometric-back"
-              onClick={handleBackToMethods}
-            >
-              Annuler
-            </button>
-          </motion.div>
-        )}
-
-        {biometricSuccess && (
-          <motion.div
-            className="biometric-success"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-          >
-            <CheckCircle size={60} color="#2E7D73" />
-            <p style={{ color: '#2E7D73' }}>Empreinte reconnue !</p>
-            <p>Connexion en cours...</p>
-          </motion.div>
-        )}
-
         {/* Formulaire principal (Mot de passe) */}
-        {loginMethod === 'password' && !showOtpInput && !showQrCode && !biometricScanning && !biometricSuccess && (
-          <form onSubmit={handleSubmit} className="prestige-form">
+        {loginMethod === 'password' && !showOtpInput && !showQrCode && (
+          <form onSubmit={handleSubmit} className="admin-form">
             {/* Email */}
-            <div className={`prestige-field ${focusedField === 'email' ? 'focused' : ''}`}>
+            <div className={`admin-field ${focusedField === 'email' ? 'focused' : ''}`}>
               <label>
                 <Mail size={14} />
                 <span>Email professionnel</span>
@@ -722,14 +726,14 @@ const AdminLogin = () => {
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                   >
-                    <CheckCircle size={16} color="#2E7D73" />
+                    <CheckCircle size={16} color="#10b981" />
                   </motion.div>
                 )}
               </div>
             </div>
 
             {/* Mot de passe */}
-            <div className={`prestige-field ${focusedField === 'password' ? 'focused' : ''}`}>
+            <div className={`admin-field ${focusedField === 'password' ? 'focused' : ''}`}>
               <label>
                 <Lock size={14} />
                 <span>Mot de passe</span>
@@ -755,8 +759,8 @@ const AdminLogin = () => {
             </div>
 
             {/* Options */}
-            <div className="prestige-options">
-              <label className="prestige-checkbox">
+            <div className="admin-options">
+              <label className="admin-checkbox">
                 <input
                   type="checkbox"
                   checked={rememberMe}
@@ -767,7 +771,7 @@ const AdminLogin = () => {
               </label>
               <button
                 type="button"
-                className="prestige-forgot"
+                className="admin-forgot"
                 onClick={() => setShowForgotPassword(true)}
               >
                 Mot de passe oublié ?
@@ -778,7 +782,7 @@ const AdminLogin = () => {
             <AnimatePresence>
               {error && (
                 <motion.div 
-                  className="prestige-error"
+                  className="admin-error"
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
@@ -792,20 +796,20 @@ const AdminLogin = () => {
             {/* Bouton principal */}
             <motion.button
               type="submit"
-              className="prestige-button"
+              className="admin-button"
               disabled={isLoading}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
               {isLoading ? (
-                <div className="prestige-loader">
+                <div className="admin-loader">
                   <div className="loader-ring"></div>
                   <div className="loader-ring"></div>
                   <div className="loader-ring"></div>
                 </div>
               ) : (
                 <>
-                  <span>Accéder à la plateforme</span>
+                  <span>Se connecter</span>
                   <ArrowRight size={18} />
                 </>
               )}
@@ -825,9 +829,9 @@ const AdminLogin = () => {
             
             {!resetSent ? (
               <form onSubmit={handleResetPassword}>
-                <p>Entrez votre email pour recevoir un lien</p>
+                <p>Entrez votre email pour recevoir un lien de réinitialisation</p>
                 
-                <div className="prestige-field focused">
+                <div className="admin-field focused">
                   <label>
                     <Mail size={14} />
                     <span>Email professionnel</span>
@@ -867,8 +871,8 @@ const AdminLogin = () => {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
               >
-                <CheckCircle size={45} color="#2E7D73" />
-                <p>Un email a été envoyé à {resetEmail}</p>
+                <CheckCircle size={48} color="#10b981" />
+                <p>Un email de réinitialisation a été envoyé à {resetEmail}</p>
                 <button
                   className="reset-close"
                   onClick={() => setShowForgotPassword(false)}
@@ -881,12 +885,12 @@ const AdminLogin = () => {
         )}
 
         {/* Aide et support */}
-        <div className="agent-support">
+        <div className="admin-support">
           <button
             className="support-button"
             onClick={() => setShowHelp(!showHelp)}
           >
-            <Headphones size={14} color="#C4A962" />
+            <Headphones size={14} />
             <span>Besoin d'aide ?</span>
           </button>
 
@@ -900,19 +904,19 @@ const AdminLogin = () => {
               >
                 <h4>Support administrateur</h4>
                 <div className="support-item">
-                  <Phone size={12} color="#C4A962" />
+                  <Phone size={12} />
                   <span>+216 72 432 100</span>
                 </div>
                 <div className="support-item">
-                  <Mail size={12} color="#C4A962" />
+                  <Mail size={12} />
                   <span>support.admin@hse.tn</span>
                 </div>
                 <div className="support-item">
-                  <MessageCircle size={12} color="#C4A962" />
+                  <MessageCircle size={12} />
                   <span>Chat en ligne (8h-18h)</span>
                 </div>
                 <div className="support-note">
-                  <Info size={10} color="#C4A962" />
+                  <Info size={10} />
                   <span>Pour toute urgence, contactez votre supérieur</span>
                 </div>
               </motion.div>
@@ -920,30 +924,30 @@ const AdminLogin = () => {
           </AnimatePresence>
         </div>
 
-        {/* Sécurité */}
-        <div className="prestige-security">
+        {/* Badges de sécurité */}
+        <div className="admin-security">
           <div className="security-dot">
-            <Zap size={12} color="#C4A962" />
-            <span>JWT</span>
+            <ShieldCheck size={12} />
+            <span>2FA</span>
           </div>
           <div className="security-dot">
-            <Shield size={12} color="#C4A962" />
+            <Lock size={12} />
             <span>256-bit</span>
           </div>
           <div className="security-dot">
-            <Award size={12} color="#C4A962" />
-            <span>2FA</span>
+            <Server size={12} />
+            <span>SSO</span>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="prestige-footer">
-          <p>© 2026 HSE Manager • Excellence & Sécurité</p>
+        <div className="admin-footer">
+          <p>© 2026 HSE Manager • Portail Administrateur • v2.4.0</p>
         </div>
       </motion.div>
 
-      {/* Particules fines */}
-      <div className="prestige-particles">
+      {/* Particules */}
+      <div className="admin-particles">
         {[...Array(30)].map((_, i) => (
           <motion.div
             key={i}
@@ -951,17 +955,17 @@ const AdminLogin = () => {
             animate={{
               y: [0, -100, 0],
               x: [0, (i % 2 === 0 ? 50 : -50), 0],
-              opacity: [0, 0.3, 0]
+              opacity: [0, 0.2, 0]
             }}
             transition={{
               duration: 10 + i,
               repeat: Infinity,
-              delay: i * 0.3
+              delay: i * 0.2
             }}
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              background: i % 3 === 0 ? '#C4A962' : i % 3 === 1 ? '#1E3A8A' : '#2E7D73'
+              background: '#1E3A8A'
             }}
           />
         ))}

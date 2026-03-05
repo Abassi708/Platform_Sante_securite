@@ -5,7 +5,8 @@ import {
   LogOut, Search, Filter, Eye, CheckCircle, XCircle, BarChart,
   Users, Briefcase, Award, Zap, Bell, Settings, HelpCircle, Key,
   Trash2, X, AlertCircle, Info, User, Mail, Shield, Eye as EyeIcon,
-  EyeOff, Send, MessageCircle, Hash, Crown, Wrench, Heart
+  EyeOff, Send, MessageCircle, Hash, Crown, Wrench, Heart,
+  History, ChevronRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/TechnicienDashboard.css';
@@ -337,9 +338,18 @@ const TechnicienDashboard = () => {
             </AnimatePresence>
           </div>
           
-          <button className="btn-icon" onClick={handleHistorique} title="Historique">
-            <FileText size={18} />
-          </button>
+          {/* BOUTON HISTORIQUE PROFESSIONNEL */}
+          <motion.button 
+            className="btn-historique"
+            onClick={handleHistorique}
+            title="Voir l'historique des connexions"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <History size={18} />
+            <span>Historique</span>
+            <ChevronRight size={16} className="historique-arrow" />
+          </motion.button>
           
           <button className="btn-icon logout-btn" onClick={handleLogout} title="Déconnexion">
             <LogOut size={18} />
@@ -401,6 +411,28 @@ const TechnicienDashboard = () => {
       >
         <h2>Bienvenue dans votre espace de travail</h2>
         <p>Gérez vos rapports et tâches administratives</p>
+        
+        {/* BANNIÈRE HISTORIQUE PROMOTIONNELLE */}
+        <motion.div 
+          className="historique-banner"
+          onClick={handleHistorique}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="banner-icon">
+            <History size={32} />
+          </div>
+          <div className="banner-content">
+            <h3>Consultez votre historique de connexions</h3>
+            <p>Retrouvez toutes vos activités récentes et suivez votre parcours</p>
+          </div>
+          <div className="banner-arrow">
+            <ChevronRight size={24} />
+          </div>
+        </motion.div>
         
         {/* SECTION NOTIFICATIONS RÉCENTES */}
         {notifications.length > 0 && (

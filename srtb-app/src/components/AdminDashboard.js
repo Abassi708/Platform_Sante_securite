@@ -270,14 +270,11 @@ const AdminDashboard = () => {
           email: user.email,
           role: user.role,
           matricule: user.matricule,
-          status: user.status || 'active',
-          lastLogin: user.lastLogin || null,
-          loginCount: user.loginCount || 0,
+          status: 'active',
+          lastLogin: user.derniere_connexion || null,
+          loginCount: user.nombre_connexions || 0,
           createdAt: user.createdAt || null,
-          lastActive: user.lastActive || null,
-          sessions: user.sessions || [],
-          failedAttempts: user.failedAttempts || 0,
-          locked: user.locked || false
+          lastActive: user.lastActive || null
         }));
         
         setUsers(realUsers);
@@ -286,9 +283,7 @@ const AdminDashboard = () => {
         const roles = [...new Set(realUsers.map(u => u.role).filter(Boolean))];
         setAvailableRoles(roles);
         
-        // Calculer les stats simples pour le dashboard
         calculateSimpleStats(realUsers);
-        // Calculer les stats avancées pour l'onglet stats
         calculateSystemStats(realUsers);
       }
     } catch (err) {
@@ -298,7 +293,7 @@ const AdminDashboard = () => {
     }
   };
 
-  // ========== CALCUL DES STATS SIMPLES (DASHBOARD ORIGINAL) ==========
+  // ========== CALCUL DES STATS SIMPLES ==========
   const calculateSimpleStats = (usersData) => {
     const total = usersData.length;
     const active = usersData.filter(u => u.status === 'active').length;
@@ -324,13 +319,10 @@ const AdminDashboard = () => {
     const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()));
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     
-    // Statistiques de base
     const totalUsers = usersData.length;
     const activeUsers = usersData.filter(u => u.status === 'active').length;
     const inactiveUsers = usersData.filter(u => u.status === 'inactive').length;
-    const lockedAccounts = usersData.filter(u => u.locked).length;
     
-    // Connexions
     const totalLogins = usersData.reduce((sum, u) => sum + (u.loginCount || 0), 0);
     
     const loginsToday = usersData.filter(u => 
@@ -345,7 +337,6 @@ const AdminDashboard = () => {
       u.lastLogin && new Date(u.lastLogin) >= startOfMonth
     ).length;
     
-    // Nouveaux utilisateurs
     const newUsersToday = usersData.filter(u => 
       u.createdAt && new Date(u.createdAt).toDateString() === today
     ).length;
@@ -358,13 +349,11 @@ const AdminDashboard = () => {
       u.createdAt && new Date(u.createdAt) >= startOfMonth
     ).length;
     
-    // Répartition par rôle
     const admins = usersData.filter(u => u.role === 'admin').length;
     const techniciens = usersData.filter(u => u.role === 'technicien').length;
     const sociaux = usersData.filter(u => u.role === 'social').length;
     const agents = usersData.filter(u => u.role === 'agent').length;
     
-    // Tendance des connexions (7 derniers jours)
     const loginTrend = Array(7).fill(0).map((_, i) => {
       const date = new Date();
       date.setDate(date.getDate() - i);
@@ -375,7 +364,6 @@ const AdminDashboard = () => {
       return { day: dayStr, count };
     }).reverse();
     
-    // Activité par heure
     const activityByHour = Array(24).fill(0);
     usersData.forEach(u => {
       if (u.lastLogin) {
@@ -384,10 +372,8 @@ const AdminDashboard = () => {
       }
     });
     
-    // Trouver l'heure de pointe
     const peakLoginHour = activityByHour.indexOf(Math.max(...activityByHour));
     
-    // Activité par jour
     const activityByDay = Array(7).fill(0);
     usersData.forEach(u => {
       if (u.lastLogin) {
@@ -399,7 +385,6 @@ const AdminDashboard = () => {
     const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
     const peakLoginDay = days[activityByDay.indexOf(Math.max(...activityByDay))];
     
-    // Alertes simulées
     const pendingAlerts = Math.floor(Math.random() * 5);
     const criticalIssues = Math.floor(Math.random() * 3);
     const warnings = Math.floor(Math.random() * 8);
@@ -441,7 +426,7 @@ const AdminDashboard = () => {
       backupSize: '89 MB',
       lastBackup: new Date(Date.now() - 86400000).toISOString(),
       failedLogins: Math.floor(Math.random() * 20),
-      lockedAccounts,
+      lockedAccounts: 0,
       passwordResets: Math.floor(Math.random() * 15) + 5
     });
   };
@@ -452,7 +437,6 @@ const AdminDashboard = () => {
 
     let filtered = [...users];
 
-    // Recherche textuelle
     if (filters.search) {
       const term = filters.search.toLowerCase();
       filtered = filtered.filter(u => 
@@ -462,17 +446,14 @@ const AdminDashboard = () => {
       );
     }
 
-    // Filtre par rôle
     if (filters.role !== 'all') {
       filtered = filtered.filter(u => u.role === filters.role);
     }
 
-    // Filtre par statut
     if (filters.status !== 'all') {
       filtered = filtered.filter(u => u.status === filters.status);
     }
 
-    // Filtre par nombre de connexions
     if (filters.minConnections) {
       filtered = filtered.filter(u => u.loginCount >= parseInt(filters.minConnections));
     }
@@ -480,7 +461,6 @@ const AdminDashboard = () => {
       filtered = filtered.filter(u => u.loginCount <= parseInt(filters.maxConnections));
     }
 
-    // Filtre par date de dernière connexion
     if (filters.lastLogin !== 'all') {
       const now = new Date();
       switch(filters.lastLogin) {
@@ -501,7 +481,6 @@ const AdminDashboard = () => {
       }
     }
 
-    // Tri
     filtered.sort((a, b) => {
       let aVal = a[filters.sortBy];
       let bVal = b[filters.sortBy];
@@ -560,32 +539,65 @@ const AdminDashboard = () => {
 
   // ========== ACTIONS UTILISATEURS ==========
   
+  // ========== AJOUTER UN UTILISATEUR (CORRIGÉ) ==========
   const handleAddUser = async (e) => {
     e.preventDefault();
+    
+    // Validation des champs
+    if (!formData.email || !formData.password || !formData.role) {
+      showNotification({ 
+        type: 'error', 
+        title: '❌ Erreur', 
+        message: 'Veuillez remplir tous les champs obligatoires' 
+      });
+      return;
+    }
+
     try {
       const token = localStorage.getItem('token');
       
+      console.log('📝 Création utilisateur:', { 
+        email: formData.email, 
+        role: formData.role,
+        matricule: formData.matricule 
+      });
+
       const response = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+          matricule: formData.matricule || null
+        })
       });
 
       const data = await response.json();
+      console.log('📦 Réponse:', data);
 
-      if (response.ok) {
+      if (response.ok && data.success) {
+        // Message de succès
         showNotification({ 
           type: 'success', 
           title: '✅ Succès', 
-          message: `Utilisateur ${formData.email} créé avec succès` 
+          message: `L'utilisateur ${formData.email} a été créé avec succès` 
         });
-        fetchUsers();
+        
+        // Fermer la modale
         setShowAddUserModal(false);
+        
+        // Réinitialiser le formulaire
         setFormData({ email: '', role: 'agent', matricule: '', password: '' });
+        
+        // Recharger la liste des utilisateurs
+        await fetchUsers();
+        
       } else {
+        // Message d'erreur
         showNotification({ 
           type: 'error', 
           title: '❌ Erreur', 
@@ -593,6 +605,7 @@ const AdminDashboard = () => {
         });
       }
     } catch (err) {
+      console.error('❌ Erreur:', err);
       showNotification({ 
         type: 'error', 
         title: '❌ Erreur', 
@@ -748,7 +761,6 @@ const AdminDashboard = () => {
   const handleResetPassword = async () => {
     if (!selectedResetUser) return;
     
-    // Validation
     const errors = {};
     if (!resetNewPassword) errors.newPassword = t.passwordRequired;
     else if (resetNewPassword.length < 6) errors.newPassword = t.passwordMinLength;
@@ -788,7 +800,6 @@ const AdminDashboard = () => {
           message: `Mot de passe réinitialisé pour ${selectedResetUser.email}` 
         });
         
-        // Ouvrir la modale de notification après succès
         setShowNotificationModal(true);
         
       } else {
