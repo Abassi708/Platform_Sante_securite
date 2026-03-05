@@ -99,7 +99,7 @@
   --radius-2xl: 16px;
   --radius-full: 9999px;
   
-  /* Transitions */
+  /* Transitions - GARDÉES POUR LE RESTE, DÉSACTIVÉES POUR LES MODALES */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -321,6 +321,12 @@ body {
   background: var(--warning-50);
   color: var(--warning-700);
   border-color: var(--warning-300);
+}
+
+.header-btn.logout-btn:hover {
+  background: var(--error-50);
+  color: var(--error-700);
+  border-color: var(--error-300);
 }
 
 /* ============================================ */
@@ -977,7 +983,7 @@ body {
 }
 
 /* ============================================ */
-/* MODALS
+/* MODALES - VERSION STABLE (SANS ANIMATIONS)
 /* ============================================ */
 
 .modal-overlay {
@@ -992,6 +998,9 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  /* DÉSACTIVATION COMPLÈTE DES ANIMATIONS */
+  transition: none !important;
+  animation: none !important;
 }
 
 .modal-content {
@@ -1003,6 +1012,10 @@ body {
   overflow-y: auto;
   box-shadow: var(--shadow-xl);
   border: 1px solid var(--border-light);
+  /* DÉSACTIVATION COMPLÈTE DES ANIMATIONS */
+  transition: none !important;
+  animation: none !important;
+  transform: none !important;
 }
 
 .modal-content.large {
@@ -1042,14 +1055,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  /* DÉSACTIVATION DES TRANSITIONS */
+  transition: none !important;
 }
 
 .modal-close:hover {
   background: var(--error-50);
   color: var(--error-600);
   border-color: var(--error-300);
-  transform: rotate(90deg);
+  /* PAS DE ROTATION */
+  transform: none !important;
 }
 
 .modal-body {
@@ -1062,6 +1077,55 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
+}
+
+/* DÉSACTIVATION DES TRANSITIONS SUR LES BOUTONS DES MODALES */
+.modal-footer button,
+.modal-header button,
+.btn-cancel,
+.btn-delete {
+  transition: none !important;
+  animation: none !important;
+}
+
+.btn-cancel {
+  padding: var(--space-2) var(--space-6);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  background: var(--error-50);
+  color: var(--error-600);
+  border-color: var(--error-300);
+  /* PAS DE TRANSFORMATION */
+  transform: none !important;
+}
+
+.btn-delete {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-5);
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--error-600);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-delete:hover {
+  background: var(--error-700);
+  /* PAS DE TRANSFORMATION */
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* ============================================ */
@@ -1100,27 +1164,6 @@ body {
   color: var(--error-600);
   font-size: 0.8125rem;
   font-weight: 500;
-}
-
-.btn-delete {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-5);
-  border: none;
-  border-radius: var(--radius-full);
-  background: var(--error-600);
-  color: white;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.btn-delete:hover {
-  background: var(--error-700);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
 }
 
 /* ============================================ */
@@ -1260,13 +1303,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-fast);
+  /* DÉSACTIVATION DES TRANSITIONS */
+  transition: none !important;
 }
 
 .copy-btn-small:hover {
   background: var(--accent-50);
   color: var(--accent-600);
   border-color: var(--accent-300);
+  /* PAS DE TRANSFORMATION */
+  transform: none !important;
 }
 
 .device-detail {
@@ -1539,15 +1585,17 @@ body {
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: all var(--transition-fast);
   width: 100%;
   text-align: left;
+  /* DÉSACTIVATION DES TRANSITIONS */
+  transition: none !important;
 }
 
 .export-option:hover {
   background: var(--accent-50);
   border-color: var(--accent-300);
-  transform: translateX(2px);
+  /* PAS DE TRANSFORMATION */
+  transform: none !important;
 }
 
 .export-option svg {
@@ -1669,28 +1717,6 @@ body {
   background: var(--surface-2);
   border-color: var(--text-tertiary);
   color: var(--text-primary);
-}
-
-/* ============================================ */
-/* BOUTONS COMMUNS
-/* ============================================ */
-
-.btn-cancel {
-  padding: var(--space-2) var(--space-6);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border-light);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.btn-cancel:hover {
-  background: var(--error-50);
-  color: var(--error-600);
-  border-color: var(--error-300);
 }
 
 /* ============================================ */
