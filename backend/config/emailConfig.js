@@ -1,9 +1,8 @@
-// backend/config/emailConfig.js
 const nodemailer = require('nodemailer');
 
 // Configuration du transporteur email
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com', // ou votre serveur SMTP
+  host: 'smtp.gmail.com',
   port: 587,
   secure: false,
   auth: {
@@ -21,7 +20,7 @@ transporter.verify((error, success) => {
   }
 });
 
-// Fonction pour envoyer l'email de réinitialisation
+// ========== FONCTION EXISTANTE (réinitialisation) ==========
 const sendResetEmail = async (userEmail, userRole, newPassword, reason) => {
   try {
     const mailOptions = {
@@ -153,7 +152,7 @@ const sendResetEmail = async (userEmail, userRole, newPassword, reason) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email envoyé à:', userEmail);
+    console.log('✅ Email de réinitialisation envoyé à:', userEmail);
     return { success: true, messageId: info.messageId };
     
   } catch (error) {
@@ -162,4 +161,75 @@ const sendResetEmail = async (userEmail, userRole, newPassword, reason) => {
   }
 };
 
-module.exports = { sendResetEmail };
+// ========== NOUVELLE FONCTION POUR OTP ==========
+const sendCodeOTP = async (userEmail, userRole, codeOTP) => {
+  try {
+    const mailOptions = {
+      from: '"HSE Manager Sécurité" <securite@hsemanager.com>',
+      to: userEmail,
+      subject: '🔐 Votre code de connexion HSE Manager',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+            .container { max-width: 400px; margin: 0 auto; background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(135deg, #2563eb, #1e40af); color: white; padding: 20px; text-align: center; }
+            .content { padding: 30px; text-align: center; }
+            .code { font-size: 48px; font-weight: bold; color: #2563eb; letter-spacing: 10px; margin: 20px 0; padding: 20px; background: #f8fafc; border-radius: 8px; }
+            .info { color: #666; margin: 20px 0; }
+            .warning { background: #fee2e2; padding: 15px; border-radius: 8px; font-size: 14px; color: #991b1b; }
+            .footer { background: #f8fafc; padding: 15px; text-align: center; font-size: 12px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>HSE Manager</h1>
+              <p>Connexion sans mot de passe</p>
+            </div>
+            
+            <div class="content">
+              <h2>Bonjour ${userRole}</h2>
+              
+              <p>Vous avez demandé à vous connecter sans mot de passe.</p>
+              
+              <p>Voici votre code de vérification :</p>
+              
+              <div class="code">${codeOTP}</div>
+              
+              <p class="info">Ce code est valable <strong>5 minutes</strong></p>
+              
+              <div class="warning">
+                ⚠️ Si vous n'êtes pas à l'origine de cette demande,<br>
+                ignorez cet email.
+              </div>
+            </div>
+            
+            <div class="footer">
+              <p>HSE Manager - Sécurité des accès</p>
+              <p>Email automatique - Ne pas répondre</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email OTP envoyé à:', userEmail);
+    return { success: true, messageId: info.messageId };
+    
+  } catch (error) {
+    console.error('❌ Erreur envoi email OTP:', error);
+    return { success: false, error: error.message };
+  }
+};
+
+// ========== EXPORTER LES DEUX FONCTIONS ==========
+module.exports = { 
+  transporter,    // ← AJOUTÉ (utile pour d'autres fichiers)
+  sendResetEmail, 
+  sendCodeOTP     // ← NOUVELLE FONCTION
+};

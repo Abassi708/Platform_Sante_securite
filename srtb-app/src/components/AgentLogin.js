@@ -14,11 +14,9 @@ import {
   Zap,
   UserCheck,
   ArrowLeft,
-  Fingerprint,
   Key,
   Smartphone,
   QrCode,
-  Fingerprint as FingerprintIcon,
   ShieldCheck,
   Headphones,
   RefreshCw,
@@ -28,7 +26,10 @@ import {
   Scan,
   Info,
   Copy,
-  Camera
+  Camera,
+  Users,
+  FileText,
+  TrendingUp
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/AgentLogin.css';
@@ -46,7 +47,7 @@ const AgentLogin = () => {
   const [focusedField, setFocusedField] = useState(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
-  // États pour les fonctionnalités avancées (gardés pour l'UI)
+  // États pour les fonctionnalités avancées
   const [loginMethod, setLoginMethod] = useState('password');
   
   // CODE OTP
@@ -56,17 +57,23 @@ const AgentLogin = () => {
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [generatedOtp, setGeneratedOtp] = useState('');
-  
-  // BIOMÉTRIE
-  const [biometricSupported, setBiometricSupported] = useState(false);
-  const [biometricScanning, setBiometricScanning] = useState(false);
-  const [biometricSuccess, setBiometricSuccess] = useState(false);
+  const [otpEmail, setOtpEmail] = useState('');
+  const [sendingOtp, setSendingOtp] = useState(false);
   
   // QR CODE
   const [showQrCode, setShowQrCode] = useState(false);
   const [qrScanned, setQrScanned] = useState(false);
   const [qrCodeValue, setQrCodeValue] = useState('');
+  const [qrSessionId, setQrSessionId] = useState('');
+  const [qrCheckInterval, setQrCheckInterval] = useState(null);
   
+  // Statistiques agent
+  const [stats, setStats] = useState({
+    todayTasks: 8,
+    pendingRequests: 3,
+    satisfactionRate: 98
+  });
+
   // Autres états
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
@@ -86,13 +93,6 @@ const AgentLogin = () => {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  // Vérifier le support biométrique
-  useEffect(() => {
-    if (window.PublicKeyCredential) {
-      setBiometricSupported(true);
-    }
-  }, []);
-
   // Timer pour OTP
   useEffect(() => {
     let interval;
@@ -103,6 +103,15 @@ const AgentLogin = () => {
     }
     return () => clearInterval(interval);
   }, [otpTimer, showOtpInput]);
+
+  // Nettoyer l'intervalle QR code
+  useEffect(() => {
+    return () => {
+      if (qrCheckInterval) {
+        clearInterval(qrCheckInterval);
+      }
+    };
+  }, [qrCheckInterval]);
 
   // Charger la dernière connexion
   useEffect(() => {
@@ -115,41 +124,74 @@ const AgentLogin = () => {
   // Éléments flottants
   const floatingElements = [
     { id: 1, icon: UserCheck, color: '#8B5CF6', size: 32, delay: 0, top: '15%', left: '10%' },
-    { id: 2, icon: Fingerprint, color: '#8B5CF6', size: 28, delay: 0.5, top: '70%', left: '15%' },
+    { id: 2, icon: Users, color: '#8B5CF6', size: 28, delay: 0.5, top: '70%', left: '15%' },
     { id: 3, icon: QrCode, color: '#8B5CF6', size: 36, delay: 1, top: '25%', right: '12%' },
     { id: 4, icon: Key, color: '#8B5CF6', size: 30, delay: 1.5, bottom: '20%', right: '15%' },
     { id: 5, icon: Smartphone, color: '#8B5CF6', size: 24, delay: 2, top: '40%', left: '20%' },
     { id: 6, icon: Shield, color: '#8B5CF6', size: 26, delay: 2.5, bottom: '30%', left: '25%' }
   ];
 
-  // Méthodes de connexion
+  // Méthodes de connexion - SANS BIOMÉTRIE
   const loginMethods = [
-    { id: 'password', icon: Key, label: 'Mot de passe', color: '#8B5CF6' },
-    { id: 'otp', icon: Smartphone, label: 'Code OTP', color: '#8B5CF6' },
-    { id: 'biometric', icon: FingerprintIcon, label: 'Biométrie', color: '#8B5CF6', disabled: !biometricSupported },
-    { id: 'qrcode', icon: QrCode, label: 'QR Code', color: '#8B5CF6' }
+    { id: 'password', icon: Key, label: 'Mot de passe' },
+    { id: 'otp', icon: Smartphone, label: 'Code OTP' },
+    { id: 'qrcode', icon: QrCode, label: 'QR Code' }
   ];
 
-  // ===== FONCTIONNALITÉS AVANCÉES (GARDÉES POUR L'UI) =====
+  // ===== FONCTIONS OTP =====
 
-  const generateOtp = () => {
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    setGeneratedOtp(otp);
-    console.log(`[SIMULATION] Code OTP envoyé à ${email || 'l\'agent'}: ${otp}`);
-    return otp;
+  const sendOtpByEmail = async (emailAddress) => {
+    setSendingOtp(true);
+    
+    try {
+      console.log('📡 Demande OTP agent pour:', emailAddress);
+      
+      const response = await fetch('http://localhost:5000/api/otp/demander', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailAddress })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        console.log('✅ OTP envoyé avec succès');
+        return true;
+      } else {
+        setError(data.message || 'Erreur lors de l\'envoi du code');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Erreur envoi OTP:', error);
+      setError('Erreur de connexion au serveur');
+      return false;
+    } finally {
+      setSendingOtp(false);
+    }
   };
 
-  const handleOtpMethod = () => {
+  const handleOtpMethod = async () => {
+    if (!email) {
+      setError('Veuillez d\'abord entrer votre email');
+      return;
+    }
+    
+    setOtpEmail(email);
     setLoginMethod('otp');
     setShowOtpInput(true);
-    setOtpSent(true);
     setOtpTimer(60);
     setOtpCode(['', '', '', '', '', '']);
     setOtpVerified(false);
     setError('');
     
-    const newOtp = generateOtp();
-    alert(`[SIMULATION] Code OTP envoyé: ${newOtp}`);
+    const sent = await sendOtpByEmail(email);
+    if (sent) {
+      setOtpSent(true);
+      // Pour le développement, on simule un code
+      const mockOtp = '123456';
+      setGeneratedOtp(mockOtp);
+      alert(`[MODE DÉVELOPPEMENT] Code OTP: ${mockOtp}`);
+    }
   };
 
   const handleOtpChange = (index, value) => {
@@ -164,18 +206,61 @@ const AgentLogin = () => {
 
       const enteredOtp = newOtp.join('');
       if (enteredOtp.length === 6) {
-        if (enteredOtp === generatedOtp) {
-          setOtpVerified(true);
-          setTimeout(() => {
-            handleSuccessfulLogin();
-          }, 1500);
-        } else {
-          setError('Code OTP incorrect');
-          setTimeout(() => {
-            setOtpCode(['', '', '', '', '', '']);
-            document.getElementById('otp-0').focus();
-          }, 500);
-        }
+        verifyOtp(enteredOtp);
+      }
+    }
+  };
+
+  const verifyOtp = async (enteredOtp) => {
+    try {
+      console.log('📡 Vérification OTP agent pour:', otpEmail);
+      
+      const response = await fetch('http://localhost:5000/api/otp/verifier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email: otpEmail, 
+          code: enteredOtp 
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setOtpVerified(true);
+        
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        
+        const loginData = {
+          timestamp: new Date().toISOString(),
+          method: 'otp',
+          email: otpEmail,
+          success: true
+        };
+        localStorage.setItem('lastAgentLogin', JSON.stringify(loginData));
+        
+        setTimeout(() => {
+          navigate('/agent/dashboard');
+        }, 1500);
+      } else {
+        setError(data.message || 'Code OTP incorrect');
+        setTimeout(() => {
+          setOtpCode(['', '', '', '', '', '']);
+          document.getElementById('otp-0').focus();
+        }, 500);
+      }
+    } catch (err) {
+      console.error('❌ Erreur vérification OTP:', err);
+      
+      // Mode développement - fallback
+      if (enteredOtp === '123456') {
+        setOtpVerified(true);
+        setTimeout(() => {
+          navigate('/agent/dashboard');
+        }, 1500);
+      } else {
+        setError('Erreur de connexion au serveur');
       }
     }
   };
@@ -186,40 +271,20 @@ const AgentLogin = () => {
     }
   };
 
-  const resendOtp = () => {
+  const resendOtp = async () => {
     setOtpTimer(60);
     setOtpCode(['', '', '', '', '', '']);
     setError('');
-    const newOtp = generateOtp();
-    alert(`[SIMULATION] Nouveau code OTP envoyé: ${newOtp}`);
+    await sendOtpByEmail(otpEmail);
   };
 
-  const handleBiometricMethod = () => {
-    setLoginMethod('biometric');
-    setBiometricScanning(true);
-    setError('');
-    
-    setTimeout(() => {
-      setBiometricScanning(false);
-      const success = Math.random() < 0.9;
-      if (success) {
-        setBiometricSuccess(true);
-        setTimeout(() => {
-          handleSuccessfulLogin();
-        }, 1500);
-      } else {
-        setError('Empreinte non reconnue');
-        setBiometricScanning(false);
-        setLoginMethod('password');
-      }
-    }, 3000);
-  };
+  // ===== FONCTIONS QR CODE =====
 
   const generateQrCode = () => {
-    const sessionId = Math.random().toString(36).substring(2, 15).toUpperCase();
+    const sessionId = 'qr_agent_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
     const agentId = 'AG' + Math.floor(1000 + Math.random() * 9000);
-    const timestamp = Date.now().toString(36).substring(0, 4).toUpperCase();
-    const qrData = `SRTB-AG-${agentId}-${sessionId}-${timestamp}`;
+    const qrData = `SRTB-AGENT-${agentId}-${sessionId}`;
+    setQrSessionId(sessionId);
     setQrCodeValue(qrData);
     return qrData;
   };
@@ -246,19 +311,19 @@ const AgentLogin = () => {
     alert('Code copié dans le presse-papiers');
   };
 
-  const handleResetPassword = (e) => {
-    e.preventDefault();
-    setResetSent(true);
-    setTimeout(() => {
-      setShowForgotPassword(false);
-      setResetSent(false);
-      setResetEmail('');
-    }, 3000);
-  };
+  // ===== CONNEXION STANDARD =====
 
-  // ===== CONNEXION RÉELLE AU BACKEND =====
   const handleSuccessfulLogin = () => {
     setIsLoading(false);
+    
+    const loginData = {
+      timestamp: new Date().toISOString(),
+      method: loginMethod,
+      email: email,
+      success: true
+    };
+    localStorage.setItem('lastAgentLogin', JSON.stringify(loginData));
+    
     navigate('/agent/dashboard');
   };
 
@@ -282,25 +347,12 @@ const AgentLogin = () => {
       });
 
       const data = await response.json();
-      console.log('📦 Réponse:', data);
 
       if (response.ok && data.success) {
-        // Sauvegarder le token JWT
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
         
-        // Sauvegarder la dernière connexion
-        const loginData = {
-          timestamp: new Date().toISOString(),
-          method: loginMethod,
-          email: email,
-          success: true
-        };
-        localStorage.setItem('lastAgentLogin', JSON.stringify(loginData));
-        
-        // Redirection vers le dashboard
-        navigate('/agent/dashboard');
-        
+        handleSuccessfulLogin();
       } else {
         setError(data.message || 'Email ou mot de passe incorrect');
       }
@@ -315,12 +367,25 @@ const AgentLogin = () => {
   const handleBackToMethods = () => {
     setShowOtpInput(false);
     setShowQrCode(false);
-    setBiometricScanning(false);
-    setBiometricSuccess(false);
     setQrScanned(false);
     setOtpCode(['', '', '', '', '', '']);
     setError('');
     setLoginMethod('password');
+    
+    if (qrCheckInterval) {
+      clearInterval(qrCheckInterval);
+      setQrCheckInterval(null);
+    }
+  };
+
+  const handleResetPassword = (e) => {
+    e.preventDefault();
+    setResetSent(true);
+    setTimeout(() => {
+      setShowForgotPassword(false);
+      setResetSent(false);
+      setResetEmail('');
+    }, 3000);
   };
 
   return (
@@ -421,7 +486,7 @@ const AgentLogin = () => {
         transition={{ delay: 2 }}
       >
         <ShieldCheck size={14} color="#8B5CF6" />
-        <span>Connexion sécurisée • 2FA disponible</span>
+        <span>Espace agent • Accès personnel</span>
       </motion.div>
 
       <motion.div 
@@ -453,7 +518,7 @@ const AgentLogin = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.3 }}
       >
-        {/* En-tête */}
+        {/* En-tête avec statistiques */}
         <div className="agent-header">
           <motion.div 
             className="agent-logo"
@@ -461,56 +526,56 @@ const AgentLogin = () => {
             animate={{ scale: 1 }}
             transition={{ type: 'spring', delay: 0.6 }}
           >
-            <UserCheck size={32} color="#8B5CF6" />
-            <span>SRTB<span>Agent</span></span>
+            <UserCheck size={36} color="#8B5CF6" />
+            <div className="logo-text">
+              <span className="logo-main">SRTB<span>Agent</span></span>
+              <span className="logo-sub">Portail personnel</span>
+            </div>
           </motion.div>
-          <h1>Portail personnel des agents SRTB</h1>
-          <p>Connectez-vous à votre espace sécurisé</p>
+          
+          <h1>Espace agent</h1>
+          <p>Gestion des tâches & suivi personnel</p>
+
+          {/* Mini statistiques */}
+          <div className="stats-mini">
+            <div className="stat-mini-item">
+              <FileText size={12} color="#8B5CF6" />
+              <span>{stats.todayTasks} tâches aujourd'hui</span>
+            </div>
+            <div className="stat-mini-item">
+              <Clock size={12} color="#8B5CF6" />
+              <span>{stats.pendingRequests} demandes</span>
+            </div>
+            <div className="stat-mini-item">
+              <TrendingUp size={12} color="#8B5CF6" />
+              <span>{stats.satisfactionRate}% satisfaction</span>
+            </div>
+          </div>
         </div>
 
-        {/* Sélecteur de méthode de connexion */}
-        {!showOtpInput && !showQrCode && !biometricScanning && !biometricSuccess && (
+        {/* Sélecteur de méthode de connexion - SANS BIOMÉTRIE */}
+        {!showOtpInput && !showQrCode && (
           <div className="login-methods">
-            <motion.button
-              className={`method-button ${loginMethod === 'password' ? 'active' : ''}`}
-              onClick={() => setLoginMethod('password')}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Key size={18} />
-              <span>Mot de passe</span>
-            </motion.button>
-            
-            <motion.button
-              className={`method-button ${loginMethod === 'otp' ? 'active' : ''}`}
-              onClick={handleOtpMethod}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Smartphone size={18} />
-              <span>Code OTP</span>
-            </motion.button>
-            
-            <motion.button
-              className={`method-button ${loginMethod === 'biometric' ? 'active' : ''} ${!biometricSupported ? 'disabled' : ''}`}
-              onClick={biometricSupported ? handleBiometricMethod : null}
-              whileHover={biometricSupported ? { y: -2 } : {}}
-              whileTap={biometricSupported ? { scale: 0.98 } : {}}
-            >
-              <FingerprintIcon size={18} />
-              <span>Biométrie</span>
-              {!biometricSupported && <span className="method-soon">(Non supporté)</span>}
-            </motion.button>
-            
-            <motion.button
-              className={`method-button ${loginMethod === 'qrcode' ? 'active' : ''}`}
-              onClick={handleQrCodeMethod}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <QrCode size={18} />
-              <span>QR Code</span>
-            </motion.button>
+            {loginMethods.map((method) => {
+              const Icon = method.icon;
+              const isActive = loginMethod === method.id;
+              return (
+                <motion.button
+                  key={method.id}
+                  className={`method-button ${isActive ? 'active' : ''}`}
+                  onClick={() => {
+                    if (method.id === 'otp') handleOtpMethod();
+                    else if (method.id === 'qrcode') handleQrCodeMethod();
+                    else setLoginMethod(method.id);
+                  }}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Icon size={18} color="#8B5CF6" />
+                  <span>{method.label}</span>
+                </motion.button>
+              );
+            })}
           </div>
         )}
 
@@ -524,7 +589,7 @@ const AgentLogin = () => {
           >
             <Smartphone size={32} color="#8B5CF6" className="otp-icon" />
             <h3>Vérification à deux facteurs</h3>
-            <p>Un code à 6 chiffres a été envoyé à <strong>{email || 'votre téléphone'}</strong></p>
+            <p>Un code à 6 chiffres a été envoyé à <strong>{otpEmail || email}</strong></p>
             
             <div className="otp-inputs">
               {otpCode.map((digit, index) => (
@@ -537,10 +602,19 @@ const AgentLogin = () => {
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
                   className="otp-digit"
+                  style={{ borderColor: otpVerified ? '#10b981' : 'rgba(139, 92, 246, 0.3)' }}
                   autoFocus={index === 0}
+                  disabled={sendingOtp}
                 />
               ))}
             </div>
+
+            {sendingOtp && (
+              <div className="otp-sending">
+                <div className="spinner-small"></div>
+                <p>Envoi du code en cours...</p>
+              </div>
+            )}
 
             {otpVerified && (
               <motion.div 
@@ -548,13 +622,13 @@ const AgentLogin = () => {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
               >
-                <CheckCircle size={40} color="#8B5CF6" />
+                <CheckCircle size={40} color="#10b981" />
                 <p>Code vérifié avec succès !</p>
               </motion.div>
             )}
 
             <div className="otp-timer">
-              <Clock size={14} />
+              <Clock size={14} color="#8B5CF6" />
               <span>Code valable {otpTimer} secondes</span>
             </div>
 
@@ -562,9 +636,9 @@ const AgentLogin = () => {
               <button 
                 className="otp-resend"
                 onClick={resendOtp}
-                disabled={otpTimer > 0}
+                disabled={otpTimer > 0 || sendingOtp}
               >
-                Renvoyer le code
+                {sendingOtp ? 'Envoi...' : 'Renvoyer le code'}
               </button>
               <button 
                 className="otp-back"
@@ -574,7 +648,7 @@ const AgentLogin = () => {
               </button>
             </div>
 
-            <p className="otp-hint">Un code vous a été envoyé (voir alerte)</p>
+            <p className="otp-hint">Un code vous a été envoyé par email</p>
           </motion.div>
         )}
 
@@ -611,7 +685,7 @@ const AgentLogin = () => {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                 >
-                  <CheckCircle size={60} color="#8B5CF6" />
+                  <CheckCircle size={60} color="#10b981" />
                   <p>QR Code scanné avec succès !</p>
                   <p className="success-message">Connexion en cours...</p>
                 </motion.div>
@@ -627,70 +701,8 @@ const AgentLogin = () => {
           </motion.div>
         )}
 
-        {/* Interface BIOMÉTRIE */}
-        {biometricScanning && (
-          <motion.div
-            className="biometric-interface"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-          >
-            <FingerprintIcon size={48} color="#8B5CF6" className="biometric-icon" />
-            <h3>Authentification biométrique</h3>
-            
-            <div className="biometric-scanner">
-              <FingerprintIcon size={80} color="#8B5CF6" />
-              <motion.div
-                className="scan-ripple"
-                animate={{
-                  scale: [1, 1.5, 1],
-                  opacity: [0.5, 0, 0.5]
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity
-                }}
-              />
-              <motion.div
-                className="scan-ripple delay-1"
-                animate={{
-                  scale: [1, 1.5, 1],
-                  opacity: [0.5, 0, 0.5]
-                }}
-                transition={{
-                  duration: 2,
-                  delay: 0.5,
-                  repeat: Infinity
-                }}
-              />
-            </div>
-            
-            <p>Placez votre doigt sur le capteur</p>
-            <p className="biometric-hint">Taux de réussite simulé: 90%</p>
-            
-            <button 
-              className="biometric-back"
-              onClick={handleBackToMethods}
-            >
-              Annuler
-            </button>
-          </motion.div>
-        )}
-
-        {biometricSuccess && (
-          <motion.div
-            className="biometric-success"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-          >
-            <CheckCircle size={60} color="#8B5CF6" />
-            <p>Empreinte reconnue !</p>
-            <p>Connexion en cours...</p>
-          </motion.div>
-        )}
-
         {/* Formulaire principal (Mot de passe) */}
-        {loginMethod === 'password' && !showOtpInput && !showQrCode && !biometricScanning && !biometricSuccess && (
+        {loginMethod === 'password' && !showOtpInput && !showQrCode && (
           <form onSubmit={handleSubmit} className="agent-form">
             {/* Email */}
             <div className={`agent-field ${focusedField === 'email' ? 'focused' : ''}`}>
@@ -714,7 +726,7 @@ const AgentLogin = () => {
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                   >
-                    <CheckCircle size={16} color="#8B5CF6" />
+                    <CheckCircle size={16} color="#10b981" />
                   </motion.div>
                 )}
               </div>
@@ -859,7 +871,7 @@ const AgentLogin = () => {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
               >
-                <CheckCircle size={48} color="#8B5CF6" />
+                <CheckCircle size={48} color="#10b981" />
                 <p>Un email de réinitialisation a été envoyé à {resetEmail}</p>
                 <button
                   className="reset-close"
@@ -912,7 +924,7 @@ const AgentLogin = () => {
           </AnimatePresence>
         </div>
 
-        {/* Badges de sécurité */}
+        {/* Badges de sécurité - SANS BIOMÉTRIE */}
         <div className="agent-security">
           <div className="security-dot">
             <ShieldCheck size={12} />
@@ -921,10 +933,6 @@ const AgentLogin = () => {
           <div className="security-dot">
             <Lock size={12} />
             <span>256-bit</span>
-          </div>
-          <div className="security-dot">
-            <Fingerprint size={12} />
-            <span>Biométrie</span>
           </div>
           <div className="security-dot">
             <Key size={12} />

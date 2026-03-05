@@ -4,6 +4,7 @@ require('dotenv').config();
 const sequelize = require('./config/database');
 const authRoutes = require('./routes/authRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const otpRoutes = require('./routes/otpRoutes');
 
 const app = express();
 
@@ -39,6 +40,8 @@ app.use((req, res, next) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/otp', otpRoutes);
+
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Backend opérationnel' });

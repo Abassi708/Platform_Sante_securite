@@ -157,7 +157,7 @@ const HistoriqueConnexions = () => {
       
       if (!token) {
         setError('Session expirée - Veuillez vous reconnecter');
-        setTimeout(() => navigate('/admin'), 2000);
+        setTimeout(() => navigate('/'), 2000);
         return;
       }
 
@@ -170,13 +170,13 @@ const HistoriqueConnexions = () => {
 
       if (response.status === 401) {
         setError('Session expirée - Veuillez vous reconnecter');
-        setTimeout(() => navigate('/admin'), 2000);
+        setTimeout(() => navigate('/'), 2000);
         return;
       }
 
       if (response.status === 403) {
         setError('Accès non autorisé');
-        setTimeout(() => navigate('/admin/dashboard'), 2000);
+        setTimeout(() => navigate('/'), 2000);
         return;
       }
 
@@ -327,8 +327,33 @@ const HistoriqueConnexions = () => {
     }, 500);
   };
 
+  // ========== FONCTION DE RETOUR CORRIGÉE ==========
   const handleBack = () => {
-    navigate('/admin/dashboard');
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      const user = JSON.parse(userData);
+      const role = user.role;
+      
+      // Redirection selon le rôle
+      switch(role) {
+        case 'admin':
+          navigate('/admin/dashboard');
+          break;
+        case 'technicien':
+          navigate('/technicien/dashboard');
+          break;
+        case 'social':
+          navigate('/social/dashboard');
+          break;
+        case 'agent':
+          navigate('/agent/dashboard');
+          break;
+        default:
+          navigate('/');
+      }
+    } else {
+      navigate('/');
+    }
   };
 
   const handleLogout = () => {
@@ -451,7 +476,6 @@ const HistoriqueConnexions = () => {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    // Utiliser une notification plus élégante
     alert('Copié dans le presse-papiers');
   };
 
@@ -886,7 +910,17 @@ const HistoriqueConnexions = () => {
             <h1>Historique des connexions</h1>
             <div className="header-greeting">
               <Sparkles size={12} />
-              <span>{greeting}, Administrateur</span>
+              <span>{greeting}, {(() => {
+                const userData = localStorage.getItem('user');
+                if (userData) {
+                  const user = JSON.parse(userData);
+                  return user.role === 'admin' ? 'Administrateur' : 
+                         user.role === 'technicien' ? 'Technicien' :
+                         user.role === 'social' ? 'Service Social' :
+                         user.role === 'agent' ? 'Agent' : 'Utilisateur';
+                }
+                return 'Administrateur';
+              })()}</span>
             </div>
           </div>
         </div>

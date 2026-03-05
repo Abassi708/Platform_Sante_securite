@@ -151,6 +151,131 @@
 }
 
 /* ============================================ */
+/* BOUTON HISTORIQUE PROFESSIONNEL
+/* ============================================ */
+
+.technicien-dashboard .btn-historique {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border: none;
+  border-radius: var(--radius-full);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.technicien-dashboard .btn-historique::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.technicien-dashboard .btn-historique:hover::before {
+  left: 100%;
+}
+
+.technicien-dashboard .btn-historique:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(245, 158, 11, 0.4);
+}
+
+.technicien-dashboard .btn-historique .historique-arrow {
+  transition: transform 0.3s ease;
+}
+
+.technicien-dashboard .btn-historique:hover .historique-arrow {
+  transform: translateX(4px);
+}
+
+/* ============================================ */
+/* BANNIÈRE HISTORIQUE
+/* ============================================ */
+
+.technicien-dashboard .historique-banner {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, var(--primary-soft), white);
+  border: 1px solid var(--primary-light);
+  border-radius: var(--radius);
+  margin-bottom: 2rem;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.technicien-dashboard .historique-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--primary);
+}
+
+.technicien-dashboard .historique-banner:hover {
+  border-color: var(--primary);
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.15);
+  transform: translateX(4px);
+}
+
+.technicien-dashboard .banner-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  background: var(--primary);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);
+}
+
+.technicien-dashboard .banner-content {
+  flex: 1;
+}
+
+.technicien-dashboard .banner-content h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 0.25rem;
+}
+
+.technicien-dashboard .banner-content p {
+  font-size: 0.85rem;
+  color: var(--text-medium);
+}
+
+.technicien-dashboard .banner-arrow {
+  color: var(--primary);
+  opacity: 0.5;
+  transition: var(--transition);
+}
+
+.technicien-dashboard .historique-banner:hover .banner-arrow {
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+/* ============================================ */
 /* NOTIFICATIONS
 /* ============================================ */
 
@@ -1001,10 +1126,22 @@
   .technicien-dashboard .header-right {
     width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
   }
   
   .technicien-dashboard .datetime {
     display: none;
+  }
+  
+  .technicien-dashboard .btn-historique {
+    order: -1;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .technicien-dashboard .historique-banner {
+    flex-direction: column;
+    text-align: center;
   }
   
   .technicien-dashboard .stats-grid {

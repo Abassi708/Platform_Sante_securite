@@ -1,14 +1,14 @@
 /* Import fonts */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-/* Reset */
+/* Reset - CE RESET EST GLOBAL, C'EST NORMAL */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-/* Container principal */
+/* Container principal - TOUT DOIT ÊTRE PRÉFIXÉ PAR .agent-container */
 .agent-container {
   min-height: 100vh;
   display: flex;
@@ -21,22 +21,22 @@
 }
 
 /* Background profond */
-.agent-bg {
+.agent-container .agent-bg {
   position: absolute;
   width: 100%;
   height: 100%;
   z-index: 0;
 }
 
-.bg-gradient {
+.agent-container .bg-gradient {
   position: absolute;
   width: 100%;
   height: 100%;
-  background: radial-gradient(ellipse at top, #1E3A8A20, #0A1929),
+  background: radial-gradient(ellipse at top, #8B5CF620, #0A1929),
               radial-gradient(ellipse at bottom, #8B5CF620, #0A1929);
 }
 
-.bg-grid {
+.agent-container .bg-grid {
   position: absolute;
   width: 100%;
   height: 100%;
@@ -46,22 +46,22 @@
   background-size: 60px 60px;
 }
 
-.bg-orb {
+.agent-container .bg-orb {
   position: absolute;
   border-radius: 50%;
   filter: blur(100px);
 }
 
-.orb-1 {
+.agent-container .orb-1 {
   width: 500px;
   height: 500px;
-  background: rgba(30, 58, 138, 0.1);
+  background: rgba(139, 92, 246, 0.1);
   top: -200px;
   right: -200px;
   animation: orbFloat 25s infinite alternate;
 }
 
-.orb-2 {
+.agent-container .orb-2 {
   width: 400px;
   height: 400px;
   background: rgba(139, 92, 246, 0.1);
@@ -70,7 +70,7 @@
   animation: orbFloat 30s infinite alternate-reverse;
 }
 
-.orb-3 {
+.agent-container .orb-3 {
   width: 300px;
   height: 300px;
   background: rgba(139, 92, 246, 0.05);
@@ -85,7 +85,7 @@
 }
 
 /* Monde flottant */
-.floating-world {
+.agent-container .floating-world {
   position: absolute;
   width: 100%;
   height: 100%;
@@ -93,14 +93,14 @@
   pointer-events: none;
 }
 
-.floating-item {
+.agent-container .floating-item {
   position: absolute;
   pointer-events: auto;
   cursor: pointer;
   z-index: 2;
 }
 
-.floating-icon {
+.agent-container .floating-icon {
   width: 70px;
   height: 70px;
   border-radius: 30px;
@@ -113,7 +113,17 @@
   transition: all 0.3s;
 }
 
-.floating-pulse {
+.agent-container .floating-icon svg {
+  color: #8B5CF6;
+}
+
+.agent-container .floating-icon:hover {
+  border-color: #8B5CF6;
+  transform: scale(1.1);
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.agent-container .floating-pulse {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -123,10 +133,11 @@
   border-radius: 30px;
   opacity: 0.2;
   z-index: -1;
+  background: #8B5CF6;
 }
 
 /* Bouton retour */
-.floating-back {
+.agent-container .floating-back {
   position: absolute;
   bottom: 15%;
   left: 8%;
@@ -141,7 +152,7 @@
   animation: floatBack 5s ease-in-out infinite;
 }
 
-.floating-back-icon {
+.agent-container .floating-back-icon {
   width: 70px;
   height: 70px;
   background: rgba(255, 255, 255, 0.03);
@@ -157,14 +168,14 @@
   z-index: 2;
 }
 
-.floating-back:hover .floating-back-icon {
+.agent-container .floating-back:hover .floating-back-icon {
   background: rgba(139, 92, 246, 0.15);
   border-color: #8B5CF6;
   transform: translateX(-8px) scale(1.05);
   box-shadow: 0 20px 40px -10px #8B5CF6;
 }
 
-.floating-back-text {
+.agent-container .floating-back-text {
   color: #8B5CF6;
   font-size: 13px;
   font-weight: 600;
@@ -179,12 +190,12 @@
   border: 1px solid rgba(139, 92, 246, 0.2);
 }
 
-.floating-back:hover .floating-back-text {
+.agent-container .floating-back:hover .floating-back-text {
   opacity: 1;
   transform: translateY(0);
 }
 
-.floating-back-pulse {
+.agent-container .floating-back-pulse {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -204,7 +215,7 @@
 }
 
 /* Badges d'information */
-.info-badge {
+.agent-container .info-badge {
   position: absolute;
   background: rgba(255, 255, 255, 0.02);
   backdrop-filter: blur(10px);
@@ -217,32 +228,40 @@
   color: #F1F5F9;
   font-size: 11px;
   z-index: 20;
+  box-shadow: 0 5px 15px -5px rgba(0, 0, 0, 0.5);
 }
 
-.left-badge {
+.agent-container .left-badge {
   top: 20px;
   left: 20px;
 }
 
-.right-badge {
+.agent-container .right-badge {
   top: 20px;
   right: 20px;
 }
 
-.bottom-badge {
+.agent-container .bottom-badge {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
+  white-space: nowrap;
 }
 
-/* Carte principale - LARGEUR AUGMENTÉE */
-.agent-card {
+.agent-container .info-badge svg {
+  color: #8B5CF6;
+  width: 14px;
+  height: 14px;
+}
+
+/* Carte principale */
+.agent-container .agent-card {
   background: rgba(255, 255, 255, 0.02);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(139, 92, 246, 0.1);
   border-radius: 30px;
   width: 100%;
-  max-width: 460px;  /* Augmenté de 420px à 460px */
+  max-width: 460px;
   padding: 30px;
   position: relative;
   z-index: 30;
@@ -250,29 +269,38 @@
 }
 
 /* En-tête */
-.agent-header {
+.agent-container .agent-header {
   text-align: center;
   margin-bottom: 20px;
 }
 
-.agent-logo {
+.agent-container .agent-logo {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 15px;
 }
 
-.agent-logo span {
+.agent-container .logo-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.agent-container .logo-main {
   font-size: 20px;
   font-weight: 700;
   color: #F1F5F9;
 }
 
-.agent-logo span span {
+.agent-container .logo-sub {
+  font-size: 12px;
   color: #8B5CF6;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
-.agent-header h1 {
+.agent-container .agent-header h1 {
   font-size: 22px;
   font-weight: 700;
   color: #F1F5F9;
@@ -280,13 +308,39 @@
   letter-spacing: -0.5px;
 }
 
-.agent-header p {
+.agent-container .agent-header p {
   font-size: 13px;
   color: #94a3b8;
 }
 
+/* Mini statistiques */
+.agent-container .stats-mini {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 15px;
+  padding: 10px 15px;
+  background: rgba(139, 92, 246, 0.05);
+  border-radius: 30px;
+  border: 1px solid rgba(139, 92, 246, 0.1);
+}
+
+.agent-container .stat-mini-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.agent-container .stat-mini-item svg {
+  width: 14px;
+  height: 14px;
+  color: #8B5CF6;
+}
+
 /* Méthodes de connexion */
-.login-methods {
+.agent-container .login-methods {
   display: flex;
   gap: 8px;
   margin-bottom: 25px;
@@ -294,7 +348,7 @@
   justify-content: center;
 }
 
-.method-button {
+.agent-container .method-button {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -311,12 +365,13 @@
   overflow: hidden;
 }
 
-.method-button svg {
+.agent-container .method-button svg {
   width: 18px;
   height: 18px;
+  color: #8B5CF6;
 }
 
-.method-button::before {
+.agent-container .method-button::before {
   content: '';
   position: absolute;
   top: 0;
@@ -327,30 +382,34 @@
   transition: left 0.5s;
 }
 
-.method-button:hover::before {
+.agent-container .method-button:hover::before {
   left: 100%;
 }
 
-.method-button:hover:not(.disabled) {
+.agent-container .method-button:hover:not(.disabled) {
   background: rgba(139, 92, 246, 0.05);
   border-color: #8B5CF6;
   color: white;
   transform: translateY(-2px);
 }
 
-.method-button.active {
+.agent-container .method-button.active {
   background: rgba(139, 92, 246, 0.1);
   border-color: #8B5CF6;
   color: white;
   box-shadow: 0 5px 15px -5px #8B5CF6;
 }
 
-.method-button.disabled {
+.agent-container .method-button.active svg {
+  color: #8B5CF6;
+}
+
+.agent-container .method-button.disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.method-soon {
+.agent-container .method-soon {
   font-size: 9px;
   color: #94a3b8;
   margin-left: 2px;
@@ -360,15 +419,15 @@
 }
 
 /* Formulaire */
-.agent-form {
+.agent-container .agent-form {
   margin-bottom: 20px;
 }
 
-.agent-field {
+.agent-container .agent-field {
   margin-bottom: 15px;
 }
 
-.agent-field label {
+.agent-container .agent-field label {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -381,17 +440,17 @@
   transition: color 0.3s;
 }
 
-.agent-field.focused label {
+.agent-container .agent-field.focused label {
   color: #8B5CF6;
 }
 
-.field-container {
+.agent-container .field-container {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.field-container input {
+.agent-container .field-container input {
   width: 100%;
   height: 45px;
   background: rgba(255, 255, 255, 0.02);
@@ -403,36 +462,37 @@
   transition: all 0.3s;
 }
 
-.field-container input:hover {
+.agent-container .field-container input:hover {
   border-color: rgba(139, 92, 246, 0.3);
   background: rgba(255, 255, 255, 0.03);
 }
 
-.field-container input:focus {
+.agent-container .field-container input:focus {
   outline: none;
   border-color: #8B5CF6;
   background: rgba(139, 92, 246, 0.02);
   box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
 }
 
-.field-container input::placeholder {
+.agent-container .field-container input::placeholder {
   color: rgba(255, 255, 255, 0.2);
   font-size: 13px;
 }
 
-.field-valid {
+.agent-container .field-valid {
   position: absolute;
   right: 15px;
   top: 50%;
   transform: translateY(-50%);
 }
 
-.field-valid svg {
+.agent-container .field-valid svg {
   width: 16px;
   height: 16px;
+  color: #8B5CF6;
 }
 
-.field-eye {
+.agent-container .field-eye {
   position: absolute;
   right: 15px;
   top: 50%;
@@ -448,24 +508,24 @@
   transition: color 0.3s;
 }
 
-.field-eye svg {
+.agent-container .field-eye svg {
   width: 16px;
   height: 16px;
 }
 
-.field-eye:hover {
+.agent-container .field-eye:hover {
   color: #8B5CF6;
 }
 
 /* Options */
-.agent-options {
+.agent-container .agent-options {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
 }
 
-.agent-checkbox {
+.agent-container .agent-checkbox {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -476,14 +536,14 @@
   padding-left: 20px;
 }
 
-.agent-checkbox input {
+.agent-container .agent-checkbox input {
   position: absolute;
   opacity: 0;
   width: 0;
   height: 0;
 }
 
-.checkbox-mark {
+.agent-container .checkbox-mark {
   position: absolute;
   left: 0;
   width: 14px;
@@ -494,16 +554,16 @@
   transition: all 0.2s;
 }
 
-.agent-checkbox:hover .checkbox-mark {
+.agent-container .agent-checkbox:hover .checkbox-mark {
   border-color: #8B5CF6;
 }
 
-.agent-checkbox input:checked + .checkbox-mark {
+.agent-container .agent-checkbox input:checked + .checkbox-mark {
   background: #8B5CF6;
   border-color: #8B5CF6;
 }
 
-.checkbox-mark:after {
+.agent-container .checkbox-mark:after {
   content: '';
   position: absolute;
   display: none;
@@ -516,11 +576,11 @@
   transform: rotate(45deg);
 }
 
-.agent-checkbox input:checked + .checkbox-mark:after {
+.agent-container .agent-checkbox input:checked + .checkbox-mark:after {
   display: block;
 }
 
-.agent-forgot {
+.agent-container .agent-forgot {
   background: none;
   border: none;
   color: #8B5CF6;
@@ -533,14 +593,14 @@
   border-radius: 20px;
 }
 
-.agent-forgot:hover {
+.agent-container .agent-forgot:hover {
   opacity: 1;
   background: rgba(139, 92, 246, 0.05);
   text-decoration: none;
 }
 
 /* Erreur */
-.agent-error {
+.agent-container .agent-error {
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.2);
   border-radius: 12px;
@@ -554,10 +614,10 @@
 }
 
 /* Bouton principal */
-.agent-button {
+.agent-container .agent-button {
   width: 100%;
   height: 45px;
-  background: linear-gradient(135deg, #1E3A8A, #8B5CF6);
+  background: linear-gradient(135deg, #0A1929, #8B5CF6);
   border: none;
   border-radius: 23px;
   color: #F1F5F9;
@@ -574,7 +634,7 @@
   overflow: hidden;
 }
 
-.agent-button::before {
+.agent-container .agent-button::before {
   content: '';
   position: absolute;
   top: -50%;
@@ -591,51 +651,24 @@
   100% { transform: translateX(100%) rotate(45deg); }
 }
 
-.agent-button:hover {
+.agent-container .agent-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 10px 20px -5px #8B5CF6;
 }
 
-.agent-button:disabled {
+.agent-container .agent-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
 }
 
-/* Boutons biométrie et QR code */
-.biometric-button,
-.qrcode-button {
-  width: 100%;
-  height: 42px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 21px;
-  color: #F1F5F9;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.3s;
-  margin-top: 8px;
-}
-
-.biometric-button:hover,
-.qrcode-button:hover {
-  background: rgba(139, 92, 246, 0.1);
-  border-color: #8B5CF6;
-  transform: translateY(-1px);
-}
-
 /* Loader */
-.agent-loader {
+.agent-container .agent-loader {
   display: flex;
   gap: 4px;
 }
 
-.loader-ring {
+.agent-container .loader-ring {
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -643,11 +676,11 @@
   animation: loaderPulse 1s infinite;
 }
 
-.loader-ring:nth-child(2) {
+.agent-container .loader-ring:nth-child(2) {
   animation-delay: 0.2s;
 }
 
-.loader-ring:nth-child(3) {
+.agent-container .loader-ring:nth-child(3) {
   animation-delay: 0.4s;
 }
 
@@ -657,32 +690,45 @@
 }
 
 /* Interface OTP */
-.otp-interface {
+.agent-container .otp-interface {
   text-align: center;
   margin-bottom: 20px;
 }
 
-.otp-interface h3 {
+.agent-container .otp-icon {
+  margin-bottom: 15px;
+  animation: pulse 2s infinite;
+  color: #8B5CF6;
+  width: 32px;
+  height: 32px;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+
+.agent-container .otp-interface h3 {
   color: #F1F5F9;
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 8px;
 }
 
-.otp-interface p {
+.agent-container .otp-interface p {
   color: #94a3b8;
   font-size: 13px;
   margin-bottom: 20px;
 }
 
-.otp-inputs {
+.agent-container .otp-inputs {
   display: flex;
   gap: 6px;
   justify-content: center;
   margin-bottom: 15px;
 }
 
-.otp-digit {
+.agent-container .otp-digit {
   width: 42px;
   height: 50px;
   background: rgba(255, 255, 255, 0.02);
@@ -695,7 +741,7 @@
   transition: all 0.3s;
 }
 
-.otp-digit:focus {
+.agent-container .otp-digit:focus {
   outline: none;
   border-color: #8B5CF6;
   background: rgba(139, 92, 246, 0.05);
@@ -703,7 +749,7 @@
   transform: scale(1.03);
 }
 
-.otp-timer {
+.agent-container .otp-timer {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -713,15 +759,21 @@
   margin-bottom: 15px;
 }
 
-.otp-actions {
+.agent-container .otp-timer svg {
+  width: 14px;
+  height: 14px;
+  color: #8B5CF6;
+}
+
+.agent-container .otp-actions {
   display: flex;
   gap: 15px;
   justify-content: center;
   margin-bottom: 20px;
 }
 
-.otp-resend,
-.otp-back {
+.agent-container .otp-resend,
+.agent-container .otp-back {
   background: none;
   border: none;
   color: #8B5CF6;
@@ -734,55 +786,77 @@
   border-radius: 20px;
 }
 
-.otp-resend:disabled {
+.agent-container .otp-resend:disabled {
   opacity: 0.3;
   cursor: not-allowed;
 }
 
-.otp-resend:hover:not(:disabled),
-.otp-back:hover {
+.agent-container .otp-resend:hover:not(:disabled),
+.agent-container .otp-back:hover {
   opacity: 1;
   background: rgba(139, 92, 246, 0.05);
 }
 
-.otp-verify {
-  width: 100%;
-  height: 45px;
-  background: linear-gradient(135deg, #1E3A8A, #8B5CF6);
-  border: none;
-  border-radius: 23px;
-  color: #F1F5F9;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
+.agent-container .otp-success {
+  text-align: center;
+  margin: 20px 0;
 }
 
-.otp-verify:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px -5px #8B5CF6;
+.agent-container .otp-success svg {
+  width: 40px;
+  height: 40px;
+  animation: successPop 0.5s;
+}
+
+@keyframes successPop {
+  0% { transform: scale(0); }
+  80% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.agent-container .otp-hint {
+  margin-top: 15px;
+  font-size: 11px;
+  color: #94a3b8;
+  border-top: 1px dashed rgba(139, 92, 246, 0.2);
+  padding-top: 12px;
+}
+
+.agent-container .otp-hint strong {
+  color: #8B5CF6;
+  background: rgba(139, 92, 246, 0.1);
+  padding: 2px 8px;
+  border-radius: 12px;
 }
 
 /* Interface QR Code */
-.qrcode-interface {
+.agent-container .qrcode-interface {
   text-align: center;
   margin-bottom: 20px;
 }
 
-.qrcode-interface h3 {
+.agent-container .qrcode-icon {
+  margin-bottom: 15px;
+  animation: pulse 2s infinite;
+  color: #8B5CF6;
+  width: 32px;
+  height: 32px;
+}
+
+.agent-container .qrcode-interface h3 {
   color: #F1F5F9;
   font-size: 18px;
   margin-bottom: 20px;
 }
 
-.qrcode-container {
+.agent-container .qrcode-container {
   padding: 20px;
   background: rgba(255, 255, 255, 0.02);
   border-radius: 25px;
   margin-bottom: 15px;
 }
 
-.qrcode-placeholder {
+.agent-container .qrcode-placeholder {
   position: relative;
   width: 160px;
   height: 160px;
@@ -794,12 +868,13 @@
   border-radius: 25px;
 }
 
-.qrcode-placeholder svg:first-child {
+.agent-container .qrcode-placeholder svg:first-child {
   width: 90px;
   height: 90px;
+  color: #8B5CF6;
 }
 
-.scan-animation {
+.agent-container .scan-animation {
   position: absolute;
   width: 30px;
   height: 30px;
@@ -813,24 +888,82 @@
   100% { transform: translateY(30px) scale(0.8); opacity: 0; }
 }
 
-.qrcode-container p {
+.agent-container .qrcode-container p {
   color: #94a3b8;
   font-size: 13px;
 }
 
-.qrcode-success svg {
+.agent-container .qrcode-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 15px 0 5px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 30px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.agent-container .qrcode-value code {
+  color: #8B5CF6;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.agent-container .copy-button {
+  background: rgba(139, 92, 246, 0.1);
+  border: none;
+  border-radius: 20px;
+  padding: 4px 8px;
+  color: #8B5CF6;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.agent-container .copy-button:hover {
+  background: #8B5CF6;
+  color: white;
+}
+
+.agent-container .copy-button:hover svg {
+  color: white;
+}
+
+.agent-container .qrcode-instruction {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 5px;
+}
+
+.agent-container .qrcode-success {
+  text-align: center;
+}
+
+.agent-container .qrcode-success svg {
   width: 50px;
   height: 50px;
   margin-bottom: 12px;
+  color: #8B5CF6;
 }
 
-.qrcode-success p {
+.agent-container .qrcode-success p {
   color: #8B5CF6;
   font-size: 14px;
   font-weight: 500;
 }
 
-.qrcode-back {
+.agent-container .success-message {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 5px;
+}
+
+.agent-container .qrcode-back {
   padding: 10px 25px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(139, 92, 246, 0.3);
@@ -841,46 +974,66 @@
   transition: all 0.3s;
 }
 
-.qrcode-back:hover {
+.agent-container .qrcode-back:hover {
   border-color: #8B5CF6;
   color: #F1F5F9;
   background: rgba(139, 92, 246, 0.05);
 }
 
 /* Interface biométrique */
-.biometric-interface {
+.agent-container .biometric-interface {
   text-align: center;
   margin-bottom: 20px;
 }
 
-.biometric-interface h3 {
+.agent-container .biometric-icon {
+  margin-bottom: 15px;
+  animation: fingerprintPulse 2s infinite;
+  color: #8B5CF6;
+  width: 48px;
+  height: 48px;
+}
+
+@keyframes fingerprintPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+.agent-container .biometric-interface h3 {
   color: #F1F5F9;
   font-size: 18px;
   margin-bottom: 25px;
 }
 
-.biometric-scanner {
+.agent-container .biometric-scanner {
   position: relative;
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 25px;
+  width: 140px;
+  height: 140px;
+  margin: 20px auto;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.biometric-scanner svg {
+.agent-container .biometric-scanner svg {
   width: 60px;
   height: 60px;
+  color: #8B5CF6;
+  z-index: 2;
 }
 
-.scan-ripple {
+.agent-container .scan-ripple {
   position: absolute;
   width: 100%;
   height: 100%;
   border-radius: 50%;
   border: 2px solid #8B5CF6;
+  opacity: 0.5;
   animation: ripple 2s infinite;
+}
+
+.agent-container .scan-ripple.delay-1 {
+  animation-delay: 0.5s;
 }
 
 @keyframes ripple {
@@ -888,40 +1041,83 @@
   100% { transform: scale(1.4); opacity: 0; }
 }
 
-.biometric-interface p {
+.agent-container .biometric-interface p {
   color: #94a3b8;
   font-size: 13px;
 }
 
+.agent-container .biometric-hint {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 5px;
+}
+
+.agent-container .biometric-back {
+  margin-top: 20px;
+  padding: 8px 25px;
+  background: none;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 20px;
+  color: #94a3b8;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.agent-container .biometric-back:hover {
+  border-color: #8B5CF6;
+  color: white;
+  background: rgba(139, 92, 246, 0.05);
+}
+
+.agent-container .biometric-success {
+  text-align: center;
+  margin: 30px 0;
+}
+
+.agent-container .biometric-success svg {
+  width: 60px;
+  height: 60px;
+  margin-bottom: 15px;
+  animation: successPop 0.5s;
+  color: #8B5CF6;
+}
+
+.agent-container .biometric-success p {
+  color: #8B5CF6;
+  font-size: 14px;
+  font-weight: 500;
+}
+
 /* Interface mot de passe oublié */
-.forgot-interface {
+.agent-container .forgot-interface {
   margin-bottom: 20px;
 }
 
-.forgot-interface h3 {
+.agent-container .forgot-interface h3 {
   color: #F1F5F9;
   font-size: 18px;
   margin-bottom: 12px;
   text-align: center;
 }
 
-.forgot-interface p {
+.agent-container .forgot-interface p {
   color: #94a3b8;
   font-size: 13px;
   margin-bottom: 15px;
   text-align: center;
 }
 
-.forgot-actions {
+.agent-container .forgot-actions {
   display: flex;
   gap: 8px;
   margin-top: 15px;
 }
 
-.forgot-submit {
+.agent-container .forgot-submit {
   flex: 2;
   height: 42px;
-  background: linear-gradient(135deg, #1E3A8A, #8B5CF6);
+  background: linear-gradient(135deg, #0A1929, #8B5CF6);
   border: none;
   border-radius: 21px;
   color: white;
@@ -931,7 +1127,12 @@
   transition: all 0.3s;
 }
 
-.forgot-cancel {
+.agent-container .forgot-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px -5px #8B5CF6;
+}
+
+.agent-container .forgot-cancel {
   flex: 1;
   height: 42px;
   background: rgba(255, 255, 255, 0.02);
@@ -943,29 +1144,32 @@
   transition: all 0.3s;
 }
 
-.forgot-cancel:hover {
+.agent-container .forgot-cancel:hover {
   border-color: #8B5CF6;
   color: #F1F5F9;
+  background: rgba(139, 92, 246, 0.05);
 }
 
-.reset-success {
+.agent-container .reset-success {
   text-align: center;
   padding: 15px;
 }
 
-.reset-success svg {
+.agent-container .reset-success svg {
   width: 45px;
   height: 45px;
   margin-bottom: 12px;
+  animation: successPop 0.5s;
+  color: #8B5CF6;
 }
 
-.reset-success p {
+.agent-container .reset-success p {
   color: #94a3b8;
   font-size: 13px;
   margin-bottom: 15px;
 }
 
-.reset-close {
+.agent-container .reset-close {
   padding: 8px 25px;
   background: rgba(139, 92, 246, 0.1);
   border: 1px solid #8B5CF6;
@@ -976,18 +1180,18 @@
   transition: all 0.3s;
 }
 
-.reset-close:hover {
+.agent-container .reset-close:hover {
   background: #8B5CF6;
   color: white;
 }
 
 /* Support */
-.agent-support {
+.agent-container .agent-support {
   position: relative;
   margin-bottom: 15px;
 }
 
-.support-button {
+.agent-container .support-button {
   width: 100%;
   background: none;
   border: 1px dashed rgba(139, 92, 246, 0.3);
@@ -1003,13 +1207,19 @@
   transition: all 0.3s;
 }
 
-.support-button:hover {
+.agent-container .support-button svg {
+  width: 14px;
+  height: 14px;
+  color: #8B5CF6;
+}
+
+.agent-container .support-button:hover {
   border-color: #8B5CF6;
   color: #F1F5F9;
   background: rgba(139, 92, 246, 0.05);
 }
 
-.support-panel {
+.agent-container .support-panel {
   position: absolute;
   bottom: 100%;
   left: 0;
@@ -1021,16 +1231,17 @@
   border-radius: 18px;
   padding: 15px;
   box-shadow: 0 15px 30px -10px rgba(0, 0, 0, 0.5);
+  z-index: 100;
 }
 
-.support-panel h4 {
+.agent-container .support-panel h4 {
   color: #F1F5F9;
   font-size: 13px;
   margin-bottom: 10px;
   text-align: center;
 }
 
-.support-item {
+.agent-container .support-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1040,17 +1251,17 @@
   border-bottom: 1px solid rgba(139, 92, 246, 0.1);
 }
 
-.support-item:last-child {
+.agent-container .support-item:last-child {
   border-bottom: none;
 }
 
-.support-item svg {
+.agent-container .support-item svg {
   width: 14px;
   height: 14px;
   color: #8B5CF6;
 }
 
-.support-note {
+.agent-container .support-note {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1062,7 +1273,7 @@
 }
 
 /* Sécurité */
-.agent-security {
+.agent-container .agent-security {
   display: flex;
   justify-content: center;
   gap: 10px;
@@ -1073,7 +1284,7 @@
   flex-wrap: wrap;
 }
 
-.security-dot {
+.agent-container .security-dot {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1089,27 +1300,27 @@
   transition: all 0.3s;
 }
 
-.security-dot:hover {
+.agent-container .security-dot:hover {
   background: rgba(139, 92, 246, 0.05);
   border-color: #8B5CF6;
   color: #F1F5F9;
 }
 
-.security-dot svg {
+.agent-container .security-dot svg {
   width: 10px;
   height: 10px;
   color: #8B5CF6;
 }
 
 /* Footer */
-.agent-footer {
+.agent-container .agent-footer {
   text-align: center;
   color: #94a3b8;
   font-size: 10px;
 }
 
 /* Particules */
-.agent-particles {
+.agent-container .agent-particles {
   position: absolute;
   width: 100%;
   height: 100%;
@@ -1117,238 +1328,75 @@
   z-index: 5;
 }
 
-.particle {
+.agent-container .particle {
   position: absolute;
   width: 2px;
   height: 2px;
   border-radius: 50%;
   opacity: 0.1;
   filter: blur(1px);
+  background: #8B5CF6;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .floating-world,
-  .info-badge,
-  .agent-particles {
+  .agent-container .floating-world,
+  .agent-container .info-badge,
+  .agent-container .agent-particles {
     display: none;
   }
   
-  .agent-card {
+  .agent-container .agent-card {
     margin: 15px;
     padding: 25px;
   }
   
-  .login-methods {
+  .agent-container .stats-mini {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+  
+  .agent-container .login-methods {
     gap: 6px;
   }
   
-  .method-button {
+  .agent-container .method-button {
     padding: 8px 12px;
     font-size: 12px;
   }
 }
 
 @media (max-width: 480px) {
-  .login-methods {
+  .agent-container .login-methods {
     flex-direction: column;
   }
   
-  .method-button {
+  .agent-container .method-button {
     width: 100%;
   }
   
-  .agent-options {
+  .agent-container .agent-options {
     flex-direction: column;
     gap: 8px;
     align-items: flex-start;
   }
   
-  .agent-header h1 {
+  .agent-container .agent-header h1 {
     font-size: 20px;
   }
   
-  .otp-inputs {
+  .agent-container .otp-inputs {
     gap: 4px;
   }
   
-  .otp-digit {
+  .agent-container .otp-digit {
     width: 38px;
     height: 45px;
     font-size: 18px;
   }
   
-  .forgot-actions {
+  .agent-container .forgot-actions {
     flex-direction: column;
   }
-}
-/* Ajouts pour les fonctionnalités avancées - à ajouter à la fin du fichier AgentLogin.css */
-
-/* OTP Icon */
-.otp-icon {
-  margin-bottom: 15px;
-  animation: pulse 2s infinite;
-}
-
-.otp-success {
-  text-align: center;
-  margin: 20px 0;
-}
-
-.otp-success svg {
-  animation: successPop 0.5s;
-}
-
-.otp-hint {
-  margin-top: 15px;
-  font-size: 11px;
-  color: #94a3b8;
-  border-top: 1px dashed rgba(139, 92, 246, 0.2);
-  padding-top: 12px;
-}
-
-.otp-hint strong {
-  color: #8B5CF6;
-  background: rgba(139, 92, 246, 0.1);
-  padding: 2px 8px;
-  border-radius: 12px;
-}
-
-/* QR Code */
-.qrcode-icon {
-  margin-bottom: 15px;
-  animation: pulse 2s infinite;
-}
-
-.qrcode-value {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin: 15px 0 5px;
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 30px;
-  border: 1px solid rgba(139, 92, 246, 0.2);
-}
-
-.qrcode-value code {
-  color: #8B5CF6;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 1px;
-}
-
-.copy-button {
-  background: rgba(139, 92, 246, 0.1);
-  border: none;
-  border-radius: 20px;
-  padding: 4px 8px;
-  color: #8B5CF6;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s;
-}
-
-.copy-button:hover {
-  background: #8B5CF6;
-  color: white;
-}
-
-.qrcode-instruction {
-  font-size: 11px;
-  color: #94a3b8;
-  margin-top: 5px;
-}
-
-.success-message {
-  font-size: 12px;
-  color: #94a3b8;
-  margin-top: 5px;
-}
-
-/* Biométrie */
-.biometric-icon {
-  margin-bottom: 15px;
-  animation: fingerprintPulse 2s infinite;
-}
-
-.biometric-scanner {
-  position: relative;
-  width: 140px;
-  height: 140px;
-  margin: 20px auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.scan-ripple {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 2px solid #8B5CF6;
-  opacity: 0.5;
-}
-
-.scan-ripple.delay-1 {
-  animation-delay: 0.5s;
-}
-
-.biometric-hint {
-  font-size: 11px;
-  color: #94a3b8;
-  margin-top: 5px;
-}
-
-.biometric-back {
-  margin-top: 20px;
-  padding: 8px 25px;
-  background: none;
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 20px;
-  color: #94a3b8;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.biometric-back:hover {
-  border-color: #8B5CF6;
-  color: white;
-}
-
-.biometric-success {
-  text-align: center;
-  margin: 30px 0;
-}
-
-.biometric-success svg {
-  margin-bottom: 15px;
-  animation: successPop 0.5s;
-}
-
-.biometric-success p {
-  color: #8B5CF6;
-  font-size: 14px;
-  font-weight: 500;
-}
-
-/* Animations */
-@keyframes pulse {
-  0%, 100% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.1); opacity: 1; }
-}
-
-@keyframes successPop {
-  0% { transform: scale(0); }
-  80% { transform: scale(1.2); }
-  100% { transform: scale(1); }
-}
-
-@keyframes fingerprintPulse {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
 }
