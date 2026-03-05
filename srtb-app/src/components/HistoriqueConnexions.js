@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { 
   History, 
   Search, 
@@ -68,7 +67,7 @@ const HistoriqueConnexions = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [greeting, setGreeting] = useState('');
   
-  // ========== STATS DE BASE (STABLES) ==========
+  // ========== STATS DE BASE ==========
   const [baseStats, setBaseStats] = useState({
     total: 0,
     success: 0,
@@ -186,7 +185,7 @@ const HistoriqueConnexions = () => {
         setConnexions(data.data);
         setFilteredConnexions(data.data);
         
-        // Calculer les stats de base (UNE SEULE FOIS)
+        // Calculer les stats de base
         calculateBaseStats(data.data);
       } else {
         setError('Format de données invalide');
@@ -327,14 +326,13 @@ const HistoriqueConnexions = () => {
     }, 500);
   };
 
-  // ========== FONCTION DE RETOUR CORRIGÉE ==========
+  // ========== FONCTION DE RETOUR ==========
   const handleBack = () => {
     const userData = localStorage.getItem('user');
     if (userData) {
       const user = JSON.parse(userData);
       const role = user.role;
       
-      // Redirection selon le rôle
       switch(role) {
         case 'admin':
           navigate('/admin/dashboard');
@@ -436,19 +434,30 @@ const HistoriqueConnexions = () => {
     return 'Internet';
   };
 
+  // ========== FONCTION FORMATDATE CORRIGÉE ==========
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Remettre les heures à 0 pour comparer les jours uniquement
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    
+    const diffTime = today - targetDay;
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     
     let relativeTime = '';
     if (diffDays === 0) {
-      const diffHours = Math.floor(diffTime / (1000 * 60 * 60));
+      // Aujourd'hui - on regarde les heures
+      const diffHours = Math.floor((now - date) / (1000 * 60 * 60));
       if (diffHours === 0) {
-        const diffMinutes = Math.floor(diffTime / (1000 * 60));
-        relativeTime = diffMinutes <= 1 ? 'à l\'instant' : `il y a ${diffMinutes} min`;
-      } else {
+        const diffMinutes = Math.floor((now - date) / (1000 * 60));
+        if (diffMinutes < 1) {
+          relativeTime = 'à l\'instant';
+        } else if (diffMinutes < 60) {
+          relativeTime = `il y a ${diffMinutes} min`;
+        }
+      } else if (diffHours < 24) {
         relativeTime = `il y a ${diffHours}h`;
       }
     } else if (diffDays === 1) {
@@ -486,20 +495,8 @@ const HistoriqueConnexions = () => {
     const { date, time, relative } = formatDate(connexion.timestamp);
     
     return (
-      <motion.div 
-        className="modal-overlay"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-      >
-        <motion.div 
-          className="modal-content"
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          onClick={e => e.stopPropagation()}
-        >
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-content" onClick={e => e.stopPropagation()}>
           <div className="modal-header">
             <h2>Détails de la connexion</h2>
             <button className="modal-close" onClick={onClose}>
@@ -599,38 +596,41 @@ const HistoriqueConnexions = () => {
               Fermer
             </button>
           </div>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
     );
   };
 
-  // ========== MODAL STATISTIQUES ==========
+  // ========== MODAL STATISTIQUES (AVEC SCROLL CORRIGÉ) ==========
   const StatsModal = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
     
     return (
-      <motion.div 
-        className="modal-overlay"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-      >
-        <motion.div 
-          className="modal-content large"
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
+      <div className="modal-overlay" onClick={onClose}>
+        <div 
+          className="modal-content large" 
           onClick={e => e.stopPropagation()}
+          style={{ 
+            maxHeight: '80vh',
+            display: 'flex',
+            flexDirection: 'column'
+          }}
         >
-          <div className="modal-header">
+          <div className="modal-header" style={{ flexShrink: 0 }}>
             <h2>Statistiques détaillées</h2>
             <button className="modal-close" onClick={onClose}>
               <X size={18} />
             </button>
           </div>
           
-          <div className="modal-body">
+          <div 
+            className="modal-body" 
+            style={{ 
+              overflowY: 'auto',
+              padding: '24px',
+              flex: 1
+            }}
+          >
             <div className="stats-overview">
               <div className="stats-card primary">
                 <div className="stats-icon">
@@ -755,13 +755,13 @@ const HistoriqueConnexions = () => {
             </div>
           </div>
           
-          <div className="modal-footer">
+          <div className="modal-footer" style={{ flexShrink: 0 }}>
             <button className="btn-cancel" onClick={onClose}>
               Fermer
             </button>
           </div>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
     );
   };
 
@@ -770,20 +770,8 @@ const HistoriqueConnexions = () => {
     if (!isOpen) return null;
     
     return (
-      <motion.div 
-        className="modal-overlay"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-      >
-        <motion.div 
-          className="modal-content small"
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          onClick={e => e.stopPropagation()}
-        >
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-content small" onClick={e => e.stopPropagation()}>
           <div className="modal-header">
             <h2>Exporter les données</h2>
             <button className="modal-close" onClick={onClose}>
@@ -829,8 +817,8 @@ const HistoriqueConnexions = () => {
               Annuler
             </button>
           </div>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
     );
   };
 
@@ -839,20 +827,8 @@ const HistoriqueConnexions = () => {
     if (!isOpen || !connexion) return null;
     
     return (
-      <motion.div 
-        className="modal-overlay"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-      >
-        <motion.div 
-          className="modal-content small"
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.95, opacity: 0 }}
-          onClick={e => e.stopPropagation()}
-        >
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-content small" onClick={e => e.stopPropagation()}>
           <div className="modal-header">
             <h2>Confirmer la suppression</h2>
             <button className="modal-close" onClick={onClose}>
@@ -882,8 +858,8 @@ const HistoriqueConnexions = () => {
               Supprimer
             </button>
           </div>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
     );
   };
 
@@ -896,12 +872,7 @@ const HistoriqueConnexions = () => {
       <div className="bg-pattern"></div>
 
       {/* ========== HEADER ========== */}
-      <motion.div 
-        className="historique-header"
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
+      <div className="historique-header">
         <div className="header-left">
           <div className="header-icon-wrapper">
             <History size={24} />
@@ -986,15 +957,10 @@ const HistoriqueConnexions = () => {
             <LogOut size={16} />
           </button>
         </div>
-      </motion.div>
+      </div>
 
       {/* ========== STATS RAPIDES ========== */}
-      <motion.div 
-        className="quick-stats"
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-      >
+      <div className="quick-stats">
         <div className="quick-stat-card">
           <div className="quick-stat-icon">
             <Activity size={18} />
@@ -1054,15 +1020,10 @@ const HistoriqueConnexions = () => {
             <span className="quick-stat-value">{baseStats.total}</span>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* ========== FILTRES ========== */}
-      <motion.div 
-        className="filters-section"
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.15, duration: 0.3 }}
-      >
+      <div className="filters-section">
         <div className="search-wrapper">
           <Search size={16} className="search-icon" />
           <input
@@ -1091,101 +1052,88 @@ const HistoriqueConnexions = () => {
             </span>
           )}
         </button>
-      </motion.div>
+      </div>
 
       {/* ========== PANNEAU DE FILTRES ========== */}
-      <AnimatePresence>
-        {showFilters && (
-          <motion.div 
-            className="filters-panel"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-          >
-            <div className="filters-header">
-              <h3>Filtres avancés</h3>
-              <button onClick={() => {
-                setSelectedRole('all');
-                setSelectedStatus('all');
-                setDateRange('all');
-                setStartDate('');
-                setEndDate('');
-              }}>
-                Réinitialiser
-              </button>
+      {showFilters && (
+        <div className="filters-panel">
+          <div className="filters-header">
+            <h3>Filtres avancés</h3>
+            <button onClick={() => {
+              setSelectedRole('all');
+              setSelectedStatus('all');
+              setDateRange('all');
+              setStartDate('');
+              setEndDate('');
+            }}>
+              Réinitialiser
+            </button>
+          </div>
+          
+          <div className="filters-grid">
+            <div className="filter-group">
+              <label>Rôle</label>
+              <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)}>
+                <option value="all">Tous les rôles</option>
+                <option value="admin">Administrateur</option>
+                <option value="technicien">Technicien</option>
+                <option value="social">Service social</option>
+                <option value="agent">Agent</option>
+              </select>
             </div>
-            
-            <div className="filters-grid">
-              <div className="filter-group">
-                <label>Rôle</label>
-                <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)}>
-                  <option value="all">Tous les rôles</option>
-                  <option value="admin">Administrateur</option>
-                  <option value="technicien">Technicien</option>
-                  <option value="social">Service social</option>
-                  <option value="agent">Agent</option>
-                </select>
-              </div>
 
-              <div className="filter-group">
-                <label>Statut</label>
-                <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
-                  <option value="all">Tous</option>
-                  <option value="success">Succès</option>
-                  <option value="failed">Échec</option>
-                </select>
-              </div>
-
-              <div className="filter-group">
-                <label>Période</label>
-                <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
-                  <option value="all">Tout l'historique</option>
-                  <option value="today">Aujourd'hui</option>
-                  <option value="week">Cette semaine</option>
-                  <option value="month">Ce mois</option>
-                  <option value="custom">Personnalisé</option>
-                </select>
-              </div>
-
-              {dateRange === 'custom' && (
-                <>
-                  <div className="filter-group">
-                    <label>Du</label>
-                    <input 
-                      type="date" 
-                      value={startDate} 
-                      onChange={(e) => setStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div className="filter-group">
-                    <label>Au</label>
-                    <input 
-                      type="date" 
-                      value={endDate} 
-                      onChange={(e) => setEndDate(e.target.value)}
-                    />
-                  </div>
-                </>
-              )}
+            <div className="filter-group">
+              <label>Statut</label>
+              <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
+                <option value="all">Tous</option>
+                <option value="success">Succès</option>
+                <option value="failed">Échec</option>
+              </select>
             </div>
-            
-            <div className="filters-footer">
-              <span className="filter-result">
-                {filteredConnexions.length} résultat{filteredConnexions.length > 1 ? 's' : ''}
-              </span>
+
+            <div className="filter-group">
+              <label>Période</label>
+              <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
+                <option value="all">Tout l'historique</option>
+                <option value="today">Aujourd'hui</option>
+                <option value="week">Cette semaine</option>
+                <option value="month">Ce mois</option>
+                <option value="custom">Personnalisé</option>
+              </select>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+            {dateRange === 'custom' && (
+              <>
+                <div className="filter-group">
+                  <label>Du</label>
+                  <input 
+                    type="date" 
+                    value={startDate} 
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="filter-group">
+                  <label>Au</label>
+                  <input 
+                    type="date" 
+                    value={endDate} 
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+          
+          <div className="filters-footer">
+            <span className="filter-result">
+              {filteredConnexions.length} résultat{filteredConnexions.length > 1 ? 's' : ''}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ========== CONTENU PRINCIPAL ========== */}
-      <motion.div 
-        className="content-wrapper"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2, duration: 0.3 }}
-      >
+      <div className="content-wrapper">
         {loading ? (
           <div className="loading-container">
             <div className="loader-spinner"></div>
@@ -1374,42 +1322,40 @@ const HistoriqueConnexions = () => {
             </div>
           </>
         )}
-      </motion.div>
+      </div>
 
       {/* ========== MODALS ========== */}
-      <AnimatePresence>
-        {showDetailsModal && (
-          <DetailsModal
-            isOpen={showDetailsModal}
-            onClose={() => setShowDetailsModal(false)}
-            connexion={selectedConnexion}
-          />
-        )}
-        
-        {showStatsModal && (
-          <StatsModal
-            isOpen={showStatsModal}
-            onClose={() => setShowStatsModal(false)}
-          />
-        )}
-        
-        {showExportModal && (
-          <ExportModal
-            isOpen={showExportModal}
-            onClose={() => setShowExportModal(false)}
-            onExport={handleExport}
-          />
-        )}
+      {showDetailsModal && (
+        <DetailsModal
+          isOpen={showDetailsModal}
+          onClose={() => setShowDetailsModal(false)}
+          connexion={selectedConnexion}
+        />
+      )}
+      
+      {showStatsModal && (
+        <StatsModal
+          isOpen={showStatsModal}
+          onClose={() => setShowStatsModal(false)}
+        />
+      )}
+      
+      {showExportModal && (
+        <ExportModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          onExport={handleExport}
+        />
+      )}
 
-        {showDeleteModal && (
-          <DeleteConfirmModal
-            isOpen={showDeleteModal}
-            onClose={cancelDelete}
-            onConfirm={confirmDelete}
-            connexion={connexionToDelete}
-          />
-        )}
-      </AnimatePresence>
+      {showDeleteModal && (
+        <DeleteConfirmModal
+          isOpen={showDeleteModal}
+          onClose={cancelDelete}
+          onConfirm={confirmDelete}
+          connexion={connexionToDelete}
+        />
+      )}
     </div>
   );
 };
