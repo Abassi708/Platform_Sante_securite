@@ -3,12 +3,17 @@ const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { sendResetEmail } = require('../config/emailConfig');
 
-// ========== ENVOYER UNE NOTIFICATION + EMAIL (VERSION RAPIDE) ==========
+// ========== ENVOYER UNE NOTIFICATION + EMAIL ==========
 const sendPasswordNotification = async (req, res) => {
   try {
     const { user_id, new_password, reason } = req.body;
     
     console.log('📝 Envoi de notification à l\'utilisateur:', user_id);
+    
+    // Vérifier que user_id est valide
+    if (!user_id) {
+      return res.status(400).json({ message: 'ID utilisateur manquant' });
+    }
     
     const user = await User.findByPk(user_id);
     if (!user) {
@@ -20,15 +25,16 @@ const sendPasswordNotification = async (req, res) => {
     // Sauvegarder le mot de passe en clair pour l'email
     const plainPassword = new_password;
     
-    // 1. CRÉER LA NOTIFICATION (rapide)
+    // 1. CRÉER LA NOTIFICATION
     const notification = await Notification.create({
-      id_utilisateur: user.Id_utilisateur,
-      email_utilisateur: user.Login,
+      id_utilisateur: user.id_utilisateur,
+      email_utilisateur: user.Login,  // ← C'est ici que ça plantait
       role_utilisateur: user.Role,
       matricule_utilisateur: user.matricule_agent,
       nouveau_motpasse: new_password,
+      mot_passe: plainPassword,
       raison: reason,
-      envoyer_par_email: admin.Login,
+      envoyer_par_email: admin ? admin.Login : 'admin@hse.tn',
       statut: 'envoyé'
     });
     
@@ -53,10 +59,9 @@ const sendPasswordNotification = async (req, res) => {
       }
     });
     
-    // 3. ENVOYER L'EMAIL EN ARRIÈRE-PLAN (ne bloque pas)
+    // 3. ENVOYER L'EMAIL EN ARRIÈRE-PLAN
     console.log('📧 Envoi de l\'email en arrière-plan à:', user.Login);
     
-    // Utiliser setTimeout pour ne pas bloquer la réponse
     setImmediate(async () => {
       try {
         const emailResult = await sendResetEmail(
@@ -70,8 +75,6 @@ const sendPasswordNotification = async (req, res) => {
           console.log('✅ Email envoyé avec succès (arrière-plan)');
         } else {
           console.log('⚠️ Échec envoi email (arrière-plan):', emailResult.error);
-          
-          // Optionnel : Mettre à jour le statut de la notification
           await notification.update({ statut: 'echec' });
         }
       } catch (emailError) {

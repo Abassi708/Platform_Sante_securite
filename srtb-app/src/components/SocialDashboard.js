@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Heart, Users, Clock, Calendar, TrendingUp, Download, ArrowLeft, 
-  LogOut, Phone, Mail, MessageCircle, Award, Star, Bell, X,
-  CheckCircle, Eye, Trash2, Info, AlertCircle, Key,
-  History, ChevronRight, Crown, Wrench, User, EyeOff
+  Heart, Users, Clock, Calendar, LogOut, Phone, Mail, MessageCircle, 
+  Award, Bell, X, CheckCircle, Eye, Trash2, Info, AlertCircle, Key,
+  History, ChevronRight, Crown, Wrench, User, EyeOff,
+  AlertTriangle, FileText, Plus, BarChart3, Home, Activity
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import SocialAccidents from './SocialAccidents';
+import PlanningPage from './visites/PlanningPage';
+import GestionVisitesPage from './visites/GestionVisitesPage';
 import '../styles/SocialDashboard.css';
 
 const SocialDashboard = () => {
@@ -15,7 +18,13 @@ const SocialDashboard = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [greeting, setGreeting] = useState('');
   
-  // ========== STATS (simulées) ==========
+  // ========== ONGLET ACTIF ==========
+  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // ========== SOUS-ONGLET POUR LES VISITES ==========
+  const [visitesSubTab, setVisitesSubTab] = useState('planning'); // 'planning' ou 'gestion'
+  
+  // ========== STATS ==========
   const [stats] = useState({
     beneficiaires: 156,
     consultations: 43,
@@ -23,7 +32,7 @@ const SocialDashboard = () => {
     satisfaction: 94
   });
 
-  // ========== ÉTATS POUR LES NOTIFICATIONS ==========
+  // ========== NOTIFICATIONS ==========
   const [notifications, setNotifications] = useState([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -34,38 +43,54 @@ const SocialDashboard = () => {
 
   // ========== EFFETS ==========
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     const hour = new Date().getHours();
     if (hour < 12) setGreeting('Bonjour');
     else if (hour < 18) setGreeting('Bon après-midi');
     else setGreeting('Bonsoir');
-    
     return () => clearInterval(timer);
   }, []);
 
-  // Charger l'utilisateur
+  // ========== CHARGEMENT UTILISATEUR ET NOTIFICATIONS ==========
   useEffect(() => {
-    const userData = localStorage.getItem('user');
     const token = localStorage.getItem('token');
+    const userData = localStorage.getItem('user');
+    
+    console.log('🔍 Token:', token ? 'présent' : 'absent');
+    console.log('🔍 userData:', userData);
     
     if (!token || !userData) {
       navigate('/social');
       return;
     }
     
-    const parsedUser = JSON.parse(userData);
-    setUser(parsedUser);
-    
-    // Charger les notifications de l'utilisateur
-    fetchNotifications(parsedUser.id);
+    try {
+      const parsedUser = JSON.parse(userData);
+      console.log('🔍 Utilisateur parsé:', parsedUser);
+      
+      // Récupérer l'ID directement
+      const userId = parsedUser.id;
+      console.log('✅ ID utilisateur:', userId);
+      
+      setUser(parsedUser);
+      
+      if (userId) {
+        fetchNotifications(userId);
+      } else {
+        console.error('❌ ID utilisateur manquant');
+      }
+      
+    } catch (err) {
+      console.error('❌ Erreur:', err);
+      navigate('/social');
+    }
   }, [navigate]);
 
   // ========== CHARGER LES NOTIFICATIONS ==========
   const fetchNotifications = async (userId) => {
+    console.log('📥 fetchNotifications pour userId:', userId);
     setLoadingNotifications(true);
+    
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`http://localhost:5000/api/notifications/user/${userId}`, {
@@ -73,14 +98,18 @@ const SocialDashboard = () => {
       });
       
       const data = await response.json();
+      console.log('📥 Réponse brute:', data);
       
       if (data.success) {
+        console.log('📥 Notifications reçues:', data.notifications);
         setNotifications(data.notifications || []);
-        const unread = data.notifications?.filter(n => n.status !== 'read').length || 0;
+        const unread = data.notifications?.filter(n => n.status !== 'lu').length || 0;
         setUnreadCount(unread);
+      } else {
+        console.error('❌ Erreur API:', data.message);
       }
     } catch (err) {
-      console.error('Erreur chargement notifications:', err);
+      console.error('❌ Erreur réseau:', err);
     } finally {
       setLoadingNotifications(false);
     }
@@ -90,21 +119,17 @@ const SocialDashboard = () => {
   const markAsRead = async (notificationId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+      await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      const data = await response.json();
-      
-      if (data.success) {
-        setNotifications(notifications.map(n => 
-          n.id === notificationId ? { ...n, status: 'read' } : n
-        ));
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
+      setNotifications(notifications.map(n => 
+        n.id === notificationId ? { ...n, status: 'lu' } : n
+      ));
+      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
-      console.error('Erreur marquage notification:', err);
+      console.error('Erreur marquage:', err);
     }
   };
 
@@ -114,21 +139,16 @@ const SocialDashboard = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}`, {
+      await fetch(`http://localhost:5000/api/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      const data = await response.json();
-      
-      if (data.success) {
-        const updatedNotifications = notifications.filter(n => n.id !== notificationId);
-        setNotifications(updatedNotifications);
-        const unread = updatedNotifications.filter(n => n.status !== 'read').length;
-        setUnreadCount(unread);
-      }
+      const updated = notifications.filter(n => n.id !== notificationId);
+      setNotifications(updated);
+      setUnreadCount(updated.filter(n => n.status !== 'lu').length);
     } catch (err) {
-      console.error('Erreur suppression notification:', err);
+      console.error('Erreur suppression:', err);
     }
   };
 
@@ -147,12 +167,12 @@ const SocialDashboard = () => {
         setShowNotificationModal(true);
         setShowPassword(false);
         
-        if (notification.status !== 'read') {
+        if (notification.status !== 'lu') {
           markAsRead(notification.id);
         }
       }
     } catch (err) {
-      console.error('Erreur ouverture notification:', err);
+      console.error('Erreur ouverture:', err);
     }
   };
 
@@ -163,31 +183,20 @@ const SocialDashboard = () => {
     navigate('/');
   };
 
-  // ========== HISTORIQUE ==========
-  const handleHistorique = () => {
-    navigate('/social/historique');
-  };
-
   // ========== FORMATER LA DATE ==========
   const formatDate = (dateString) => {
     if (!dateString) return 'Date inconnue';
     const date = new Date(dateString);
     const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil(Math.abs(now - date) / (1000 * 60 * 60 * 24));
     
-    if (diffDays === 0) {
-      return "Aujourd'hui";
-    } else if (diffDays === 1) {
-      return "Hier";
-    } else if (diffDays < 7) {
-      return `Il y a ${diffDays} jours`;
-    } else {
-      return date.toLocaleDateString('fr-FR', { 
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-      });
-    }
+    if (diffDays === 0) return "Aujourd'hui";
+    if (diffDays === 1) return "Hier";
+    if (diffDays < 7) return `Il y a ${diffDays} jours`;
+    return date.toLocaleDateString('fr-FR', { 
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
   };
 
   // ========== FONCTIONS UTILITAIRES ==========
@@ -196,7 +205,6 @@ const SocialDashboard = () => {
       case 'admin': return <Crown size={16} />;
       case 'technicien': return <Wrench size={16} />;
       case 'social': return <Heart size={16} />;
-      case 'agent': return <User size={16} />;
       default: return <User size={16} />;
     }
   };
@@ -206,7 +214,6 @@ const SocialDashboard = () => {
       case 'admin': return '#2563eb';
       case 'technicien': return '#f59e0b';
       case 'social': return '#10b981';
-      case 'agent': return '#8b5cf6';
       default: return '#64748b';
     }
   };
@@ -221,6 +228,7 @@ const SocialDashboard = () => {
     return labels[role] || role;
   };
 
+  // ========== RENDU ==========
   return (
     <div className="social-dashboard">
       
@@ -238,18 +246,21 @@ const SocialDashboard = () => {
           <div>
             <h1>Service Social</h1>
             <p className="header-greeting">{greeting}, <strong>{user?.email?.split('@')[0] || 'Social'}</strong></p>
+            <p className="user-id-info" style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+              ID: {user?.id || 'inconnu'}
+            </p>
           </div>
         </div>
         
         <div className="header-right">
           <div className="datetime">
             <Clock size={14} /> 
-            <span>{currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            <span>{currentTime.toLocaleTimeString('fr-FR')}</span>
             <Calendar size={14} /> 
-            <span>{currentTime.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+            <span>{currentTime.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
           </div>
           
-          {/* BOUTON NOTIFICATIONS */}
+          {/* NOTIFICATIONS */}
           <div className="notifications-wrapper">
             <button 
               className={`btn-icon notification-btn ${unreadCount > 0 ? 'has-notifications' : ''}`}
@@ -262,7 +273,6 @@ const SocialDashboard = () => {
               )}
             </button>
             
-            {/* DROPDOWN DES NOTIFICATIONS */}
             <AnimatePresence>
               {showNotifications && (
                 <motion.div 
@@ -273,7 +283,7 @@ const SocialDashboard = () => {
                   transition={{ duration: 0.2 }}
                 >
                   <div className="notifications-header">
-                    <h3>Notifications</h3>
+                    <h3>Notifications ({notifications.length})</h3>
                     <button onClick={() => setShowNotifications(false)}>
                       <X size={16} />
                     </button>
@@ -293,10 +303,10 @@ const SocialDashboard = () => {
                       notifications.slice(0, 5).map(notif => (
                         <div 
                           key={notif.id} 
-                          className={`notification-item ${notif.status !== 'read' ? 'unread' : ''}`}
+                          className={`notification-item ${notif.status === 'lu' ? '' : 'unread'}`}
                           onClick={() => openNotification(notif)}
                         >
-                          <div className="notification-icon" style={{ background: `${getRoleColor(notif.user_role)}20`, color: getRoleColor(notif.user_role) }}>
+                          <div className="notification-icon" style={{ background: `${getRoleColor(notif.role_utilisateur)}20`, color: getRoleColor(notif.role_utilisateur) }}>
                             <Key size={16} />
                           </div>
                           <div className="notification-content">
@@ -304,13 +314,13 @@ const SocialDashboard = () => {
                               Mot de passe modifié
                             </div>
                             <div className="notification-message">
-                              {notif.reason?.substring(0, 50)}...
+                              {notif.raison?.substring(0, 50)}...
                             </div>
                             <div className="notification-time">
                               {formatDate(notif.created_at)}
                             </div>
                           </div>
-                          {notif.status !== 'read' && (
+                          {notif.status !== 'lu' && (
                             <span className="notification-dot"></span>
                           )}
                         </div>
@@ -318,9 +328,7 @@ const SocialDashboard = () => {
                     )}
                     
                     {notifications.length > 5 && (
-                      <button className="view-all-btn">
-                        Voir toutes les notifications
-                      </button>
+                      <button className="view-all-btn">Voir toutes</button>
                     )}
                   </div>
                 </motion.div>
@@ -328,19 +336,37 @@ const SocialDashboard = () => {
             </AnimatePresence>
           </div>
           
-          {/* BOUTON HISTORIQUE PROFESSIONNEL */}
-          <motion.button 
-            className="btn-historique"
-            onClick={handleHistorique}
-            title="Voir l'historique des connexions"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}
-          >
-            <History size={18} />
-            <span>Historique</span>
-            <ChevronRight size={16} className="historique-arrow" />
-          </motion.button>
+          {/* MENU PRINCIPAL */}
+          <div className="dashboard-menu">
+            <button 
+              className={`menu-btn ${activeTab === 'dashboard' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('dashboard')}
+            >
+              <Home size={18} /> <span>Accueil</span>
+            </button>
+            
+            <button 
+              className={`menu-btn ${activeTab === 'accidents' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('accidents')}
+            >
+              <AlertTriangle size={18} /> <span>Accidents</span>
+            </button>
+            
+            {/* NOUVEAU BOUTON VISITES */}
+            <button 
+              className={`menu-btn ${activeTab === 'visites' ? 'active' : ''}`} 
+              onClick={() => setActiveTab('visites')}
+            >
+              <Activity size={18} /> <span>Visites</span>
+            </button>
+            
+            <button 
+              className={`menu-btn ${activeTab === 'historique' ? 'active' : ''}`} 
+              onClick={() => navigate('/social/historique')}
+            >
+              <History size={18} /> <span>Historique</span>
+            </button>
+          </div>
           
           <button className="btn-icon logout-btn" onClick={handleLogout} title="Déconnexion">
             <LogOut size={18} />
@@ -348,233 +374,208 @@ const SocialDashboard = () => {
         </div>
       </motion.div>
 
-      {/* STATS CARDS */}
-      <motion.div 
-        className="stats-grid"
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-      >
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
-            <Users size={24} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Bénéficiaires</span>
-            <span className="stat-value">{stats.beneficiaires}</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
-            <Phone size={24} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Consultations</span>
-            <span className="stat-value">{stats.consultations}</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
-            <MessageCircle size={24} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Suivis</span>
-            <span className="stat-value">{stats.suivis}</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
-            <Award size={24} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Satisfaction</span>
-            <span className="stat-value">{stats.satisfaction}%</span>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* CONTENU PRINCIPAL */}
-      <motion.div 
-        className="dashboard-content"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2, duration: 0.3 }}
-      >
-        <h2>Espace d'accompagnement social</h2>
-        <p>Gérez vos dossiers et suivis sociaux</p>
+      {/* CONTENU */}
+      <motion.div className="dashboard-content">
         
-        {/* BANNIÈRE HISTORIQUE PROMOTIONNELLE */}
-        <motion.div 
-          className="historique-banner"
-          onClick={handleHistorique}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          style={{ background: 'linear-gradient(135deg, #10b98110, #05966910)', borderColor: '#10b981' }}
-        >
-          <div className="banner-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-            <History size={32} />
-          </div>
-          <div className="banner-content">
-            <h3>Consultez votre historique de connexions</h3>
-            <p>Retrouvez toutes vos activités récentes et suivez votre parcours</p>
-          </div>
-          <div className="banner-arrow" style={{ color: '#10b981' }}>
-            <ChevronRight size={24} />
-          </div>
-        </motion.div>
-        
-        {/* SECTION NOTIFICATIONS RÉCENTES */}
-        {notifications.length > 0 && (
-          <div className="recent-notifications">
-            <h3>
-              <Bell size={18} />
-              Notifications récentes
-              {unreadCount > 0 && <span className="unread-badge">{unreadCount} non lue(s)</span>}
-            </h3>
-            
-            <div className="recent-list">
-              {notifications.slice(0, 3).map(notif => (
-                <div 
-                  key={notif.id} 
-                  className={`recent-item ${notif.status !== 'read' ? 'unread' : ''}`}
-                  onClick={() => openNotification(notif)}
-                >
-                  <div className="recent-icon" style={{ background: `${getRoleColor(notif.user_role)}20`, color: getRoleColor(notif.user_role) }}>
-                    <Key size={16} />
-                  </div>
-                  <div className="recent-content">
-                    <div className="recent-title">
-                      Mot de passe modifié
-                      {notif.status !== 'read' && <span className="new-badge">Nouveau</span>}
-                    </div>
-                    <div className="recent-reason">{notif.reason}</div>
-                    <div className="recent-date">{formatDate(notif.created_at)}</div>
-                  </div>
+        {/* ACCUEIL */}
+        {activeTab === 'dashboard' && (
+          <>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
+                  <Users size={24} />
                 </div>
-              ))}
+                <div className="stat-content">
+                  <span className="stat-label">Bénéficiaires</span>
+                  <span className="stat-value">{stats.beneficiaires}</span>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
+                  <Phone size={24} />
+                </div>
+                <div className="stat-content">
+                  <span className="stat-label">Consultations</span>
+                  <span className="stat-value">{stats.consultations}</span>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
+                  <MessageCircle size={24} />
+                </div>
+                <div className="stat-content">
+                  <span className="stat-label">Suivis</span>
+                  <span className="stat-value">{stats.suivis}</span>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
+                  <Award size={24} />
+                </div>
+                <div className="stat-content">
+                  <span className="stat-label">Satisfaction</span>
+                  <span className="stat-value">{stats.satisfaction}%</span>
+                </div>
+              </div>
             </div>
+
+            <h2>Espace d'accompagnement social</h2>
+            <p>Gérez vos dossiers et suivis sociaux</p>
+            
+            {/* BANNIÈRE ACCIDENTS */}
+            <div className="historique-banner" onClick={() => setActiveTab('accidents')}>
+              <div className="banner-icon">
+                <AlertTriangle size={32} />
+              </div>
+              <div className="banner-content">
+                <h3>Gestion des accidents du travail</h3>
+                <p>Déclarez et suivez les accidents, consultez les statistiques</p>
+              </div>
+              <div className="banner-arrow">
+                <ChevronRight size={24} />
+              </div>
+            </div>
+            
+            {/* BANNIÈRE VISITES (NOUVELLE) */}
+            <div className="historique-banner" onClick={() => setActiveTab('visites')} style={{ marginTop: '1rem', borderColor: '#10b981' }}>
+              <div className="banner-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                <Activity size={32} />
+              </div>
+              <div className="banner-content">
+                <h3>Gestion des visites médicales</h3>
+                <p>Planning automatique, enregistrement et historique des consultations</p>
+              </div>
+              <div className="banner-arrow" style={{ color: '#10b981' }}>
+                <ChevronRight size={24} />
+              </div>
+            </div>
+            
+            {/* NOTIFICATIONS RÉCENTES */}
+            {notifications.length > 0 && (
+              <div className="recent-notifications">
+                <h3>
+                  <Bell size={18} /> Notifications récentes
+                  {unreadCount > 0 && <span className="unread-badge">{unreadCount} non lue(s)</span>}
+                </h3>
+                <div className="recent-list">
+                  {notifications.slice(0, 3).map(notif => (
+                    <div 
+                      key={notif.id} 
+                      className={`recent-item ${notif.status !== 'lu' ? 'unread' : ''}`} 
+                      onClick={() => openNotification(notif)}
+                    >
+                      <div className="recent-icon" style={{ background: `${getRoleColor(notif.role_utilisateur)}20`, color: getRoleColor(notif.role_utilisateur) }}>
+                        <Key size={16} />
+                      </div>
+                      <div className="recent-content">
+                        <div className="recent-title">
+                          Mot de passe modifié
+                          {notif.status !== 'lu' && <span className="new-badge">Nouveau</span>}
+                        </div>
+                        <div className="recent-reason">{notif.raison}</div>
+                        <div className="recent-date">{formatDate(notif.created_at)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ACCIDENTS */}
+        {activeTab === 'accidents' && <SocialAccidents />}
+
+        {/* VISITES MÉDICALES */}
+        {activeTab === 'visites' && (
+          <div className="visites-container">
+            {/* SOUS-MENU POUR LES VISITES */}
+            <div className="visites-submenu" style={{
+              display: 'flex',
+              gap: '0.5rem',
+              marginBottom: '1.5rem',
+              padding: '0.375rem',
+              background: 'var(--bg-white)',
+              border: '1px solid var(--border)',
+              borderRadius: '9999px',
+              width: 'fit-content'
+            }}>
+              <button 
+                className={`submenu-btn ${visitesSubTab === 'planning' ? 'active' : ''}`}
+                onClick={() => setVisitesSubTab('planning')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.6rem 1.25rem',
+                  borderRadius: '9999px',
+                  background: visitesSubTab === 'planning' ? 'var(--primary)' : 'transparent',
+                  color: visitesSubTab === 'planning' ? 'white' : 'var(--text-light)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <Calendar size={18} /> Planning
+              </button>
+              <button 
+                className={`submenu-btn ${visitesSubTab === 'gestion' ? 'active' : ''}`}
+                onClick={() => setVisitesSubTab('gestion')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.6rem 1.25rem',
+                  borderRadius: '9999px',
+                  background: visitesSubTab === 'gestion' ? 'var(--primary)' : 'transparent',
+                  color: visitesSubTab === 'gestion' ? 'white' : 'var(--text-light)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+              >
+                <FileText size={18} /> Gestion & Historique
+              </button>
+            </div>
+
+            {/* CONTENU DES VISITES */}
+            <motion.div
+              key={visitesSubTab}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              {visitesSubTab === 'planning' ? <PlanningPage /> : <GestionVisitesPage />}
+            </motion.div>
           </div>
         )}
       </motion.div>
 
-      {/* MODALE DE NOTIFICATION AMÉLIORÉE */}
+      {/* MODALE NOTIFICATION */}
       <AnimatePresence>
         {showNotificationModal && selectedNotification && (
-          <motion.div 
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowNotificationModal(false)}
-          >
-            <motion.div 
-              className="modal-content"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="modal-header" style={{ background: `linear-gradient(135deg, #10b98120, #05966920)` }}>
-                <div className="header-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-                  <Bell size={24} />
-                </div>
-                <h2>Notification de changement de mot de passe</h2>
+          <div className="modal-overlay" onClick={() => setShowNotificationModal(false)}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>Notification</h2>
                 <button className="modal-close" onClick={() => setShowNotificationModal(false)}>
                   <X size={18} />
                 </button>
               </div>
-              
               <div className="modal-body">
-                <div className="notification-preview">
-                  <div className="preview-card">
-                    <div className="preview-row">
-                      <span className="preview-label">Destinataire :</span>
-                      <span className="preview-value">
-                        <strong>{selectedNotification.user_email}</strong>
-                      </span>
-                    </div>
-                    <div className="preview-row">
-                      <span className="preview-label">Rôle :</span>
-                      <span className="preview-value">
-                        <span className="role-badge-small" style={{ background: getRoleColor(selectedNotification.user_role) }}>
-                          {getRoleIcon(selectedNotification.user_role)} {getRoleLabel(selectedNotification.user_role)}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="preview-row">
-                      <span className="preview-label">Date d'envoi :</span>
-                      <span className="preview-value">
-                        {new Date(selectedNotification.created_at).toLocaleString('fr-FR', {
-                          day: '2-digit', month: '2-digit', year: 'numeric',
-                          hour: '2-digit', minute: '2-digit'
-                        })}
-                      </span>
-                    </div>
-                    <div className="preview-row">
-                      <span className="preview-label">Raison :</span>
-                      <span className="preview-value reason">{selectedNotification.reason}</span>
-                    </div>
-                    <div className="preview-row password-row">
-                      <span className="preview-label">Nouveau mot de passe :</span>
-                      <div className="password-display">
-                        <span className={`preview-value password ${showPassword ? '' : 'hidden'}`}>
-                          {showPassword ? selectedNotification.new_password : '••••••••'}
-                        </span>
-                        <button 
-                          className="password-toggle-btn"
-                          onClick={() => setShowPassword(!showPassword)}
-                          title={showPassword ? 'Masquer' : 'Afficher'}
-                        >
-                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="preview-row">
-                      <span className="preview-label">Statut :</span>
-                      <span className={`preview-value status ${selectedNotification.status}`}>
-                        {selectedNotification.status === 'read' ? 'Lu' : 'Non lu'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="notification-message-box">
-                    <h4>Message complet</h4>
-                    <div className="message-content">
-                      <p><strong>Objet :</strong> Changement de votre mot de passe</p>
-                      <p>Bonjour {user?.email},</p>
-                      <p>Votre mot de passe a été modifié par l'administrateur.</p>
-                      <p><strong>Raison :</strong> {selectedNotification.reason}</p>
-                      <p><strong>Nouveau mot de passe :</strong> <span className="password-highlight">{showPassword ? selectedNotification.new_password : '••••••••'}</span></p>
-                      <p>Nous vous recommandons de changer ce mot de passe après votre prochaine connexion.</p>
-                      <p>Cordialement,<br/>L'équipe HSE Manager</p>
-                    </div>
-                  </div>
-                </div>
+                <p><strong>Raison :</strong> {selectedNotification.reason}</p>
+                <p><strong>Nouveau mot de passe :</strong> {showPassword ? selectedNotification.new_password : '••••••••'}</p>
+                <button onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? 'Masquer' : 'Afficher'}
+                </button>
               </div>
-              
               <div className="modal-footer">
-                <button 
-                  className="btn-secondary"
-                  onClick={() => setShowNotificationModal(false)}
-                >
-                  Fermer
-                </button>
-                <button 
-                  className="btn-delete"
-                  onClick={() => {
-                    if (window.confirm('Supprimer cette notification ?')) {
-                      deleteNotification(selectedNotification.id);
-                    }
-                  }}
-                >
-                  <Trash2 size={16} /> Supprimer
-                </button>
+                <button onClick={() => setShowNotificationModal(false)}>Fermer</button>
+                <button onClick={() => deleteNotification(selectedNotification.id)}>Supprimer</button>
               </div>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         )}
       </AnimatePresence>
     </div>

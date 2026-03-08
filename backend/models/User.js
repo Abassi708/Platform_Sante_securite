@@ -4,11 +4,11 @@ const sequelize = require('../config/database');
 const bcrypt = require('bcryptjs');
 
 const User = sequelize.define('User', {
-  Id_utilisateur: {
+  id_utilisateur: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true,
-    field: 'Id_utilisateur'
+    field: 'id_utilisateur'
   },
   Login: {
     type: DataTypes.STRING(50),
@@ -26,7 +26,7 @@ const User = sequelize.define('User', {
     field: 'Role'
   },
   matricule_agent: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.STRING(50),
     allowNull: true,
     field: 'matricule_agent'
   },
@@ -46,18 +46,20 @@ const User = sequelize.define('User', {
 });
 
 // Créer un utilisateur
-User.createUser = async (email, password, role = 'agent', matricule = 1) => {
+User.createUser = async (email, password, role = 'agent', matricule = null) => {
   try {
     console.log('📝 Création utilisateur:', { email, role, matricule });
     
     const salt = await bcrypt.genSalt(parseInt(process.env.BCRYPT_ROUNDS) || 10);
     const hashedPassword = await bcrypt.hash(password, salt);
     
+    const matriculeValue = (matricule && matricule !== '') ? matricule : null;
+    
     const user = await User.create({
       Login: email,
       Mot_de_passe: hashedPassword,
       Role: role,
-      matricule_agent: parseInt(matricule),
+      matricule_agent:matriculeValue,
       nombre_connexions: 0
     });
     
@@ -105,7 +107,7 @@ User.verifyCredentials = async (email, password) => {
 
 User.prototype.toJSON = function() {
   return {
-    id: this.Id_utilisateur,
+    id: this.id_utilisateur,
     email: this.Login,
     role: this.Role,
     matricule: this.matricule_agent,
