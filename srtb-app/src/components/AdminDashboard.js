@@ -250,48 +250,52 @@ const AdminDashboard = () => {
 
   // ========== CHARGEMENT DES UTILISATEURS ==========
   const fetchUsers = async () => {
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        navigate('/admin');
-        return;
-      }
-
-      const response = await fetch('http://localhost:5000/api/auth/users', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      const data = await response.json();
-
-      if (data.success && Array.isArray(data.users)) {
-        const realUsers = data.users.map(user => ({
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          matricule: user.matricule,
-          status: 'active',
-          lastLogin: user.derniere_connexion || null,
-          loginCount: user.nombre_connexions || 0,
-          createdAt: user.createdAt || null,
-          lastActive: user.lastActive || null
-        }));
-        
-        setUsers(realUsers);
-        setFilteredUsers(realUsers);
-        
-        const roles = [...new Set(realUsers.map(u => u.role).filter(Boolean))];
-        setAvailableRoles(roles);
-        
-        calculateSimpleStats(realUsers);
-        calculateSystemStats(realUsers);
-      }
-    } catch (err) {
-      setError('Erreur de connexion');
-    } finally {
-      setLoading(false);
+  setLoading(true);
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/admin');
+      return;
     }
-  };
+
+    const response = await fetch('http://localhost:5000/api/auth/users', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    const data = await response.json();
+
+    if (data.success && Array.isArray(data.users)) {
+      console.log('📦 Données brutes de l\'API:', data.users);
+      
+      const realUsers = data.users.map(user => ({
+        id: user.id,  // ← Maintenant l'ID est bien récupéré
+        email: user.email,
+        role: user.role,
+        matricule: user.matricule,
+        status: 'active',
+        lastLogin: user.derniere_connexion || null,
+        loginCount: user.nombre_connexions || 0,
+        createdAt: user.createdAt || null,
+        lastActive: user.lastActive || null
+      }));
+      
+      console.log('✅ Utilisateurs transformés avec ID:', realUsers);
+      
+      setUsers(realUsers);
+      setFilteredUsers(realUsers);
+      
+      const roles = [...new Set(realUsers.map(u => u.role).filter(Boolean))];
+      setAvailableRoles(roles);
+      
+      calculateSimpleStats(realUsers);
+      calculateSystemStats(realUsers);
+    }
+  } catch (err) {
+    setError('Erreur de connexion');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ========== CALCUL DES STATS SIMPLES ==========
   const calculateSimpleStats = (usersData) => {
@@ -536,6 +540,13 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchUsers();
   }, []);
+  
+useEffect(() => {
+ 
+  window.debugUsers = users;
+  window.debugSelectedUser = selectedResetUser;
+  console.log('✅ Mode débogage activé - Tapez window.debugUsers dans la console');
+}, [users, selectedResetUser]);
 
   // ========== ACTIONS UTILISATEURS ==========
   
@@ -757,68 +768,111 @@ const AdminDashboard = () => {
     }
   };
 
-  // ========== RÉINITIALISATION DE MOT DE PASSE ==========
-  const handleResetPassword = async () => {
-    if (!selectedResetUser) return;
-    
-    const errors = {};
-    if (!resetNewPassword) errors.newPassword = t.passwordRequired;
-    else if (resetNewPassword.length < 6) errors.newPassword = t.passwordMinLength;
-    if (!resetConfirmPassword) errors.confirmPassword = t.passwordRequired;
-    else if (resetNewPassword !== resetConfirmPassword) errors.confirmPassword = t.passwordsDoNotMatch;
+const handleResetPassword = async () => {
+  console.log('🟢 ===== DÉBOGAGE RÉINITIALISATION =====');
+  console.log('🟢 selectedResetUser:', selectedResetUser);
+  
+  if (!selectedResetUser) {
+    showNotification({ 
+      type: 'error', 
+      title: '❌ Erreur', 
+      message: 'Veuillez sélectionner un utilisateur' 
+    });
+    return;
+  }
 
-    if (Object.keys(errors).length > 0) {
-      setResetErrors(errors);
-      return;
+  // Récupérer l'ID - SANS parseInt sur le matricule
+  let userId = selectedResetUser.id || 
+               selectedResetUser.Id_utilisateur || 
+               selectedResetUser.userId ||
+               selectedResetUser._id;
+
+  console.log('🟢 ID trouvé:', userId);
+  console.log('🟢 Type ID:', typeof userId);
+
+  // Si pas d'ID, chercher dans window.debugUsers
+  if (!userId && window.debugUsers) {
+    console.log('🟢 Recherche dans debugUsers...');
+    const foundUser = window.debugUsers.find(u => u.email === selectedResetUser.email);
+    if (foundUser) {
+      userId = foundUser.id;
+      console.log('🟢 ID trouvé dans debugUsers:', userId);
     }
+  }
 
-    setResetLoading(true);
-    setResetErrors({});
-    setResetSuccess(false);
+  if (!userId) {
+    console.error('❌ AUCUN ID TROUVÉ DANS:', selectedResetUser);
+    showNotification({ 
+      type: 'error', 
+      title: '❌ Erreur', 
+      message: 'ID utilisateur introuvable' 
+    });
+    return;
+  }
 
-    try {
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch(`http://localhost:5000/api/auth/users/${selectedResetUser.id}/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          newPassword: resetNewPassword
-        })
+  // Validation du mot de passe
+  const errors = {};
+  if (!resetNewPassword) errors.newPassword = t.passwordRequired;
+  else if (resetNewPassword.length < 6) errors.newPassword = t.passwordMinLength;
+  if (!resetConfirmPassword) errors.confirmPassword = t.passwordRequired;
+  else if (resetNewPassword !== resetConfirmPassword) errors.confirmPassword = t.passwordsDoNotMatch;
+
+  if (Object.keys(errors).length > 0) {
+    setResetErrors(errors);
+    return;
+  }
+
+  setResetLoading(true);
+  setResetErrors({});
+  setResetSuccess(false);
+
+  try {
+    const token = localStorage.getItem('token');
+    
+    console.log('📝 Envoi requête à:', `http://localhost:5000/api/auth/users/${userId}/reset-password`);
+    
+    const response = await fetch(`http://localhost:5000/api/auth/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        newPassword: resetNewPassword
+      })
+    });
+
+    const data = await response.json();
+    console.log('📦 Réponse:', data);
+
+    if (response.ok) {
+      setResetSuccess(true);
+      showNotification({ 
+        type: 'success', 
+        title: '🔑 Succès', 
+        message: `Mot de passe réinitialisé pour ${selectedResetUser.email}` 
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setResetSuccess(true);
-        showNotification({ 
-          type: 'success', 
-          title: '🔑 Succès', 
-          message: `Mot de passe réinitialisé pour ${selectedResetUser.email}` 
-        });
-        
-        setShowNotificationModal(true);
-        
-      } else {
-        showNotification({ 
-          type: 'error', 
-          title: '❌ Erreur', 
-          message: data.message || 'Erreur lors de la réinitialisation' 
-        });
-        setResetLoading(false);
-      }
-    } catch (err) {
+      
+      setShowNotificationModal(true);
+      
+    } else {
       showNotification({ 
         type: 'error', 
         title: '❌ Erreur', 
-        message: 'Erreur de connexion au serveur' 
+        message: data.message || 'Erreur lors de la réinitialisation' 
       });
       setResetLoading(false);
     }
-  };
+  } catch (err) {
+    console.error('❌ Erreur:', err);
+    showNotification({ 
+      type: 'error', 
+      title: '❌ Erreur', 
+      message: 'Erreur de connexion au serveur' 
+    });
+    setResetLoading(false);
+  }
+};
 
   const clearResetForm = () => {
     setSelectedResetUser(null);
@@ -832,60 +886,64 @@ const AdminDashboard = () => {
 
   // ========== ENVOYER NOTIFICATION ==========
   const sendNotification = async () => {
-    if (!selectedResetUser || !resetNewPassword || !resetReason) {
+  if (!selectedResetUser || !resetNewPassword || !resetReason) {
+    showNotification({ 
+      type: 'error', 
+      title: '❌ Erreur', 
+      message: 'Veuillez remplir tous les champs' 
+    });
+    return;
+  }
+
+  setSendingNotification(true);
+
+  try {
+    const token = localStorage.getItem('token');
+    
+    // Récupérer l'ID de la même façon
+    const userId = selectedResetUser.id || selectedResetUser.Id_utilisateur;
+    
+    const response = await fetch('http://localhost:5000/api/notifications/send-password', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        new_password: resetNewPassword,
+        reason: resetReason
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showNotification({ 
+        type: 'success', 
+        title: '✅ Notification envoyée', 
+        message: `Notification envoyée avec succès à ${selectedResetUser.email}` 
+      });
+      setShowNotificationModal(false);
+      clearResetForm();
+    } else {
       showNotification({ 
         type: 'error', 
         title: '❌ Erreur', 
-        message: 'Veuillez remplir tous les champs' 
+        message: data.message || 'Erreur lors de l\'envoi de la notification' 
       });
-      return;
     }
-
-    setSendingNotification(true);
-
-    try {
-      const token = localStorage.getItem('token');
-      
-      const response = await fetch('http://localhost:5000/api/notifications/send-password', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          user_id: selectedResetUser.id,
-          new_password: resetNewPassword,
-          reason: resetReason
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        showNotification({ 
-          type: 'success', 
-          title: '✅ Notification envoyée', 
-          message: `Notification envoyée avec succès à ${selectedResetUser.email}` 
-        });
-        setShowNotificationModal(false);
-        clearResetForm();
-      } else {
-        showNotification({ 
-          type: 'error', 
-          title: '❌ Erreur', 
-          message: data.message || 'Erreur lors de l\'envoi de la notification' 
-        });
-      }
-    } catch (err) {
-      showNotification({ 
-        type: 'error', 
-        title: '❌ Erreur', 
-        message: 'Erreur de connexion au serveur' 
-      });
-    } finally {
-      setSendingNotification(false);
-    }
-  };
+  } catch (err) {
+    console.error('❌ Erreur:', err);
+    showNotification({ 
+      type: 'error', 
+      title: '❌ Erreur', 
+      message: 'Erreur de connexion au serveur' 
+    });
+  } finally {
+    setSendingNotification(false);
+  }
+};
 
   // ========== SÉLECTION MULTIPLE ==========
   const handleSelectUser = (userId) => {
@@ -1584,15 +1642,23 @@ const AdminDashboard = () => {
                                   <Eye size={14} />
                                 </button>
                                 <button 
-                                  className="action-btn" 
-                                  onClick={() => {
-                                    setActiveTab('reset');
-                                    setSelectedResetUser(user);
-                                  }} 
-                                  title="Réinitialiser mot de passe"
-                                >
-                                  <Key size={14} />
-                                </button>
+  className="action-btn" 
+  onClick={() => {
+    console.log('🟢 ===== DÉBOGAGE UTILISATEUR =====');
+    console.log('🟢 user complet:', user);
+    console.log('🟢 user.id:', user.id);
+    console.log('🟢 user.Id_utilisateur:', user.Id_utilisateur);
+    console.log('🟢 type de user.id:', typeof user.id);
+    console.log('🟢 Clés disponibles:', Object.keys(user));
+    console.log('🟢 ================================');
+    
+    setActiveTab('reset');
+    setSelectedResetUser(user);
+  }} 
+  title="Réinitialiser mot de passe"
+>
+  <Key size={14} />
+</button>
                                 <button 
                                   className="action-btn delete-btn" 
                                   onClick={() => confirmDelete(user)} 
@@ -1645,6 +1711,7 @@ const AdminDashboard = () => {
                             <Eye size={14} />
                           </button>
                           <button onClick={() => {
+                            console.log('Utilisateur sélectionné pour reset:', user);
                             setActiveTab('reset');
                             setSelectedResetUser(user);
                           }} title="Réinitialiser">
@@ -1731,7 +1798,10 @@ const AdminDashboard = () => {
                       <div 
                         key={user.id}
                         className={`reset-user-item ${selectedResetUser?.id === user.id ? 'selected' : ''}`}
-                        onClick={() => setSelectedResetUser(user)}
+                        onClick={() => {
+                          console.log('Utilisateur sélectionné dans reset:', user);
+                          setSelectedResetUser(user);
+                        }}
                       >
                         <div className="reset-user-avatar" style={{ background: `linear-gradient(135deg, ${getRoleColor(user.role)}, ${getRoleColor(user.role)}dd)` }}>
                           {user.email.charAt(0).toUpperCase()}

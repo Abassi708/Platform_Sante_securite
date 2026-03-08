@@ -11,7 +11,8 @@ const Historique = sequelize.define('Historique', {
   },
   id_utilisateur: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true,  
+    defaultValue: null,
     field: 'id_utilisateur'
   },
   email_utilisateur: {

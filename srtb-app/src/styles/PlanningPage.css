@@ -1,0 +1,976 @@
+/* ============================================ */
+/* PLANNING PAGE - DESIGN ÉLÉGANT (SOCIAL THEME)
+/* ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ============================================ */
+/* VARIABLES - MÊMES COULEURS QUE SOCIAL
+/* ============================================ */
+
+.planning-page {
+  --primary: #10b981;
+  --primary-light: #34d399;
+  --primary-dark: #059669;
+  --primary-soft: #d1fae5;
+  
+  --success: #10b981;
+  --success-soft: #d1fae5;
+  --danger: #ef4444;
+  --danger-soft: #fee2e2;
+  --warning: #f59e0b;
+  --warning-soft: #fef3c7;
+  
+  --text-dark: #1e293b;
+  --text-medium: #475569;
+  --text-light: #64748b;
+  --bg-white: #ffffff;
+  --bg-soft: #f8fafc;
+  --border: #e2e8f0;
+  --border-light: #f1f5f9;
+  
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-primary: 0 4px 12px rgba(16, 185, 129, 0.2);
+  --shadow-danger: 0 4px 12px rgba(239, 68, 68, 0.2);
+  --radius: 12px;
+  --radius-full: 9999px;
+  
+  --transition: all 0.2s ease;
+}
+
+/* ============================================ */
+/* BASE
+/* ============================================ */
+
+.planning-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  padding: 1.5rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--text-dark);
+}
+
+/* ============================================ */
+/* NOTIFICATIONS
+/* ============================================ */
+
+.planning-page .notification-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  animation: slideIn 0.3s ease;
+  max-width: 400px;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.planning-page .notification-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--bg-white);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+}
+
+.planning-page .notification-container.success .notification-content {
+  border-left-color: var(--success);
+}
+
+.planning-page .notification-container.error .notification-content {
+  border-left-color: var(--danger);
+}
+
+.planning-page .notification-container.warning .notification-content {
+  border-left-color: var(--warning);
+}
+
+.planning-page .notification-container.info .notification-content {
+  border-left-color: var(--primary);
+}
+
+.planning-page .notification-icon {
+  flex-shrink: 0;
+}
+
+.planning-page .notification-text {
+  flex: 1;
+}
+
+.planning-page .notification-text h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.planning-page .notification-text p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-medium);
+}
+
+.planning-page .notification-close {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.planning-page .notification-close:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger);
+  transform: rotate(90deg);
+}
+
+/* ============================================ */
+/* HEADER - COMME SOCIAL
+/* ============================================ */
+
+.planning-page .planning-header {
+  background: var(--bg-white);
+  border-radius: var(--radius);
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.planning-page .header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.planning-page .header-icon {
+  width: 2.8rem;
+  height: 2.8rem;
+  background: var(--primary);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+}
+
+.planning-page .header-title h1 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 0.2rem;
+}
+
+.planning-page .header-title p {
+  font-size: 0.85rem;
+  color: var(--text-light);
+}
+
+.planning-page .header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ============================================ */
+/* BOUTONS - MÊME STYLE QUE SOCIAL
+/* ============================================ */
+
+.planning-page .btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border: none;
+  border-radius: var(--radius-full);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: var(--shadow-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.planning-page .btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.planning-page .btn-primary:hover::before {
+  left: 100%;
+}
+
+.planning-page .btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(16, 185, 129, 0.4);
+}
+
+.planning-page .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.planning-page .btn-primary:disabled::before {
+  display: none;
+}
+
+.planning-page .btn-secondary {
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-full);
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  color: var(--text-light);
+  font-size: 0.9rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.planning-page .btn-secondary:hover {
+  background: var(--bg-soft);
+  border-color: var(--text-light);
+}
+
+.planning-page .btn-danger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: linear-gradient(135deg, var(--danger), #dc2626);
+  border: none;
+  border-radius: var(--radius-full);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  box-shadow: var(--shadow-danger);
+}
+
+.planning-page .btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(239, 68, 68, 0.4);
+}
+
+.planning-page .btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.planning-page .spinner-small {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================ */
+/* LÉGENDE - MÊME STYLE QUE SOCIAL
+/* ============================================ */
+
+.planning-page .planning-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+  justify-content: center;
+}
+
+.planning-page .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1rem;
+  background: var(--bg-soft);
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  color: var(--text-medium);
+  transition: var(--transition);
+  cursor: help;
+  position: relative;
+}
+
+.planning-page .legend-item:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+  transform: translateY(-2px);
+}
+
+.planning-page .legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transition: var(--transition);
+}
+
+.planning-page .legend-item:hover .legend-dot {
+  transform: scale(1.2);
+}
+
+.planning-page .legend-dot.programme {
+  background: var(--primary);
+}
+
+.planning-page .legend-dot.effectue {
+  background: var(--success);
+}
+
+.planning-page .legend-dot.reporte {
+  background: var(--warning);
+}
+
+.planning-page .legend-dot.annule {
+  background: var(--danger);
+}
+
+/* Tooltips */
+.planning-page .legend-item[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text-dark);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* ============================================ */
+/* PLANNING GRID
+/* ============================================ */
+
+.planning-page .planning-grid {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.planning-page .planning-row {
+  display: grid;
+  grid-template-columns: 100px repeat(4, 1fr);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.planning-page .planning-row:last-child {
+  border-bottom: none;
+}
+
+.planning-page .planning-row.header {
+  background: var(--bg-soft);
+  font-weight: 600;
+  border-bottom: 2px solid var(--border);
+}
+
+.planning-page .planning-cell {
+  padding: 1rem;
+  border-right: 1px solid var(--border-light);
+  min-height: 180px;
+}
+
+.planning-page .planning-cell:last-child {
+  border-right: none;
+}
+
+.planning-page .planning-cell.time-cell {
+  background: var(--bg-soft);
+  font-weight: 600;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+}
+
+.planning-page .planning-cell.day-cell {
+  text-align: center;
+  background: var(--bg-soft);
+}
+
+.planning-page .jour-label {
+  font-weight: 600;
+  color: var(--text-dark);
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.planning-page .date-label {
+  font-size: 0.75rem;
+  color: var(--text-light);
+}
+
+/* ============================================ */
+/* VISITE CARD - MÊME STYLE QUE LES STAT CARDS SOCIAL
+/* ============================================ */
+
+.planning-page .visite-card {
+  height: 100%;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  transition: var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.planning-page .visite-card:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow);
+  transform: translateY(-2px);
+}
+
+.planning-page .visite-card.programme {
+  border-left-color: var(--primary);
+}
+
+.planning-page .visite-card.effectue {
+  border-left-color: var(--success);
+  background: var(--success-soft);
+}
+
+.planning-page .visite-card.reporte {
+  border-left-color: var(--warning);
+  background: var(--warning-soft);
+}
+
+.planning-page .visite-card.annule {
+  border-left-color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.planning-page .visite-card.empty {
+  border-left-color: var(--border);
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-light);
+  font-size: 0.8rem;
+  border: 2px dashed var(--border);
+  min-height: 150px;
+}
+
+.planning-page .visite-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.planning-page .agent-matricule {
+  font-family: 'SF Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--bg-white);
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.planning-page .badge-statut {
+  font-size: 0.6rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  background: var(--bg-white);
+  color: var(--text-medium);
+  border: 1px solid var(--border);
+}
+
+.planning-page .badge-statut.effectue {
+  background: var(--success);
+  color: white;
+  border-color: var(--success);
+}
+
+.planning-page .agent-nom {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--text-dark);
+  margin-bottom: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.planning-page .agent-infos {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.65rem;
+  color: var(--text-light);
+  margin-bottom: 0.25rem;
+}
+
+.planning-page .agent-agence,
+.planning-page .agent-derniere,
+.planning-page .agent-priorite {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.planning-page .agent-agence svg {
+  color: var(--primary);
+}
+
+.planning-page .agent-priorite {
+  color: var(--warning);
+}
+
+.planning-page .visite-type {
+  font-size: 0.65rem;
+  color: var(--text-medium);
+  background: var(--bg-white);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  display: inline-block;
+  align-self: flex-start;
+  border: 1px solid var(--border);
+}
+
+/* ============================================ */
+/* ACTIONS BOUTONS
+/* ============================================ */
+
+.planning-page .visite-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.planning-page .action-btn {
+  width: 100%;
+  padding: 0.25rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-white);
+  font-size: 0.6rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.planning-page .action-btn.success {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.planning-page .action-btn.success:hover {
+  background: var(--success);
+  color: white;
+}
+
+.planning-page .action-btn.warning {
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+.planning-page .action-btn.warning:hover {
+  background: var(--warning);
+  color: white;
+}
+
+.planning-page .action-btn.danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.planning-page .action-btn.danger:hover {
+  background: var(--danger);
+  color: white;
+}
+
+.planning-page .visite-effectuee-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  font-size: 0.6rem;
+  color: var(--success);
+  margin-top: 0.25rem;
+}
+
+/* ============================================ */
+/* LOADING STATE
+/* ============================================ */
+
+.planning-page .loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.planning-page .spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.planning-page .loading-state p {
+  color: var(--text-light);
+  font-size: 0.9rem;
+}
+
+/* ============================================ */
+/* MODALES - MÊME STYLE QUE SOCIAL
+/* ============================================ */
+
+.planning-page .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.planning-page .modal-content {
+  width: 100%;
+  max-width: 550px;
+  background: var(--bg-white);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.planning-page .modal-content.small {
+  max-width: 450px;
+}
+
+.planning-page .modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  position: sticky;
+  top: 0;
+  background: var(--bg-white);
+  z-index: 10;
+}
+
+.planning-page .modal-header.warning {
+  background: var(--warning-soft);
+}
+
+.planning-page .modal-header.danger {
+  background: var(--danger-soft);
+}
+
+.planning-page .header-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  flex-shrink: 0;
+  background: var(--primary);
+}
+
+.planning-page .header-icon.warning {
+  background: var(--warning);
+}
+
+.planning-page .header-icon.danger {
+  background: var(--danger);
+}
+
+.planning-page .modal-header h2 {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.planning-page .modal-close {
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg-white);
+  color: var(--text-light);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.planning-page .modal-close:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-color: var(--danger);
+  transform: rotate(90deg);
+}
+
+.planning-page .modal-body {
+  padding: 1.5rem;
+}
+
+.planning-page .modal-footer {
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  background: var(--bg-soft);
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
+/* ============================================ */
+/* FORMULAIRES
+/* ============================================ */
+
+.planning-page .form-group {
+  margin-bottom: 1.25rem;
+}
+
+.planning-page .form-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+}
+
+.planning-page .form-group.readonly label {
+  color: var(--text-medium);
+}
+
+.planning-page .readonly-value {
+  padding: 0.75rem 1rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+  font-weight: 500;
+}
+
+.planning-page .form-group input,
+.planning-page .form-group select,
+.planning-page .form-group textarea {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+  transition: var(--transition);
+  font-family: 'Inter', sans-serif;
+}
+
+.planning-page .form-group input:focus,
+.planning-page .form-group select:focus,
+.planning-page .form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.planning-page .form-group input.error {
+  border-color: var(--danger);
+}
+
+.planning-page .error-message {
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--danger);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.planning-page .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.planning-page .required {
+  color: var(--danger);
+  margin-left: 2px;
+}
+
+/* ============================================ */
+/* RÉAFFECTATION INFO
+/* ============================================ */
+
+.planning-page .reaffect-info {
+  background: var(--bg-soft);
+  padding: 1rem;
+  border-radius: 6px;
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--border);
+}
+
+.planning-page .reaffect-info p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+  color: var(--text-medium);
+}
+
+.planning-page .reaffect-info strong {
+  color: var(--text-dark);
+  min-width: 60px;
+  display: inline-block;
+}
+
+/* ============================================ */
+/* RESPONSIVE
+/* ============================================ */
+
+@media (max-width: 1200px) {
+  .planning-page .planning-grid {
+    overflow-x: auto;
+  }
+  
+  .planning-page .planning-row {
+    min-width: 1000px;
+  }
+}
+
+@media (max-width: 768px) {
+  .planning-page {
+    padding: 1rem;
+  }
+  
+  .planning-page .planning-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .planning-page .header-right {
+    width: 100%;
+    flex-direction: column;
+  }
+  
+  .planning-page .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .planning-page .planning-legend {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .planning-page .legend-item {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .planning-page .modal-footer {
+    flex-direction: column;
+  }
+  
+  .planning-page .modal-footer button {
+    width: 100%;
+  }
+  
+  .planning-page .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .planning-page .planning-header .header-left {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .planning-page .header-title h1 {
+    font-size: 1rem;
+  }
+}

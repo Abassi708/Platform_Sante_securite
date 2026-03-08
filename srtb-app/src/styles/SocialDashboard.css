@@ -276,11 +276,12 @@
 }
 
 /* ============================================ */
-/* NOTIFICATIONS
+/* NOTIFICATIONS - CORRIGÉ
 /* ============================================ */
 
 .social-dashboard .notifications-wrapper {
   position: relative;
+  z-index: 1000; /* Augmenté */
 }
 
 .social-dashboard .notification-btn.has-notifications {
@@ -313,10 +314,32 @@
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
-  z-index: 100;
+  z-index: 9999 !important; /* Z-index très élevé */
   overflow: hidden;
+  /* Assurer que le dropdown est visible */
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: all !important;
 }
 
+/* Forcer les parents à ne pas cacher le dropdown */
+.social-dashboard .header-right {
+  overflow: visible !important;
+  position: relative;
+  z-index: 1000;
+}
+
+.social-dashboard .dashboard-header {
+  overflow: visible !important;
+  position: relative;
+  z-index: 500;
+}
+
+.social-dashboard .dashboard-content {
+  overflow: visible !important;
+}
+
+/* Reste du CSS identique... */
 .social-dashboard .notifications-header {
   display: flex;
   align-items: center;
@@ -461,7 +484,6 @@
 .social-dashboard .view-all-btn:hover {
   background: var(--primary-soft);
 }
-
 /* ============================================ */
 /* STATS CARDS
 /* ============================================ */
@@ -934,6 +956,51 @@
 }
 
 /* ============================================ */
+/* MENU DE NAVIGATION
+/* ============================================ */
+
+.social-dashboard .dashboard-menu {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 0.25rem;
+  margin: 0 0.5rem;
+}
+
+.social-dashboard .menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-full);
+  background: transparent;
+  border: none;
+  color: var(--text-light);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.social-dashboard .menu-btn:hover {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.social-dashboard .menu-btn.active {
+  background: var(--primary);
+  color: white;
+}
+
+.social-dashboard .menu-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ============================================ */
 /* RESPONSIVE
 /* ============================================ */
 
@@ -944,6 +1011,31 @@
   
   .social-dashboard .recent-list {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 992px) {
+  .social-dashboard .dashboard-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .social-dashboard .header-right {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  
+  .social-dashboard .dashboard-menu {
+    order: -1;
+    width: 100%;
+    overflow-x: auto;
+    justify-content: flex-start;
+    margin: 0;
+  }
+  
+  .social-dashboard .menu-btn span {
+    display: inline;
   }
 }
 
@@ -977,6 +1069,11 @@
   .social-dashboard .historique-banner {
     flex-direction: column;
     text-align: center;
+    padding: 1rem;
+  }
+  
+  .social-dashboard .banner-icon {
+    margin-bottom: 0.5rem;
   }
   
   .social-dashboard .stats-grid {
@@ -1009,6 +1106,14 @@
   .social-dashboard .btn-delete {
     width: 100%;
     justify-content: center;
+  }
+  
+  .social-dashboard .menu-btn span {
+    display: none;
+  }
+  
+  .social-dashboard .menu-btn {
+    padding: 0.5rem;
   }
 }
 

@@ -7,13 +7,13 @@ const CodeOTP = sequelize.define('CodeOTP', {
     primaryKey: true,
     autoIncrement: true
   },
-  Id_utilisateur: {
+  id_utilisateur: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    field: 'Id_utilisateur',
+    field: 'id_utilisateur',
     references: {
       model: 'utilisateur',
-      key: 'Id_utilisateur'
+      key: 'id_utilisateur'
     }
   },
   email: {
@@ -46,7 +46,7 @@ const CodeOTP = sequelize.define('CodeOTP', {
   }
 }, {
   tableName: 'codes_otp',
-  timestamps: false
+  timestamps: true
 });
 
 module.exports = CodeOTP;

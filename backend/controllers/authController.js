@@ -34,7 +34,7 @@ const login = async (req, res, expectedRole = null) => {
       });
     }
     
-    const token = generateToken(user.Id_utilisateur);
+    const token = generateToken(user.id_utilisateur);
     
     await user.update({
       derniere_connexion: new Date(),
@@ -43,7 +43,7 @@ const login = async (req, res, expectedRole = null) => {
     
     await Historique.enregistrerConnexion(
       { 
-        id: user.Id_utilisateur,
+        id: user.id_utilisateur,
         email: user.Login, 
         role: user.Role 
       }, 
@@ -111,13 +111,13 @@ const registerUser = async (req, res) => {
 const getUsers = async (req, res) => {
   try {
     const users = await User.findAll({
-      attributes: ['Id_utilisateur', 'Login', 'Role', 'matricule_agent', 'derniere_connexion', 'nombre_connexions']
+      attributes: ['id_utilisateur', 'Login', 'Role', 'matricule_agent', 'derniere_connexion', 'nombre_connexions']
     });
     
     res.json({
       success: true,
       users: users.map(u => ({
-        id: u.Id_utilisateur,
+        id: u.id_utilisateur,
         email: u.Login,
         role: u.Role,
         matricule: u.matricule_agent,
@@ -329,6 +329,23 @@ const getMe = async (req, res) => {
 const logout = (req, res) => {
   res.json({ success: true, message: 'Déconnexion réussie' });
 };
+// Vérification des exports
+console.log('=== EXPORTS authController ===');
+console.log('loginAdmin:', typeof loginAdmin);
+console.log('loginTechnicien:', typeof loginTechnicien);
+console.log('loginSocial:', typeof loginSocial);
+console.log('loginAgent:', typeof loginAgent);
+console.log('registerUser:', typeof registerUser);
+console.log('getUsers:', typeof getUsers);
+console.log('getUserById:', typeof getUserById);
+console.log('updateUser:', typeof updateUser);
+console.log('deleteUser:', typeof deleteUser);
+console.log('resetPassword:', typeof resetPassword);
+console.log('getHistorique:', typeof getHistorique);
+console.log('getHistoriqueStats:', typeof getHistoriqueStats);
+console.log('getMe:', typeof getMe);
+console.log('logout:', typeof logout);
+console.log('==============================');
 
 module.exports = {
   loginAdmin, loginTechnicien, loginSocial, loginAgent,

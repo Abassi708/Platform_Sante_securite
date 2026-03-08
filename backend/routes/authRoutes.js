@@ -17,6 +17,12 @@ const {
   logout
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
+// routes/authRoutes.js - après les imports
+console.log('🔍 VÉRIFICATION DES IMPORTS:');
+console.log('- loginAdmin:', typeof loginAdmin);
+console.log('- getHistorique:', typeof getHistorique);
+console.log('- protect:', typeof protect);  // ← Vérifions protect
+console.log('============================');
 
 // ========== ROUTES PUBLIQUES ==========
 // Routes de login pour chaque rôle

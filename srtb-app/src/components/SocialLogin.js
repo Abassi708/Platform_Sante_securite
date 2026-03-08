@@ -334,42 +334,60 @@ const SocialLogin = () => {
     navigate('/social/dashboard');
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
+  // Dans SocialLogin.js - fonction handleSubmit
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setIsLoading(true);
+  setError('');
 
-    try {
-      console.log('📡 Tentative de connexion social...');
+  try {
+    const response = await fetch('http://localhost:5000/api/auth/social/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      // Récupérer l'ID depuis le token si nécessaire
+      let userId = data.user.id;
       
-      const response = await fetch('http://localhost:5000/api/auth/social/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email,
-          password: password
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        
-        handleSuccessfulLogin();
-      } else {
-        setError(data.message || 'Email ou mot de passe incorrect');
+      // Si pas d'ID, essayer de le décoder depuis le token
+      if (!userId && data.token) {
+        try {
+          const base64Url = data.token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const payload = JSON.parse(atob(base64));
+          userId = payload.id;
+          console.log('🔑 ID récupéré depuis token:', userId);
+        } catch (e) {
+          console.error('❌ Erreur décodage token:', e);
+        }
       }
-    } catch (err) {
-      console.error('❌ Erreur:', err);
-      setError('Erreur de connexion au serveur');
-    } finally {
-      setIsLoading(false);
+
+      // Stocker l'utilisateur avec l'ID
+      const userToStore = {
+        ...data.user,
+        id: userId || data.user.id || 18 // Fallback à 18 si nécessaire
+      };
+      
+      console.log('✅ Utilisateur à stocker:', userToStore);
+      
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(userToStore));
+      
+      navigate('/social/dashboard');
+    } else {
+      setError(data.message || 'Email ou mot de passe incorrect');
     }
-  };
+  } catch (err) {
+    console.error('❌ Erreur:', err);
+    setError('Erreur de connexion au serveur');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleBackToMethods = () => {
     setShowOtpInput(false);
