@@ -8,19 +8,23 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  }
+  },
+  debug: true, // Pour voir les logs détaillés
+  logger: true // Pour logger les échanges SMTP
 });
 
 // Vérifier la connexion
 transporter.verify((error, success) => {
   if (error) {
-    console.log('❌ Erreur configuration email:', error);
+    console.log('❌ Erreur configuration email:', error.message);
+    console.log('🔑 Vérifiez vos identifiants Gmail et mot de passe d\'application');
   } else {
-    console.log('✅ Serveur email prêt');
+    console.log('✅ Serveur email prêt - Connexion SMTP établie');
+    console.log('📧 Envoi possible depuis:', process.env.EMAIL_USER);
   }
 });
 
-// ========== FONCTION EXISTANTE (réinitialisation) ==========
+// ========== FONCTION RÉINITIALISATION MOT DE PASSE ==========
 const sendResetEmail = async (userEmail, userRole, newPassword, reason) => {
   try {
     const mailOptions = {
@@ -156,14 +160,17 @@ const sendResetEmail = async (userEmail, userRole, newPassword, reason) => {
     return { success: true, messageId: info.messageId };
     
   } catch (error) {
-    console.error('❌ Erreur envoi email:', error);
+    console.error('❌ Erreur envoi email réinitialisation:', error);
     return { success: false, error: error.message };
   }
 };
 
-// ========== NOUVELLE FONCTION POUR OTP ==========
-const sendCodeOTP = async (userEmail, userRole, codeOTP) => {
+// ========== FONCTION POUR ENVOI CODE OTP ==========
+const sendOtpEmail = async (userEmail, userRole, otpCode) => {
   try {
+    console.log('📧 Préparation envoi email OTP à:', userEmail);
+    console.log('🔐 Code OTP à envoyer:', otpCode);
+    
     const mailOptions = {
       from: '"HSE Manager Sécurité" <securite@hsemanager.com>',
       to: userEmail,
@@ -197,7 +204,7 @@ const sendCodeOTP = async (userEmail, userRole, codeOTP) => {
               
               <p>Voici votre code de vérification :</p>
               
-              <div class="code">${codeOTP}</div>
+              <div class="code">${otpCode}</div>
               
               <p class="info">Ce code est valable <strong>5 minutes</strong></p>
               
@@ -218,18 +225,25 @@ const sendCodeOTP = async (userEmail, userRole, codeOTP) => {
     };
 
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Email OTP envoyé à:', userEmail);
+    console.log('✅ Email OTP envoyé avec succès à:', userEmail);
+    console.log('📨 Message ID:', info.messageId);
+    
     return { success: true, messageId: info.messageId };
     
   } catch (error) {
-    console.error('❌ Erreur envoi email OTP:', error);
+    console.error('❌ Erreur détaillée envoi email OTP:');
+    console.error('Message:', error.message);
+    console.error('Code:', error.code);
+    console.error('Commande:', error.command);
+    console.error('Response:', error.response);
+    
     return { success: false, error: error.message };
   }
 };
 
-// ========== EXPORTER LES DEUX FONCTIONS ==========
+// ========== EXPORTER LES FONCTIONS ==========
 module.exports = { 
-  transporter,    // ← AJOUTÉ (utile pour d'autres fichiers)
+  transporter,
   sendResetEmail, 
-  sendCodeOTP     // ← NOUVELLE FONCTION
+  sendOtpEmail  // ← Renommé pour éviter les conflits
 };

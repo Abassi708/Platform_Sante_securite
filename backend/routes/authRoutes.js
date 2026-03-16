@@ -14,24 +14,17 @@ const {
   getHistorique,
   getHistoriqueStats,
   getMe,
-  logout
+  logout,
+  getConnexionsStats,  // ← AJOUTEZ CETTE LIGNE
+  getGlobalStats        // ← AJOUTEZ CETTE LIGNE
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
-// routes/authRoutes.js - après les imports
-console.log('🔍 VÉRIFICATION DES IMPORTS:');
-console.log('- loginAdmin:', typeof loginAdmin);
-console.log('- getHistorique:', typeof getHistorique);
-console.log('- protect:', typeof protect);  // ← Vérifions protect
-console.log('============================');
 
 // ========== ROUTES PUBLIQUES ==========
-// Routes de login pour chaque rôle
 router.post('/admin/login', loginAdmin);
 router.post('/technicien/login', loginTechnicien);
 router.post('/social/login', loginSocial);
 router.post('/agent/login', loginAgent);
-
-// Route d'inscription (pour créer des utilisateurs - à protéger plus tard)
 router.post('/register', registerUser);
 
 // ========== ROUTES PROTÉGÉES ==========
@@ -39,15 +32,19 @@ router.post('/register', registerUser);
 router.get('/me', protect, getMe);
 router.post('/logout', protect, logout);
 
-// Gestion des utilisateurs (admin seulement)
+// Gestion des utilisateurs
 router.get('/users', protect, getUsers);
 router.get('/users/:id', protect, getUserById);
 router.put('/users/:id', protect, updateUser);
 router.delete('/users/:id', protect, deleteUser);
 router.post('/users/:id/reset-password', protect, resetPassword);
 
-// Historique (admin, technicien, social)
+// Historique
 router.get('/historique', protect, getHistorique);
 router.get('/historique/stats', protect, getHistoriqueStats);
+
+// ========== ROUTES DE STATISTIQUES ==========
+router.get('/stats/connexions', protect, getConnexionsStats);
+router.get('/stats/global', protect, getGlobalStats);
 
 module.exports = router;

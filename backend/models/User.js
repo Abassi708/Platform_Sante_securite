@@ -1,4 +1,3 @@
-// models/User.js
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const bcrypt = require('bcryptjs');
@@ -30,15 +29,20 @@ const User = sequelize.define('User', {
     allowNull: true,
     field: 'matricule_agent'
   },
-  derniere_connexion: {  // ← SANS accent !
+  derniere_connexion: {
     type: DataTypes.DATE,
     allowNull: true,
-    field: 'derniere_connexion'  // ← SANS accent
+    field: 'derniere_connexion'
   },
   nombre_connexions: {
     type: DataTypes.INTEGER,
     defaultValue: 0,
     field: 'nombre_connexions'
+  },
+  date_creation: {  // ← NOUVEAU CHAMP
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+    field: 'date_creation'
   }
 }, {
   tableName: 'utilisateur',
@@ -59,11 +63,12 @@ User.createUser = async (email, password, role = 'agent', matricule = null) => {
       Login: email,
       Mot_de_passe: hashedPassword,
       Role: role,
-      matricule_agent:matriculeValue,
-      nombre_connexions: 0
+      matricule_agent: matriculeValue,
+      nombre_connexions: 0,
+      date_creation: new Date() // ← On ajoute la date manuellement
     });
     
-    console.log('✅ Utilisateur créé avec ID:', user.Id_utilisateur);
+    console.log('✅ Utilisateur créé avec ID:', user.id_utilisateur);
     return user;
     
   } catch (error) {
@@ -92,7 +97,7 @@ User.verifyCredentials = async (email, password) => {
       return null;
     }
     
-    user.derniere_connexion = new Date();  // ← SANS accent
+    user.derniere_connexion = new Date();
     user.nombre_connexions = (user.nombre_connexions || 0) + 1;
     await user.save();
     
@@ -111,8 +116,9 @@ User.prototype.toJSON = function() {
     email: this.Login,
     role: this.Role,
     matricule: this.matricule_agent,
-    derniere_connexion: this.derniere_connexion,  // ← SANS accent
-    nombre_connexions: this.nombre_connexions
+    derniere_connexion: this.derniere_connexion,
+    nombre_connexions: this.nombre_connexions,
+    createdAt: this.date_creation  // ← AJOUTER ICI
   };
 };
 

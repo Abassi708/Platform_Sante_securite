@@ -131,7 +131,7 @@ const AgentLogin = () => {
     { id: 6, icon: Shield, color: '#8B5CF6', size: 26, delay: 2.5, bottom: '30%', left: '25%' }
   ];
 
-  // Méthodes de connexion - SANS BIOMÉTRIE
+  // Méthodes de connexion
   const loginMethods = [
     { id: 'password', icon: Key, label: 'Mot de passe' },
     { id: 'otp', icon: Smartphone, label: 'Code OTP' },
@@ -190,7 +190,7 @@ const AgentLogin = () => {
       // Pour le développement, on simule un code
       const mockOtp = '123456';
       setGeneratedOtp(mockOtp);
-      alert(`[MODE DÉVELOPPEMENT] Code OTP: ${mockOtp}`);
+      // ALERT SUPPRIMÉE - Plus de popup
     }
   };
 
@@ -253,7 +253,7 @@ const AgentLogin = () => {
     } catch (err) {
       console.error('❌ Erreur vérification OTP:', err);
       
-      // Mode développement - fallback
+      // Fallback pour le développement seulement
       if (enteredOtp === '123456') {
         setOtpVerified(true);
         setTimeout(() => {
@@ -553,7 +553,7 @@ const AgentLogin = () => {
           </div>
         </div>
 
-        {/* Sélecteur de méthode de connexion - SANS BIOMÉTRIE */}
+        {/* Sélecteur de méthode de connexion */}
         {!showOtpInput && !showQrCode && (
           <div className="login-methods">
             {loginMethods.map((method) => {
@@ -579,7 +579,7 @@ const AgentLogin = () => {
           </div>
         )}
 
-        {/* Interface CODE OTP */}
+        {/* Interface CODE OTP - AVEC MESSAGE PROFESSIONNEL */}
         {showOtpInput && (
           <motion.div
             className="otp-interface"
@@ -589,7 +589,32 @@ const AgentLogin = () => {
           >
             <Smartphone size={32} color="#8B5CF6" className="otp-icon" />
             <h3>Vérification à deux facteurs</h3>
-            <p>Un code à 6 chiffres a été envoyé à <strong>{otpEmail || email}</strong></p>
+            
+            {/* ✅ MESSAGE PROFESSIONNEL DE SUCCÈS (AJOUTÉ) */}
+            {otpSent && !otpVerified && (
+              <motion.div 
+                className="otp-success-message"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{
+                  backgroundColor: '#f0fdf4',
+                  border: '2px solid #22c55e',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}
+              >
+                <CheckCircle size={20} color="#10b981" />
+                <p style={{ margin: 0, color: '#166534' }}>
+                  Un code de vérification a été envoyé à <strong>{otpEmail || email}</strong>
+                </p>
+              </motion.div>
+            )}
+
+            <p>Saisissez le code à 6 chiffres reçu par email</p>
             
             <div className="otp-inputs">
               {otpCode.map((digit, index) => (
@@ -924,7 +949,7 @@ const AgentLogin = () => {
           </AnimatePresence>
         </div>
 
-        {/* Badges de sécurité - SANS BIOMÉTRIE */}
+        {/* Badges de sécurité */}
         <div className="agent-security">
           <div className="security-dot">
             <ShieldCheck size={12} />

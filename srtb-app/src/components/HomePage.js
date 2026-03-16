@@ -81,7 +81,7 @@ const HomePage = () => {
       setScrolled(window.scrollY > 50);
       
       const scrollPosition = window.scrollY + 100;
-      const sections = ['accueil', 'solutions', 'innovation', 'contact', 'impact'];
+      const sections = ['accueil', 'solutions', 'innovation', 'contact'];
       for (const section of sections) {
         const element = document.getElementById(section);
         if (element) {
@@ -246,52 +246,6 @@ const HomePage = () => {
     { id: 'prediction', label: 'Prédiction des risques', icon: Brain, desc: 'IA & analyse prédictive', color: '#F9A826' },
     { id: 'assistant', label: 'Assistant IA', icon: MessageSquare, desc: 'Chatbot intelligent', color: '#2C7DA0' },
     { id: 'medical', label: 'Suivi médical', icon: Calendar, desc: 'Planning automatisé', color: '#1A3B5D' }
-  ];
-
-  // Données pour la section Impact
-  const impactData = [
-    {
-      icon: Users,
-      value: counts.agents,
-      label: 'Agents protégés',
-      color: '#3B82F6',
-      chart: [65, 70, 75, 80, 85, 90, 95, 100],
-      trend: '+12%'
-    },
-    {
-      icon: Heart,
-      value: counts.jours,
-      label: 'Jours sans accident',
-      color: '#10B981',
-      chart: [20, 40, 60, 80, 100, 120, 127, 127],
-      trend: 'Record'
-    },
-    {
-      icon: Calendar,
-      value: counts.visites,
-      label: 'Visites/mois',
-      color: '#F59E0B',
-      chart: [200, 250, 280, 300, 320, 340, 342, 342],
-      trend: '+8%'
-    },
-    {
-      icon: Brain,
-      value: counts.prevention + '%',
-      label: 'Prévention des risques',
-      color: '#8B5CF6',
-      chart: [70, 75, 80, 85, 90, 92, 94, 94],
-      trend: '+15%'
-    }
-  ];
-
-  // Technologies innovantes
-  const technologies = [
-    { icon: Cpu, name: 'IA Prédictive', desc: 'Algorithmes de machine learning', color: '#F9A826' },
-    { icon: Database, name: 'Big Data', desc: 'Analyse en temps réel', color: '#1A3B5D' },
-    { icon: Lock, name: 'Blockchain', desc: 'Sécurité des données', color: '#2C7DA0' },
-    { icon: Radio, name: 'IoT', desc: 'Capteurs connectés', color: '#10B981' },
-    { icon: Atom, name: 'Quantum', desc: 'Calcul avancé', color: '#8B5CF6' },
-    { icon: Microscope, name: 'R&D', desc: 'Innovation continue', color: '#F59E0B' }
   ];
 
   // Objets 3D
@@ -641,7 +595,7 @@ const HomePage = () => {
           </motion.button>
 
           {/* Bouton Espace pro */}
-          <Link to="/login" className="login-link-smart">
+          <Link to="/unified-login" className="login-link-smart">
             <motion.button 
               className="login-btn-smart"
               whileHover={{ scale: 1.05, y: -2 }}
@@ -747,7 +701,7 @@ const HomePage = () => {
                 <span>Contact</span>
               </motion.button>
 
-              <Link to="/login" className="mobile-login-link">
+              <Link to="/unified-login" className="mobile-login-link">
                 <motion.div 
                   className="mobile-login-btn"
                   whileHover={{ scale: 1.02 }}
@@ -763,7 +717,7 @@ const HomePage = () => {
         </AnimatePresence>
       </motion.nav>
 
-      {/* Hero Section */}
+      {/* Hero Section - CORRIGÉE AVEC TOUTES LES ICÔNES EN DORÉ */}
       <section id="accueil" className="hero">
         <div className="hero-container">
           <motion.div 
@@ -783,12 +737,13 @@ const HomePage = () => {
 
             <p className="hero-description">
               Solution complète de gestion des risques professionnels, suivi médical 
-              et prévention des accidents pour vos 1 247 agents.
+              et prévention des accidents
             </p>
 
             <div className="stats-row">
+              {/* Agents protégés */}
               <div className="stat-item">
-                <div className="stat-icon">
+                <div className="stat-icon" style={{ borderColor: '#F9A826' }}>
                   <Users size={20} color="#F9A826" />
                 </div>
                 <div>
@@ -796,8 +751,10 @@ const HomePage = () => {
                   <span className="stat-label">Agents protégés</span>
                 </div>
               </div>
+
+              {/* Jours sans accident */}
               <div className="stat-item">
-                <div className="stat-icon">
+                <div className="stat-icon" style={{ borderColor: '#F9A826' }}>
                   <Heart size={20} color="#F9A826" />
                 </div>
                 <div>
@@ -805,8 +762,10 @@ const HomePage = () => {
                   <span className="stat-label">Jours sans accident</span>
                 </div>
               </div>
+
+              {/* Visites/mois */}
               <div className="stat-item">
-                <div className="stat-icon">
+                <div className="stat-icon" style={{ borderColor: '#F9A826' }}>
                   <Calendar size={20} color="#F9A826" />
                 </div>
                 <div>
@@ -814,8 +773,10 @@ const HomePage = () => {
                   <span className="stat-label">Visites/mois</span>
                 </div>
               </div>
+
+              {/* Satisfaction */}
               <div className="stat-item">
-                <div className="stat-icon">
+                <div className="stat-icon" style={{ borderColor: '#F9A826' }}>
                   <Star size={20} color="#F9A826" />
                 </div>
                 <div>
@@ -826,19 +787,22 @@ const HomePage = () => {
             </div>
 
             <div className="hero-actions">
+              {/* BOUTON GET STARTED TRANSPARENT AVEC CADRE DORÉ */}
               <motion.button 
                 className="btn-primary"
-                onClick={() => window.location.href = '/login'}
+                onClick={() => navigate('/unified-login')}
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <span>Accéder à la plateforme</span>
+                <span>Get Started</span>
                 <ArrowRight size={18} />
               </motion.button>
+              
               <motion.button 
                 className="btn-outline"
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.98 }}
+                onClick={() => scrollToSection('solutions')}
               >
                 <span>Découvrir</span>
               </motion.button>
@@ -931,263 +895,6 @@ const HomePage = () => {
               ))}
             </motion.div>
           </motion.div>
-        </div>
-      </section>
-
-      {/* Section Impact */}
-      <section id="impact" className="impact-section-innovative">
-        <div className="impact-header">
-          <div className="section-badge">
-            <Sparkles size={18} color="#F9A826" />
-            <span>PERFORMANCE & INNOVATION</span>
-          </div>
-          <h2>Notre <span className="gradient-text">impact</span> en temps réel</h2>
-          <p>Des résultats mesurables grâce à nos technologies avancées</p>
-        </div>
-
-        <div className="impact-dashboard">
-          {impactData.map((item, index) => {
-            const Icon = item.icon;
-            const isActive = activeTab === index;
-            
-            return (
-              <motion.div
-                key={index}
-                className={`impact-card-advanced ${isActive ? 'active' : ''}`}
-                onHoverStart={() => setActiveTab(index)}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                whileHover={{ y: -10, scale: 1.02 }}
-              >
-                <div className="card-header" style={{ borderBottomColor: item.color }}>
-                  <div className="card-icon-large" style={{ background: `${item.color}15` }}>
-                    <Icon size={32} color={item.color} />
-                  </div>
-                  <div className="card-title">
-                    <span className="card-value" style={{ color: item.color }}>{item.value}</span>
-                    <span className="card-label">{item.label}</span>
-                  </div>
-                  <div className="card-trend" style={{ color: item.color }}>
-                    {item.trend}
-                  </div>
-                </div>
-
-                <div className="card-chart">
-                  {item.chart.map((val, i) => (
-                    <motion.div
-                      key={i}
-                      className="chart-bar"
-                      initial={{ height: 0 }}
-                      whileInView={{ height: `${val * 0.5}%` }}
-                      viewport={{ once: true }}
-                      transition={{ delay: 0.5 + i * 0.05, duration: 1 }}
-                      style={{
-                        background: item.color,
-                        opacity: 0.3 + (i / 10)
-                      }}
-                    />
-                  ))}
-                </div>
-
-                <div className="card-particles">
-                  {[...Array(5)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className="particle"
-                      style={{ background: item.color }}
-                      animate={{
-                        y: [0, -20, 0],
-                        x: [0, (i % 2 === 0 ? 10 : -10), 0],
-                        opacity: [0, 0.5, 0]
-                      }}
-                      transition={{
-                        duration: 3 + i,
-                        repeat: Infinity,
-                        delay: i * 0.2
-                      }}
-                    />
-                  ))}
-                </div>
-
-                <div className="card-progress">
-                  <div className="progress-track">
-                    <motion.div
-                      className="progress-fill-advanced"
-                      initial={{ width: 0 }}
-                      whileInView={{ width: '100%' }}
-                      viewport={{ once: true }}
-                      transition={{ delay: 1, duration: 1.5 }}
-                      style={{ background: `linear-gradient(90deg, ${item.color}, ${item.color}80)` }}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-
-        <div className="tech-showcase">
-          <h3>Technologies de pointe</h3>
-          <div className="tech-grid">
-            {technologies.map((tech, index) => {
-              const Icon = tech.icon;
-              return (
-                <motion.div
-                  key={index}
-                  className="tech-card"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ y: -5, scale: 1.05 }}
-                >
-                  <div className="tech-icon" style={{ background: `${tech.color}15` }}>
-                    <Icon size={24} color={tech.color} />
-                  </div>
-                  <div className="tech-info">
-                    <span className="tech-name">{tech.name}</span>
-                    <span className="tech-desc">{tech.desc}</span>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="advanced-metrics">
-          <motion.div 
-            className="metric-circle"
-            initial={{ scale: 0 }}
-            whileInView={{ scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ type: "spring", stiffness: 100 }}
-          >
-            <svg width="120" height="120" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(249,168,38,0.1)" strokeWidth="4" />
-              <motion.circle
-                cx="60"
-                cy="60"
-                r="54"
-                fill="none"
-                stroke="#F9A826"
-                strokeWidth="4"
-                strokeLinecap="round"
-                initial={{ pathLength: 0 }}
-                whileInView={{ pathLength: 0.94 }}
-                viewport={{ once: true }}
-                transition={{ duration: 2 }}
-                style={{
-                  rotate: -90,
-                  transformOrigin: "center"
-                }}
-              />
-            </svg>
-            <div className="metric-content">
-              <span className="metric-value">94%</span>
-              <span className="metric-label">Prévention</span>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            className="metric-circle"
-            initial={{ scale: 0 }}
-            whileInView={{ scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ type: "spring", stiffness: 100, delay: 0.2 }}
-          >
-            <svg width="120" height="120" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(16,185,129,0.1)" strokeWidth="4" />
-              <motion.circle
-                cx="60"
-                cy="60"
-                r="54"
-                fill="none"
-                stroke="#10B981"
-                strokeWidth="4"
-                strokeLinecap="round"
-                initial={{ pathLength: 0 }}
-                whileInView={{ pathLength: 0.98 }}
-                viewport={{ once: true }}
-                transition={{ duration: 2 }}
-                style={{
-                  rotate: -90,
-                  transformOrigin: "center"
-                }}
-              />
-            </svg>
-            <div className="metric-content">
-              <span className="metric-value">98%</span>
-              <span className="metric-label">Satisfaction</span>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            className="metric-circle"
-            initial={{ scale: 0 }}
-            whileInView={{ scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ type: "spring", stiffness: 100, delay: 0.4 }}
-          >
-            <svg width="120" height="120" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(59,130,246,0.1)" strokeWidth="4" />
-              <motion.circle
-                cx="60"
-                cy="60"
-                r="54"
-                fill="none"
-                stroke="#3B82F6"
-                strokeWidth="4"
-                strokeLinecap="round"
-                initial={{ pathLength: 0 }}
-                whileInView={{ pathLength: 0.86 }}
-                viewport={{ once: true }}
-                transition={{ duration: 2 }}
-                style={{
-                  rotate: -90,
-                  transformOrigin: "center"
-                }}
-              />
-            </svg>
-            <div className="metric-content">
-              <span className="metric-value">86%</span>
-              <span className="metric-label">Efficacité</span>
-            </div>
-          </motion.div>
-        </div>
-
-        <div className="innovation-timeline">
-          <div className="timeline-header">
-            <Rocket size={20} color="#F9A826" />
-            <span>Notre feuille de route innovation</span>
-          </div>
-          <div className="timeline-steps">
-            {[
-              { year: '2024', title: 'IA Prédictive', desc: 'Algorithmes de prévision', color: '#3B82F6' },
-              { year: '2025', title: 'IoT Médical', desc: 'Capteurs connectés', color: '#F59E0B' },
-              { year: '2026', title: 'Blockchain Santé', desc: 'Sécurité des données', color: '#10B981' },
-              { year: '2027', title: 'Quantum Computing', desc: 'Calcul avancé', color: '#8B5CF6' }
-            ].map((step, index) => (
-              <motion.div
-                key={index}
-                className="timeline-step"
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.2 }}
-              >
-                <div className="step-marker" style={{ background: step.color }}>
-                  <div className="step-pulse"></div>
-                </div>
-                <div className="step-content">
-                  <span className="step-year">{step.year}</span>
-                  <span className="step-title">{step.title}</span>
-                  <span className="step-desc">{step.desc}</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -1335,7 +1042,7 @@ const HomePage = () => {
             <p>Rejoignez les {counts.agents} agents déjà protégés par notre plateforme</p>
             <motion.button 
               className="btn-cta"
-              onClick={() => window.location.href = '/login'}
+              onClick={() => navigate('/unified-login')}
               whileHover={{ scale: 1.05, y: -2 }}
               whileTap={{ scale: 0.98 }}
             >
@@ -1365,7 +1072,6 @@ const HomePage = () => {
               <h4>Navigation</h4>
               <ul>
                 <li><a href="#accueil">Accueil</a></li>
-                <li><a href="#impact">Impact</a></li>
                 <li><a href="#solutions">Solutions</a></li>
                 <li><a href="#innovation">Innovation</a></li>
                 <li><a href="#contact">Contact</a></li>

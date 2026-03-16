@@ -1,6 +1,8 @@
+// src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import RoleSelection from './components/RoleSelection';
+import HomePage from './components/HomePage'; // ← IMPORTEZ HomePage
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
 import TechnicienLogin from './components/TechnicienLogin';
@@ -10,13 +12,18 @@ import SocialDashboard from './components/SocialDashboard';
 import AgentLogin from './components/AgentLogin';
 import AgentDashboard from './components/AgentDashboard';
 import HistoriqueConnexions from './components/HistoriqueConnexions';
+import UnifiedLogin from './components/UnifiedLogin';
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* ========== PAGE D'ACCUEIL ========== */}
+        {/* ========== PAGE D'ACCUEIL PRINCIPALE ========== */}
         <Route path="/" element={<RoleSelection />} />
+        
+        {/* ========== PAGE D'ACCUEIL ALTERNATIVE ========== */}
+        <Route path="/home" element={<HomePage />} />
+        <Route path="/accueil" element={<HomePage />} />
         
         {/* ========== ROUTES ADMIN ========== */}
         <Route path="/admin" element={<AdminLogin />} />
@@ -37,7 +44,10 @@ function App() {
         <Route path="/agent" element={<AgentLogin />} />
         <Route path="/agent/dashboard" element={<AgentDashboard />} />
         
-        {/* ========== REDIRECTION PAR DÉFAUT ========== */}
+        {/* ========== ROUTES UNIFIED LOGIN ========== */}
+        <Route path="/unified-login" element={<UnifiedLogin />} />
+        
+        {/* ========== REDIRECTION ========== */}
         <Route path="*" element={<RoleSelection />} />
       </Routes>
     </Router>

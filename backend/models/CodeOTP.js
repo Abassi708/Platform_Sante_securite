@@ -10,11 +10,7 @@ const CodeOTP = sequelize.define('CodeOTP', {
   id_utilisateur: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    field: 'id_utilisateur',
-    references: {
-      model: 'utilisateur',
-      key: 'id_utilisateur'
-    }
+    field: 'id_utilisateur'
   },
   email: {
     type: DataTypes.STRING(255),
@@ -46,7 +42,7 @@ const CodeOTP = sequelize.define('CodeOTP', {
   }
 }, {
   tableName: 'codes_otp',
-  timestamps: true
+  timestamps: false
 });
 
 module.exports = CodeOTP;

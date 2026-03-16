@@ -194,7 +194,7 @@ const TechnicienLogin = () => {
       // Pour le développement, on simule un code
       const mockOtp = '123456';
       setGeneratedOtp(mockOtp);
-      alert(`[MODE DÉVELOPPEMENT] Code OTP: ${mockOtp}`);
+      // ALERT SUPPRIMÉE
     }
   };
 
@@ -583,7 +583,7 @@ const TechnicienLogin = () => {
           </div>
         )}
 
-        {/* Interface CODE OTP */}
+        {/* Interface CODE OTP - AVEC MESSAGE PROFESSIONNEL */}
         {showOtpInput && (
           <motion.div
             className="otp-interface"
@@ -593,7 +593,32 @@ const TechnicienLogin = () => {
           >
             <Smartphone size={32} color="#f59e0b" className="otp-icon" />
             <h3>Vérification à deux facteurs</h3>
-            <p>Un code à 6 chiffres a été envoyé à <strong>{otpEmail || email}</strong></p>
+            
+            {/* ✅ MESSAGE PROFESSIONNEL DE SUCCÈS */}
+            {otpSent && !otpVerified && (
+              <motion.div 
+                className="otp-success-message"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                style={{
+                  backgroundColor: '#f0fdf4',
+                  border: '2px solid #22c55e',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}
+              >
+                <CheckCircle size={20} color="#10b981" />
+                <p style={{ margin: 0, color: '#166534' }}>
+                  Un code de vérification a été envoyé à <strong>{otpEmail || email}</strong>
+                </p>
+              </motion.div>
+            )}
+
+            <p>Saisissez le code à 6 chiffres reçu par email</p>
             
             <div className="otp-inputs">
               {otpCode.map((digit, index) => (
@@ -652,7 +677,7 @@ const TechnicienLogin = () => {
               </button>
             </div>
 
-            <p className="otp-hint">Un code vous a été envoyé par email</p>
+            <p className="otp-hint">Vérifiez votre boîte de réception (pensez à regarder dans les spams)</p>
           </motion.div>
         )}
 
