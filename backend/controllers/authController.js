@@ -1,10 +1,13 @@
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const Historique = require('../models/Historique');
-const CodeOTP = require('../models/CodeOTP');
+const db = require('../models');
 const { Op, Sequelize } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const { sendOtpEmail } = require('../config/emailConfig');
+
+// ✅ Récupérer les modèles depuis db
+const User = db.local.User;
+const Historique = db.local.Historique;
+const CodeOTP = db.local.CodeOTP;
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {

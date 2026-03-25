@@ -1,316 +1,474 @@
 // backend/services/planningService.js
 const { Op } = require('sequelize');
-const Agent = require('../models/Agent');
-const Planning = require('../models/Planning');
-const Visite = require('../models/Visite');
-const User = require('../models/User');
+const db = require('../models');
+const joursFeriesService = require('./joursFeriesService');
+const moment = require('moment');
+
+console.log('🟢 PLANNING SERVICE CHARGÉ - moment.js version:', moment.version);
 
 class PlanningService {
   constructor() {
-    // Jours fériés tunisiens 2026
-    this.joursFeries = [
-      '2026-01-01', // Jour de l'an
-      '2026-01-14', // Fête de la Révolution
-      '2026-03-20', // Fête de l'Indépendance
-      '2026-04-09', // Fête des Martyrs
-      '2026-05-01', // Fête du Travail
-      '2026-07-25', // Fête de la République
-      '2026-08-13', // Fête de la Femme
-      '2026-10-15', // Fête de l'Évacuation
-      '2026-03-31', // Aïd el-Fitr (variable)
-      '2026-04-01', // Aïd el-Fitr
-      '2026-06-07', // Aïd el-Adha
-      '2026-06-08', // Aïd el-Adha
-      '2026-06-28', // Ras el-Am el-Hijri
-      '2026-09-05', // Mouled
-    ];
+    this.creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
+    this.joursFeriesService = joursFeriesService;
+    this.JOURS_VISITE = [2, 3, 4, 5];
+    this.CAPACITE_HEBDOMADAIRE = 16;
     
-    // Créneaux horaires (4 par jour)
-    this.creneaux = [
-      '08:00:00',
-      '08:30:00',
-      '09:00:00',
-      '09:30:00'
-    ];
+    // Récupérer les modèles depuis db
+    this.Agent = db.global.Agent;
+    this.Planning = db.local.Planning;
+    this.Visite = db.local.Visite;
   }
 
-  // ========== VÉRIFIER SI UN JOUR EST OUVERT ==========
-  estJourOuvre(date) {
-    const jour = date.getDay(); // 0 = Dimanche, 1 = Lundi, ... 6 = Samedi
-    const dateStr = date.toISOString().split('T')[0];
+  calculerPeriodicite(agent) {
+    if (agent.periodicite_jours && agent.periodicite_jours > 0) {
+      return agent.periodicite_jours;
+    }
+    return agent.code_affectation === 3 ? 180 : 365;
+  }
+
+  getNumeroSemaine(date) {
+    const semaine = moment(date).isoWeek();
+    console.log(`📅 getNumeroSemaine: ${date.toISOString().split('T')[0]} → semaine ${semaine}`);
+    return semaine;
+  }
+
+  getLundiSemaine(numeroSemaine, annee) {
+    console.log(`🔍 getLundiSemaine ENTRÉE: numeroSemaine=${numeroSemaine}, annee=${annee}`);
+    const lundi = moment().year(annee).isoWeek(numeroSemaine).startOf('isoWeek');
+    const result = lundi.format('YYYY-MM-DD');
+    console.log(`🔍 getLundiSemaine SORTIE: ${result}`);
+    return result;
+  }
+
+  async estJourOuvre(date) {
+    const annee = date.getFullYear();
+    const mois = date.getMonth();
+    const jour = date.getDate();
+    const dateLocale = new Date(annee, mois, jour);
+    const jourSemaine = dateLocale.getDay();
     
-    // Pas de visites le dimanche, samedi et jours fériés
-    if (jour === 0 || jour === 6) return false;
-    if (this.joursFeries.includes(dateStr)) return false;
+    console.log(`   🔍 estJourOuvre: ${annee}-${mois+1}-${jour} -> jour: ${jourSemaine} (0=dim,1=lun,2=mar,3=mer,4=jeu,5=ven,6=sam)`);
     
+    if (jourSemaine < 2 || jourSemaine > 5) {
+      console.log(`   ❌ ${annee}-${mois+1}-${jour} n'est pas un jour ouvré`);
+      return false;
+    }
+    
+    const estFerie = await this.joursFeriesService.estJourFerie(date);
+    if (estFerie) {
+      console.log(`   ❌ ${annee}-${mois+1}-${jour} est un jour férié`);
+      return false;
+    }
+    
+    console.log(`   ✅ ${annee}-${mois+1}-${jour} est un jour ouvré`);
     return true;
   }
 
-  // ========== CALCULER LA PRIORITÉ D'UN AGENT ==========
-  calculerPriorite(agent) {
-    let priorite = 0;
+  async getProchainJourOuvre(date) {
+    const dateTemp = new Date(date);
+    let essais = 0;
+    while (!(await this.estJourOuvre(dateTemp)) && essais < 21) {
+      dateTemp.setDate(dateTemp.getDate() + 1);
+      essais++;
+    }
+    return dateTemp;
+  }
+
+  async getJourOuvreAvant(date) {
+    const dateTemp = new Date(date);
+    let essais = 0;
+    while (!(await this.estJourOuvre(dateTemp)) && essais < 21) {
+      dateTemp.setDate(dateTemp.getDate() - 1);
+      essais++;
+    }
+    return dateTemp;
+  }
+
+  async aDejaUneVisitePlanifiee(agent, dateReference = null) {
+    const dateDebut = dateReference || new Date();
+    const dateFin = new Date(dateDebut);
+    dateFin.setDate(dateDebut.getDate() + 30);
+
+    const existe = await this.Planning.findOne({
+      where: {
+        matricule_agent: agent.matricule_agent,
+        date_visite: { [Op.gte]: dateDebut, [Op.lte]: dateFin },
+        statut: 'Programmé',
+        type_visite: ['Périodique', 'Reprise']
+      }
+    });
+
+    return existe !== null;
+  }
+
+  async estVisitePeriodiqueNecessaire(agent) {
+    const aujourdhui = new Date();
+
+    if (agent.date_fin_inaptitude) {
+      const dateFin = new Date(agent.date_fin_inaptitude);
+      if (dateFin > aujourdhui) return false;
+    }
+
+    if (await this.aDejaUneVisitePlanifiee(agent)) return false;
+
+    if (!agent.date_derniere_visite) return true;
+
+    const joursDepuis = Math.floor((aujourdhui - new Date(agent.date_derniere_visite)) / (1000 * 60 * 60 * 24));
+    const periodicite = this.calculerPeriodicite(agent);
+
+    if (joursDepuis >= periodicite) {
+      console.log(`   📋 Agent #${agent.matricule_agent}: ${joursDepuis}j depuis dernière visite (périodicité ${periodicite}j)`);
+      return true;
+    }
+
+    return false;
+  }
+
+  async estVisiteRepriseNecessaire(agent) {
+    if (!agent.date_fin_inaptitude) return false;
     
-    // Priorité basée sur la date de dernière visite
-    if (!agent.date_derniere_visite) {
-      priorite += 100; // Jamais visité = priorité max
-    } else {
-      const joursDepuisVisite = Math.floor(
-        (new Date() - new Date(agent.date_derniere_visite)) / (1000 * 60 * 60 * 24)
-      );
-      
-      // Plus la dernière visite est ancienne, plus la priorité est élevée
-      priorite += Math.min(joursDepuisVisite, 365); // Max 365 jours
+    const dateFin = new Date(agent.date_fin_inaptitude);
+    const aujourdhui = new Date();
+    
+    const dateReprise = new Date(dateFin);
+    dateReprise.setDate(dateFin.getDate() - 3);
+    
+    console.log(`   🔄 Agent #${agent.matricule_agent}: Fin inaptitude ${agent.date_fin_inaptitude} → Reprise idéale le ${dateReprise.toISOString().split('T')[0]}`);
+    
+    if (await this.aDejaUneVisitePlanifiee(agent, dateReprise)) return false;
+    
+    if (dateReprise >= aujourdhui && dateFin > aujourdhui) {
+      return true;
     }
     
-    // Priorité basée sur le type d'affectation
-    if (agent.code_affectation === 3) priorite += 30; // Terrain = priorité
-    if (agent.code_affectation === 5) priorite += 20; // Chauffeur
+    return false;
+  }
+
+  async getDateRepriseOptimale(agent) {
+    if (!agent.date_fin_inaptitude) return null;
     
-    // Priorité basée sur l'inaptitude
-    if (agent.date_fin_inaptitude && new Date(agent.date_fin_inaptitude) > new Date()) {
-      priorite += 50; // Agent en inaptitude temporaire
-    }
+    const dateFin = new Date(agent.date_fin_inaptitude);
+    const dateReprise = new Date(dateFin);
+    dateReprise.setDate(dateFin.getDate() - 3);
     
+    const dateOuvre = await this.getJourOuvreAvant(dateReprise);
+    
+    console.log(`   📅 Agent #${agent.matricule_agent}: Reprise optimale le ${dateOuvre.toISOString().split('T')[0]}`);
+    
+    return dateOuvre;
+  }
+
+  async calculerPriorite(agent, typeVisite) {
+    if (typeVisite === 'Reprise') return 2000;
+    if (!agent.date_derniere_visite) return 1000;
+
+    const aujourdhui = new Date();
+    const periodicite = this.calculerPeriodicite(agent);
+    const joursDepuis = Math.floor((aujourdhui - new Date(agent.date_derniere_visite)) / (1000 * 60 * 60 * 24));
+    const joursDepassement = Math.max(0, joursDepuis - periodicite);
+
+    let priorite = joursDepuis + joursDepassement * 5;
+    if (agent.code_affectation === 3) priorite += 30;
+
     return priorite;
   }
 
-  // ========== DISTRIBUER LES AGENTS PAR AGENCE ==========
-  distribuerParAgence(agents) {
-    const agences = {};
-    
-    agents.forEach(agent => {
-      if (!agences[agent.code_agence]) {
-        agences[agent.code_agence] = [];
-      }
-      agences[agent.code_agence].push(agent);
-    });
-    
-    return agences;
-  }
-
-  // ========== GÉNÉRER LE PLANNING POUR UNE SEMAINE ==========
   async genererPlanningSemaine(dateDebut, userId) {
     try {
-      console.log(`📅 Génération planning pour semaine du ${dateDebut.toISOString().split('T')[0]}`);
+      console.log('\n' + '='.repeat(70));
+      console.log('📅 GÉNÉRATION PLANNING AUTOMATIQUE (Périodique + Reprise)');
+      console.log('='.repeat(70));
+
+      const dateDebutStr = dateDebut.toISOString().split('T')[0];
+      console.log(`🔍 dateDebut reçu = ${dateDebutStr}`);
       
-      const planning = [];
+      const semaine = moment(dateDebutStr).isoWeek();
+      console.log(`🔍 moment(${dateDebutStr}).isoWeek() = ${semaine}`);
+      
       const annee = dateDebut.getFullYear();
-      const semaine = this.getNumeroSemaine(dateDebut);
-      
-      // Récupérer tous les agents actifs
-      const agents = await Agent.findAll({
-        where: { statut: 'actif' },
-        order: [['matricule_agent', 'ASC']]
-      });
-      
-      console.log(`👥 ${agents.length} agents actifs trouvés`);
-      
-      // Calculer la priorité pour chaque agent
-      const agentsAvecPriorite = agents.map(agent => ({
-        ...agent.toJSON(),
-        priorite: this.calculerPriorite(agent)
-      }));
-      
-      // Trier par priorité (décroissante)
-      agentsAvecPriorite.sort((a, b) => b.priorite - a.priorite);
-      
-      // Distribuer par agence
-      const parAgence = this.distribuerParAgence(agentsAvecPriorite);
-      console.log('📊 Répartition par agence:', Object.keys(parAgence).map(k => 
-        `Agence ${k}: ${parAgence[k].length} agents`
-      ));
-      
-      // Générer les jours de la semaine (mardi à vendredi)
-      for (let i = 0; i < 7; i++) {
-        const jour = new Date(dateDebut);
-        jour.setDate(dateDebut.getDate() + i);
-        
-        if (this.estJourOuvre(jour)) {
-          const jourStr = jour.toISOString().split('T')[0];
-          console.log(`📆 Jour ouvré: ${jourStr}`);
-          
-          // Pour chaque créneau (4 par jour)
-          for (const creneau of this.creneaux) {
-            // Choisir un agent en respectant l'équilibre des agences
-            const agentChoisi = this.choisirAgent(agentsAvecPriorite, planning, jourStr);
-            
-            if (agentChoisi) {
-              planning.push({
-                matricule_agent: agentChoisi.matricule_agent,
-                date_visite: jourStr,
-                heure_visite: creneau,
-                type_visite: 'Périodique',
-                statut: 'Programmé',
-                priorite: agentChoisi.priorite,
-                semaine,
-                annee,
-                created_by: userId
-              });
-              
-              console.log(`   ✅ ${creneau} - Agent ${agentChoisi.matricule_agent} (Agence ${agentChoisi.code_agence}, priorité ${agentChoisi.priorite})`);
-            } else {
-              console.log(`   ⚠️ Aucun agent disponible pour ${creneau}`);
-            }
-          }
+
+      console.log(`📆 Semaine cible: ${semaine}/${annee}`);
+      console.log(`📆 Lundi: ${dateDebutStr}`);
+
+      const existant = await this.Planning.findOne({ where: { semaine, annee } });
+      if (existant) {
+        console.log(`⚠️ Planning semaine ${semaine}/${annee} déjà existant — abandon`);
+        return [];
+      }
+
+      const tousAgents = await this.Agent.findAll({ where: { statut: 'actif' } });
+      console.log(`\n👥 Agents actifs: ${tousAgents.length}`);
+
+      const agentsNecessaires = [];
+
+      for (const agent of tousAgents) {
+        const besoinReprise = await this.estVisiteRepriseNecessaire(agent);
+        const besoinPeriodique = !besoinReprise && (await this.estVisitePeriodiqueNecessaire(agent));
+
+        if (besoinReprise || besoinPeriodique) {
+          const typeVisite = besoinReprise ? 'Reprise' : 'Périodique';
+          const priorite = await this.calculerPriorite(agent, typeVisite);
+          const dateOptimal = besoinReprise ? await this.getDateRepriseOptimale(agent) : null;
+
+          agentsNecessaires.push({
+            ...agent.toJSON(),
+            priorite,
+            type_visite_calcule: typeVisite,
+            date_optimal: dateOptimal
+          });
         }
       }
-      
-      console.log(`✅ Planning généré: ${planning.length} visites programmées`);
-      
-      // Sauvegarder le planning en base
+
+      agentsNecessaires.sort((a, b) => b.priorite - a.priorite);
+
+      console.log(`\n📊 Agents nécessitant une visite: ${agentsNecessaires.length}`);
+      console.log(`   Capacité hebdomadaire: ${this.CAPACITE_HEBDOMADAIRE} visites max`);
+
+      console.log('\n🏆 AGENTS PRIORITAIRES:');
+      agentsNecessaires.slice(0, 20).forEach((a, i) => {
+        const type = a.type_visite_calcule === 'Reprise'
+          ? '🔄 REPRISE'
+          : !a.date_derniere_visite
+          ? '🔴 1ÈRE VISITE'
+          : '📋 Périodique';
+        const dateInfo = a.date_optimal ? ` → Reprise ≈ ${a.date_optimal.toISOString().split('T')[0]}` : '';
+        console.log(
+          `   ${i + 1}. #${a.matricule_agent} - ${a.nom} ${a.prenom}` +
+          ` (Agence ${a.code_agence}) - ${type}${dateInfo} - Priorité: ${a.priorite}`
+        );
+      });
+
+      if (agentsNecessaires.length === 0) {
+        console.log("ℹ️ Aucun agent n'a besoin de visite cette semaine");
+        return [];
+      }
+
+      const joursSemaine = [];
+      for (let i = 1; i <= 4; i++) {
+        const jourDate = new Date(dateDebut);
+        jourDate.setDate(dateDebut.getDate() + i);
+        if (await this.estJourOuvre(jourDate)) {
+          joursSemaine.push(jourDate);
+        }
+      }
+
+      const planning = [];
+      const agentsDejaPlanifies = new Set();
+
+      for (const jourDate of joursSemaine) {
+        const dateStr = jourDate.toISOString().split('T')[0];
+        const jourNom = jourDate.toLocaleDateString('fr-FR', { weekday: 'long' });
+        console.log(`\n📆 ${dateStr} (${jourNom}):`);
+
+        const agentsJour = [];
+        const agencesJour = [];
+        const postesJour = [];
+        let nbCreneauxJour = 0;
+
+        for (const creneau of this.creneaux) {
+          let agentChoisi = null;
+
+          for (let i = 0; i < agentsNecessaires.length; i++) {
+            const agent = agentsNecessaires[i];
+
+            if (agentsDejaPlanifies.has(agent.matricule_agent)) continue;
+            if (agentsJour.includes(agent.matricule_agent)) continue;
+            if (agencesJour.includes(agent.code_agence)) continue;
+            if (postesJour.includes(agent.code_affectation)) continue;
+
+            if (agent.type_visite_calcule === 'Reprise' && agent.date_optimal) {
+              const dateOptStr = agent.date_optimal.toISOString().split('T')[0];
+              if (dateOptStr !== dateStr) continue;
+            }
+
+            agentChoisi = agent;
+            break;
+          }
+
+          if (agentChoisi) {
+            planning.push({
+              matricule_agent: agentChoisi.matricule_agent,
+              date_visite: dateStr,
+              heure_visite: creneau,
+              type_visite: agentChoisi.type_visite_calcule,
+              statut: 'Programmé',
+              priorite: agentChoisi.priorite,
+              semaine: semaine,
+              annee: annee,
+              created_by: userId,
+              convocation_envoyee: false,
+              source_planification: 'auto'
+            });
+
+            agentsDejaPlanifies.add(agentChoisi.matricule_agent);
+            agentsJour.push(agentChoisi.matricule_agent);
+            agencesJour.push(agentChoisi.code_agence);
+            postesJour.push(agentChoisi.code_affectation);
+            nbCreneauxJour++;
+
+            const typeLabel = agentChoisi.type_visite_calcule === 'Reprise' ? '🔄 REPRISE' : '📋 Périodique';
+            console.log(`   ✅ ${creneau} - #${agentChoisi.matricule_agent} ${agentChoisi.nom} ${agentChoisi.prenom} (Agence ${agentChoisi.code_agence}) - ${typeLabel}`);
+          } else {
+            console.log(`   ⚠️  ${creneau} - Aucun agent disponible`);
+          }
+        }
+
+        console.log(`   📊 Bilan: ${nbCreneauxJour}/${this.creneaux.length} créneaux remplis`);
+      }
+
+      console.log('\n' + '='.repeat(70));
+      console.log('📊 RÉCAPITULATIF');
+      console.log('='.repeat(70));
+      console.log(`   • Agents nécessitant une visite : ${agentsNecessaires.length}`);
+      console.log(`   • Agents planifiés              : ${agentsDejaPlanifies.size}`);
+      console.log(`   • Visites générées              : ${planning.length}`);
+
+      const periodik = planning.filter(p => p.type_visite === 'Périodique').length;
+      const reprises = planning.filter(p => p.type_visite === 'Reprise').length;
+      console.log(`     - Périodiques : ${periodik}`);
+      console.log(`     - Reprises    : ${reprises}`);
+
+      const nonPlanifies = agentsNecessaires.filter(a => !agentsDejaPlanifies.has(a.matricule_agent));
+      if (nonPlanifies.length > 0) {
+        console.log(`\n⚠️  ${nonPlanifies.length} agent(s) non planifiés (capacité insuffisante):`);
+        nonPlanifies.forEach(a => {
+          console.log(`   • #${a.matricule_agent} - ${a.nom} ${a.prenom} (Agence ${a.code_agence}) - ${a.type_visite_calcule}`);
+        });
+      }
+
       if (planning.length > 0) {
-        await Planning.bulkCreate(planning);
+        await this.Planning.bulkCreate(planning);
         console.log('💾 Planning sauvegardé en base');
       }
-      
+
       return planning;
-      
     } catch (error) {
       console.error('❌ Erreur génération planning:', error);
       throw error;
     }
   }
 
-  // ========== CHOISIR UN AGENT POUR UN CRÉNEAU ==========
-  choisirAgent(agents, planningExistant, dateVisite) {
-    // Exclure les agents déjà programmés ce jour-là
-    const agentsProgrammesJour = planningExistant
-      .filter(p => p.date_visite === dateVisite)
-      .map(p => p.matricule_agent);
-    
-    const agentsDisponibles = agents.filter(a => 
-      !agentsProgrammesJour.includes(a.matricule_agent)
-    );
-    
-    if (agentsDisponibles.length === 0) return null;
-    
-    // Distribuer par agence pour assurer l'équilibre
-    const parAgence = {};
-    agentsDisponibles.forEach(a => {
-      if (!parAgence[a.code_agence]) parAgence[a.code_agence] = [];
-      parAgence[a.code_agence].push(a);
+  async planifierVisiteManuelle(matricule_agent, dateVisite, heureVisite, typeVisite, motif, userId) {
+    const dateObj = new Date(dateVisite);
+
+    if (!(await this.estJourOuvre(dateObj))) {
+      throw new Error("La date choisie n'est pas un jour ouvré (Mardi à Vendredi, hors jours fériés)");
+    }
+
+    if (!['Reclassement', 'Embauche'].includes(typeVisite)) {
+      throw new Error(`Type de visite "${typeVisite}" invalide pour une planification manuelle. Utilisez Reclassement ou Embauche.`);
+    }
+
+    const planning = await this.Planning.create({
+      matricule_agent,
+      date_visite: dateVisite,
+      heure_visite: heureVisite || '09:00:00',
+      type_visite: typeVisite,
+      statut: 'Programmé',
+      priorite: 200,
+      semaine: moment(dateObj).isoWeek(),
+      annee: dateObj.getFullYear(),
+      created_by: userId,
+      convocation_envoyee: false,
+      motif_reprogrammation: motif || `Visite de ${typeVisite} programmée manuellement`,
+      source_planification: 'manuel'
     });
-    
-    // Choisir l'agence avec le moins d'agents programmés cette semaine
-    const comptageAgence = {};
-    planningExistant.forEach(p => {
-      const agent = agents.find(a => a.matricule_agent === p.matricule_agent);
-      if (agent) {
-        comptageAgence[agent.code_agence] = (comptageAgence[agent.code_agence] || 0) + 1;
-      }
-    });
-    
-    // Trouver l'agence avec le moins de représentants
-    let agenceChoisie = null;
-    let minComptage = Infinity;
-    
-    Object.keys(parAgence).forEach(agence => {
-      const comptage = comptageAgence[agence] || 0;
-      if (comptage < minComptage) {
-        minComptage = comptage;
-        agenceChoisie = agence;
-      }
-    });
-    
-    if (!agenceChoisie) return agentsDisponibles[0];
-    
-    // Choisir l'agent avec la plus haute priorité dans cette agence
-    const candidats = parAgence[agenceChoisie];
-    candidats.sort((a, b) => b.priorite - a.priorite);
-    
-    return candidats[0];
+
+    return planning;
   }
 
-  // ========== RÉAFFECTATION AUTOMATIQUE ==========
-  async reaffecterAgent(idPlanning, motif, userId) {
+  async planifierVisiteReclassement(agent, userId, dateVisite, heureVisite, motif) {
     try {
-      const ancienPlanning = await Planning.findByPk(idPlanning, {
-        include: [{ model: Agent }]
-      });
+      console.log(`📝 Planification reclassement pour agent #${agent.matricule_agent} le ${dateVisite} à ${heureVisite}`);
       
-      if (!ancienPlanning) {
-        throw new Error('Planning non trouvé');
+      const dateObj = new Date(dateVisite);
+      const heure = heureVisite || '09:00:00';
+      
+      const estOuvre = await this.estJourOuvre(dateObj);
+      if (!estOuvre) {
+        throw new Error('La date choisie n\'est pas un jour ouvré (Mardi à Vendredi, hors jours fériés)');
       }
       
-      // Marquer comme reprogrammé
-      ancienPlanning.statut = 'Reporté';
-      ancienPlanning.reprogrammee = true;
-      ancienPlanning.motif_reprogrammation = motif;
-      await ancienPlanning.save();
-      
-      // Récupérer les agents disponibles
-      const agents = await Agent.findAll({
-        where: { statut: 'actif' }
-      });
-      
-      // Calculer priorités
-      const agentsAvecPriorite = agents.map(a => ({
-        ...a.toJSON(),
-        priorite: this.calculerPriorite(a)
-      }));
-      
-      // Exclure l'agent actuel et ceux déjà programmés ce jour-là
-      const planningJour = await Planning.findAll({
+      const existeDeja = await this.Planning.findOne({
         where: {
-          date_visite: ancienPlanning.date_visite,
+          date_visite: dateVisite,
+          heure_visite: heure,
           statut: 'Programmé'
         }
       });
       
-      const exclus = planningJour.map(p => p.matricule_agent);
-      exclus.push(ancienPlanning.matricule_agent);
-      
-      const disponibles = agentsAvecPriorite.filter(a => !exclus.includes(a.matricule_agent));
-      
-      if (disponibles.length === 0) {
-        console.log('⚠️ Aucun agent disponible pour réaffectation');
-        return null;
+      if (existeDeja) {
+        console.log(`⚠️ Créneau déjà occupé par planning #${existeDeja.id_planning}`);
+        throw new Error(`Le créneau du ${dateVisite} à ${heure.substring(0,5)} est déjà occupé`);
       }
       
-      // Choisir le meilleur agent
-      disponibles.sort((a, b) => b.priorite - a.priorite);
-      const nouvelAgent = disponibles[0];
-      
-      // Créer nouvelle affectation
-      const nouveauPlanning = await Planning.create({
-        matricule_agent: nouvelAgent.matricule_agent,
-        date_visite: ancienPlanning.date_visite,
-        heure_visite: ancienPlanning.heure_visite,
-        type_visite: ancienPlanning.type_visite,
+      const planning = await this.Planning.create({
+        matricule_agent: agent.matricule_agent,
+        date_visite: dateVisite,
+        heure_visite: heure,
+        type_visite: 'Reclassement',
         statut: 'Programmé',
-        priorite: nouvelAgent.priorite,
-        visite_originale_id: ancienPlanning.id_planning,
-        semaine: ancienPlanning.semaine,
-        annee: ancienPlanning.annee,
-        created_by: userId
+        priorite: 200,
+        semaine: this.getNumeroSemaine(dateObj),
+        annee: dateObj.getFullYear(),
+        created_by: userId,
+        convocation_envoyee: false,
+        motif_reprogrammation: motif || 'Visite de reclassement programmée manuellement',
+        source_planification: 'manuel'
       });
       
-      console.log(`✅ Réaffectation: Agent ${nouvelAgent.matricule_agent} remplace ${ancienPlanning.matricule_agent}`);
-      
-      return nouveauPlanning;
+      console.log(`✅ Planning reclassement créé avec ID: ${planning.id_planning}`);
+      return planning;
       
     } catch (error) {
-      console.error('❌ Erreur réaffectation:', error);
+      console.error('❌ Erreur dans planifierVisiteReclassement:', error);
       throw error;
     }
   }
 
-  // ========== UTILITAIRES ==========
-  getNumeroSemaine(date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
-    const week1 = new Date(d.getFullYear(), 0, 4);
-    return 1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+  async planifierVisiteEmbauche(agent, userId, dateVisite, heureVisite, motif) {
+    return this.planifierVisiteManuelle(agent.matricule_agent, dateVisite, heureVisite || '09:00:00', 'Embauche', motif, userId);
   }
 
-  getLundiSemaine(numeroSemaine, annee) {
-    const simple = new Date(annee, 0, 1 + (numeroSemaine - 1) * 7);
-    const dow = simple.getDay();
-    const ISOweekStart = simple;
-    if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-    else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-    return ISOweekStart;
+  async verifierEtGenererSemainesManquantes(userId) {
+    console.log('\n🔍 VÉRIFICATION DES SEMAINES MANQUANTES');
+    
+    const aujourdhui = new Date();
+    const semaineActuelle = this.getNumeroSemaine(aujourdhui);
+    const annee = aujourdhui.getFullYear();
+    let totalGenere = 0;
+    
+    console.log(`🔍 DEBUG: aujourdhui = ${aujourdhui.toISOString().split('T')[0]}`);
+    console.log(`🔍 DEBUG: semaineActuelle = ${semaineActuelle}`);
+    console.log(`🔍 DEBUG: getLundiSemaine(${semaineActuelle}, ${annee}) = ${this.getLundiSemaine(semaineActuelle, annee)}`);
+    console.log(`🔍 DEBUG: getLundiSemaine(${semaineActuelle + 1}, ${annee}) = ${this.getLundiSemaine(semaineActuelle + 1, annee)}`);
+    
+    const planningActuel = await this.Planning.findOne({ where: { semaine: semaineActuelle, annee } });
+    if (!planningActuel) {
+      console.log(`⚠️  Planning semaine ${semaineActuelle}/${annee} manquant — Génération...`);
+      const lundiActuel = this.getLundiSemaine(semaineActuelle, annee);
+      console.log(`🔍 lundiActuel = ${lundiActuel}`);
+      const planning = await this.genererPlanningSemaine(new Date(lundiActuel), userId);
+      totalGenere += planning.length;
+    } else {
+      console.log(`✅ Planning semaine ${semaineActuelle}/${annee} existe déjà`);
+    }
+    
+    const semaineSuivante = semaineActuelle + 1;
+    if (semaineSuivante <= 52) {
+      const planningProchain = await this.Planning.findOne({ where: { semaine: semaineSuivante, annee } });
+      if (!planningProchain) {
+        console.log(`⚠️  Planning semaine ${semaineSuivante}/${annee} manquant — Génération...`);
+        const lundiProchain = this.getLundiSemaine(semaineSuivante, annee);
+        console.log(`🔍 lundiProchain = ${lundiProchain}`);
+        const planning = await this.genererPlanningSemaine(new Date(lundiProchain), userId);
+        totalGenere += planning.length;
+      } else {
+        console.log(`✅ Planning semaine ${semaineSuivante}/${annee} existe déjà`);
+      }
+    }
+    
+    return totalGenere;
   }
 }
 

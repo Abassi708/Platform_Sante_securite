@@ -1,4 +1,4 @@
-// routes/notificationRoutes.js
+// backend/routes/notificationRoutes.js
 const express = require('express');
 const router = express.Router();
 const { 
@@ -13,7 +13,7 @@ const { protect } = require('../middleware/authMiddleware');
 // Routes protégées
 router.post('/send-password', protect, sendPasswordNotification);
 router.get('/user/:userId', protect, getUserNotifications);
-router.get('/:id', protect, getNotificationById); // NOUVELLE ROUTE
+router.get('/:id', protect, getNotificationById);
 router.put('/:id/read', protect, markAsRead);
 router.delete('/:id', protect, deleteNotification);
 

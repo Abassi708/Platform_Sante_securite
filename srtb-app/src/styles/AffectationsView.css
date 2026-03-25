@@ -1,0 +1,435 @@
+/* frontend/src/styles/AffectationsView.css */
+.affectations-container {
+  padding: 24px;
+  background: #f8fafc;
+  min-height: 100vh;
+}
+
+.affectations-header {
+  margin-bottom: 24px;
+}
+
+.affectations-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 24px;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.affectations-header p {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn.active {
+  background: white;
+  color: #f59e0b;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.affectations-grid, .agences-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 20px;
+}
+
+.affectation-card, .agence-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.affectation-card:hover, .agence-card:hover {
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
+
+.card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.card-content h3 {
+  font-size: 18px;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.card-content .description {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.periodicite-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.card-stats {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stat-item strong {
+  font-size: 24px;
+  color: #f59e0b;
+}
+
+.stat-details {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.stat-details span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.card-arrow {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: #cbd5e1;
+}
+
+/* Agence card specific */
+.card-header-agence {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.agence-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.agence-info h3 {
+  font-size: 18px;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.agence-info p {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.agence-stats {
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+.stat-main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.stat-number {
+  font-size: 28px;
+  font-weight: bold;
+  color: #2563eb;
+}
+
+.stat-breakdown {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+}
+
+.affectation-breakdown {
+  margin-top: 12px;
+}
+
+.breakdown-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.breakdown-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.breakdown-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 20px;
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: white;
+  border-radius: 24px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  padding: 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+}
+
+.modal-header .header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #94a3b8;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.info-section {
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.description-full {
+  margin-bottom: 16px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.stats-section {
+  margin-bottom: 24px;
+}
+
+.stats-section h3, .agents-list-modal h3, .affectation-distribution h3 {
+  font-size: 16px;
+  margin-bottom: 16px;
+  color: #1e293b;
+}
+
+.stats-grid-modal {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.stat-box {
+  text-align: center;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+}
+
+.stat-box svg {
+  margin-bottom: 8px;
+  color: #f59e0b;
+}
+
+.stat-box strong {
+  display: block;
+  font-size: 28px;
+  color: #1e293b;
+}
+
+.stat-box span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.agents-table-mini {
+  overflow-x: auto;
+}
+
+.agents-table-mini table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.agents-table-mini th, .agents-table-mini td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.agents-table-mini th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #475569;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.status-badge.actif {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.status-badge.inactif {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.status-badge.conge {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.status-badge.maladie {
+  background: #e0e7ff;
+  color: #4f46e5;
+}
+
+.distribution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.distribution-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dist-label {
+  width: 120px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.dist-bar {
+  flex: 1;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.dist-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.dist-count {
+  width: 80px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.affectations-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+}

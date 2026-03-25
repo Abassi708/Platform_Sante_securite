@@ -146,7 +146,7 @@ const AdminLogin = () => {
     try {
       console.log('📡 Demande OTP admin pour:', emailAddress);
       
-      const response = await fetch('http://localhost:5000/api/otp/demander', {
+      const response = await fetch('`${process.env.REACT_APP_API_URL}/api/otp/demander', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailAddress })
@@ -214,8 +214,7 @@ const AdminLogin = () => {
   const verifyOtp = async (enteredOtp) => {
     try {
       console.log('📡 Vérification OTP admin pour:', otpEmail);
-      
-      const response = await fetch('http://localhost:5000/api/otp/verifier', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/otp/verifier`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -335,7 +334,7 @@ const AdminLogin = () => {
     try {
       console.log('📡 Tentative de connexion admin...');
       
-      const response = await fetch('http://localhost:5000/api/auth/admin/login', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/admin/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

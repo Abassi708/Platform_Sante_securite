@@ -1,46 +1,54 @@
+// backend/server.js
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const sequelize = require('./config/database');
+const { sequelizeGlobal, sequelizeLocal, testConnections } = require('./config/database');
 
-// Import des routes
+// ========== IMPORT DES MODÈLES ==========
+const db = require('./models');
+
+// ========== IMPORT DES ROUTES ==========
 const authRoutes = require('./routes/authRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const otpRoutes = require('./routes/otpRoutes');
 const accidentRoutes = require('./routes/accidentRoutes');
 const visiteRoutes = require('./routes/visiteRoutes');
 const passwordRoutes = require('./routes/passwordRoutes');
+const notificationIntelligenteRoutes = require('./routes/notificationIntelligenteRoutes');
+const previsionsRoutes = require('./routes/previsionsRoutes');
+const planningRoutes = require('./routes/planningRoutes');
+const technicienRoutes = require('./routes/technicienRoutes');
 
-require('./models');
+// ========== IMPORT DES CRONS ==========
+require('./cron/planningCron');
+require('./cron/notificationIntelligenteCron');
+require('./cron/convocationCron');
+require('./cron/autoPlanningCron');
 
 const app = express();
 
-// ✅ DIAGNOSTIC DES IMPORTS
-console.log('🔍 DIAGNOSTIC DES IMPORTS:');
-console.log('authRoutes est un router:', typeof authRoutes === 'function');
-console.log('notificationRoutes est un router:', typeof notificationRoutes === 'function');
-console.log('otpRoutes est un router:', typeof otpRoutes === 'function');
-console.log('accidentRoutes est un router:', typeof accidentRoutes === 'function');
-console.log('visiteRoutes est un router:', typeof visiteRoutes === 'function');
-console.log('passwordRoutes est un router:', typeof passwordRoutes === 'function');
-console.log('====================================');
-
+// ========== CONFIGURATION CORS ==========
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost',
+  'http://127.0.0.1:3000',
   'http://localhost:3001',
   'http://localhost:3002',
   'http://localhost:3003',
   'http://localhost:3004',
-  'http://localhost:3005'
+  'http://localhost:3005',
+  'http://server680404.ddns.net:2500',  // Votre serveur
+  'http://server680404.ddns.net:3000'   // Si le frontend est sur le même serveur
 ];
 
-// Configuration CORS
 app.use(cors({
   origin: function(origin, callback) {
+    // Autoriser les requêtes sans origin (comme Postman)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('server680404.ddns.net')) {
       callback(null, true);
     } else {
+      console.log('❌ CORS bloqué pour:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -49,87 +57,74 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-app.use(express.json());
+// ========== MIDDLEWARES ==========
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Middleware de logging
 app.use((req, res, next) => {
   console.log(`📡 ${req.method} ${req.url} - ${new Date().toLocaleTimeString()}`);
   next();
 });
 
-// ✅ MONTAGE DES ROUTES AVEC VÉRIFICATION
+// ========== MONTAGE DES ROUTES ==========
 try {
-  if (typeof authRoutes === 'function') {
-    app.use('/api/auth', authRoutes);
-    console.log('✅ Route /api/auth montée');
-  } else {
-    console.error('❌ authRoutes n\'est pas un router valide');
-  }
-
-  if (typeof notificationRoutes === 'function') {
-    app.use('/api/notifications', notificationRoutes);
-    console.log('✅ Route /api/notifications montée');
-  } else {
-    console.error('❌ notificationRoutes n\'est pas un router valide');
-  }
-
-  if (typeof otpRoutes === 'function') {
-    app.use('/api/otp', otpRoutes);
-    console.log('✅ Route /api/otp montée');
-  } else {
-    console.error('❌ otpRoutes n\'est pas un router valide');
-  }
-
-  if (typeof accidentRoutes === 'function') {
-    app.use('/api', accidentRoutes);
-    console.log('✅ Route /api/accident montée');
-  } else {
-    console.error('❌ accidentRoutes n\'est pas un router valide');
-  }
-
-  if (typeof visiteRoutes === 'function') {
-    app.use('/api', visiteRoutes);
-    console.log('✅ Route /api/visite montée');
-  } else {
-    console.error('❌ visiteRoutes n\'est pas un router valide');
-  }
-
-  if (typeof passwordRoutes === 'function') {
-    app.use('/api/password', passwordRoutes);
-    console.log('✅ Route /api/password montée');
-  } else {
-    console.error('❌ passwordRoutes n\'est pas un router valide');
-  }
+  app.use('/api/auth', authRoutes);
+  app.use('/api/notifications', notificationRoutes);
+  app.use('/api/otp', otpRoutes);
+  app.use('/api', accidentRoutes);
+  app.use('/api', visiteRoutes);
+  app.use('/api/password', passwordRoutes);
+  app.use('/api/notifications-intelligentes', notificationIntelligenteRoutes);
+  app.use('/api/previsions', previsionsRoutes);
+  app.use('/api', planningRoutes);
+  app.use('/api/technicien', technicienRoutes);
+  console.log('✅ Routes montées avec succès');
 } catch (error) {
   console.error('❌ Erreur lors du montage des routes:', error.message);
 }
 
-// Route de santé (toujours accessible même si les autres routes échouent)
+// ========== ROUTE DE SANTÉ ==========
 app.get('/api/health', (req, res) => {
   res.json({ 
     success: true,
     status: 'OK', 
     message: 'Backend opérationnel',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    version: '2.0.0',
+    environment: process.env.NODE_ENV
   });
 });
 
+// ========== DÉMARRAGE DU SERVEUR ==========
 const PORT = process.env.PORT || 5000;
 
-// Connexion à la base de données et démarrage du serveur
-sequelize.authenticate()
-  .then(() => {
-    console.log('✅ Connecté à MySQL');
-    console.log('✅ Connexion à la base de données établie');
-    
-    app.listen(PORT, () => {
-      console.log(`✅ Backend démarré sur http://localhost:${PORT}`);
-      console.log(`✅ Test: http://localhost:${PORT}/api/health`);
-    });
-  })
-  .catch(error => {
-    console.error('❌ Erreur de connexion à la base de données:', error);
-    process.exit(1); // Arrêter le processus si la DB ne répond pas
+testConnections().then(() => {
+  // Écouter sur toutes les interfaces réseau
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`\n🚀 Serveur démarré sur http://localhost:${PORT}`);
+    console.log(`   Accessible sur le réseau: http://${getLocalIp()}:${PORT}`);
+    console.log(`   API publique: http://server680404.ddns.net:${PORT}/api/health`);
+    console.log('\n✅ Backend prêt !\n');
   });
+}).catch(error => {
+  console.error('\n❌ Erreur de connexion aux bases de données:');
+  console.error(error);
+  console.log('\n💡 Vérifications:');
+  console.log('   1. Le serveur MySQL est-il accessible depuis cette machine ?');
+  console.log('   2. Le port 3368 est-il ouvert sur le serveur distant ?');
+  console.log('   3. Les identifiants sont-ils corrects ?');
+  process.exit(1);
+});
 
-console.log('✅ Serveur email configuré');
+function getLocalIp() {
+  const { networkInterfaces } = require('os');
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return 'votre-ip';
+}

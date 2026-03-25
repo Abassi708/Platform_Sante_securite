@@ -1,61 +1,56 @@
 // backend/cron/planningCron.js
 const cron = require('node-cron');
 const planningService = require('../services/planningService');
-const Planning = require('../models/Planning');
-const User = require('../models/User');
-const Notification = require('../models/Notification');
+const joursFeriesService = require('../services/joursFeriesService');
+const db = require('../models');
 
-// Planifier pour chaque dimanche à 23h
+// Précharger les jours fériés au démarrage
+joursFeriesService.prechargerAnnees();
+
 cron.schedule('0 23 * * 0', async () => {
-  console.log('🔄 Génération automatique du planning hebdomadaire...');
-  
+  console.log('\n🔄 ===== GÉNÉRATION AUTOMATIQUE DU PLANNING =====');
+  console.log(`📅 ${new Date().toLocaleString('fr-FR')}`);
+
   try {
-    // Récupérer un utilisateur système (admin)
-    const systemUser = await User.findOne({ where: { Role: 'admin' } });
+    // ✅ CORRECTION : Utiliser db.local.User
+    const systemUser = await db.local.User.findOne({ where: { Role: 'admin' } });
     if (!systemUser) {
       console.error('❌ Aucun administrateur trouvé');
       return;
     }
-    
-    // Date de début de la semaine prochaine (lundi)
+
     const aujourdhui = new Date();
-    const joursJusquaLundi = (aujourdhui.getDay() === 0 ? 1 : 8 - aujourdhui.getDay());
-    const debutSemaine = new Date(aujourdhui);
-    debutSemaine.setDate(aujourdhui.getDate() + joursJusquaLundi);
-    
-    // Vérifier si un planning existe déjà pour cette semaine
-    const annee = debutSemaine.getFullYear();
-    const semaine = planningService.getNumeroSemaine(debutSemaine);
-    
-    const existant = await Planning.findOne({
-      where: { semaine, annee }
-    });
-    
+
+    const jourActuel = aujourdhui.getDay();
+    const joursJusquaLundi = jourActuel === 0 ? 1 : 8 - jourActuel;
+    const lundiProchain = new Date(aujourdhui);
+    lundiProchain.setDate(aujourdhui.getDate() + joursJusquaLundi);
+    lundiProchain.setHours(0, 0, 0, 0);
+
+    const annee = lundiProchain.getFullYear();
+    const semaine = planningService.getNumeroSemaine(lundiProchain);
+
+    console.log(`📆 Génération pour semaine ${semaine}/${annee} (lundi: ${lundiProchain.toISOString().split('T')[0]})`);
+
+    const Planning = db.local.Planning;
+    const existant = await Planning.findOne({ where: { semaine, annee } });
     if (existant) {
       console.log(`ℹ️ Planning semaine ${semaine}/${annee} déjà existant`);
       return;
     }
-    
-    // Générer le planning
-    const planning = await planningService.genererPlanningSemaine(debutSemaine, systemUser.id_utilisateur);
-    
-    // Créer une notification pour le GRH
-    if (planning.length > 0) {
-      await Notification.create({
-        id_utilisateur: systemUser.id_utilisateur,
-        email_utilisateur: systemUser.Login,
-        role_utilisateur: 'admin',
-        raison: `Planning de la semaine ${semaine} généré automatiquement avec ${planning.length} visites`,
-        envoyer_par_email: 'Système',
-        statut: 'envoyé'
-      });
-      
-      console.log(`✅ Planning semaine ${semaine} généré avec ${planning.length} visites`);
-    }
-    
+
+    const planning = await planningService.genererPlanningSemaine(lundiProchain, systemUser.id_utilisateur);
+
+    console.log(`✅ Planning semaine ${semaine}/${annee} : ${planning.length} visite(s) générée(s)`);
+
   } catch (error) {
     console.error('❌ Erreur génération automatique:', error);
   }
 });
 
-console.log('⏰ Cron job pour planning hebdomadaire activé');
+cron.schedule('0 0 1 1 *', async () => {
+  console.log('📅 Préchargement des jours fériés pour la nouvelle année...');
+  await joursFeriesService.prechargerAnnees();
+});
+
+console.log('⏰ Cron planning activé (génération automatique chaque dimanche à 23h)');

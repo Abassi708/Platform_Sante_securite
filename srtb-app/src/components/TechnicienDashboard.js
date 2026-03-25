@@ -1,3 +1,4 @@
+// frontend/src/pages/TechnicienDashboard.js
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -6,9 +7,12 @@ import {
   Users, Briefcase, Award, Zap, Bell, Settings, HelpCircle, Key,
   Trash2, X, AlertCircle, Info, User, Mail, Shield, Eye as EyeIcon,
   EyeOff, Send, MessageCircle, Hash, Crown, Wrench, Heart,
-  History, ChevronRight
+  History, ChevronRight, Home, Building2, Activity, UserCheck, UserX,
+  Truck  // ← AJOUTEZ CETTE LIGNE
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import AgentsList from '../components/AgentsList';
+import AffectationsView from '../components/AffectationsView';
 import '../styles/TechnicienDashboard.css';
 
 const TechnicienDashboard = () => {
@@ -35,6 +39,10 @@ const TechnicienDashboard = () => {
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  
+  // ========== STATISTIQUES GLOBALES ==========
+  const [globalStats, setGlobalStats] = useState(null);
+  const [loadingStats, setLoadingStats] = useState(false);
 
   // ========== EFFETS ==========
   useEffect(() => {
@@ -64,14 +72,38 @@ const TechnicienDashboard = () => {
     
     // Charger les notifications de l'utilisateur
     fetchNotifications(parsedUser.id);
+    
+    // Charger les statistiques globales
+    fetchGlobalStats();
   }, [navigate]);
+
+  // ========== CHARGER LES STATISTIQUES GLOBALES ==========
+  const fetchGlobalStats = async () => {
+    setLoadingStats(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/technicien/stats/dashboard`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setGlobalStats(data.data);
+      }
+    } catch (err) {
+      console.error('Erreur chargement statistiques:', err);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   // ========== CHARGER LES NOTIFICATIONS ==========
   const fetchNotifications = async (userId) => {
     setLoadingNotifications(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/notifications/user/${userId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/user/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -93,7 +125,7 @@ const TechnicienDashboard = () => {
   const markAsRead = async (notificationId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}/read`, {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -120,7 +152,7 @@ const TechnicienDashboard = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -141,12 +173,11 @@ const TechnicienDashboard = () => {
     }
   };
 
-  // ========== OUVRIR UNE NOTIFICATION (VERSION CORRIGÉE) ==========
+  // ========== OUVRIR UNE NOTIFICATION ==========
   const openNotification = async (notification) => {
     try {
-      // Récupérer la notification complète depuis le serveur
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/notifications/${notification.id}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notification.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -402,73 +433,184 @@ const TechnicienDashboard = () => {
         </div>
       </motion.div>
 
-      {/* CONTENU PRINCIPAL */}
-      <motion.div 
-        className="dashboard-content"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2, duration: 0.3 }}
-      >
-        <h2>Bienvenue dans votre espace de travail</h2>
-        <p>Gérez vos rapports et tâches administratives</p>
-        
-        {/* BANNIÈRE HISTORIQUE PROMOTIONNELLE */}
-        <motion.div 
-          className="historique-banner"
-          onClick={handleHistorique}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+      {/* TABS DE NAVIGATION */}
+      <div className="dashboard-tabs">
+        <button
+          className={`tab-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => setActiveTab('dashboard')}
         >
-          <div className="banner-icon">
-            <History size={32} />
-          </div>
-          <div className="banner-content">
-            <h3>Consultez votre historique de connexions</h3>
-            <p>Retrouvez toutes vos activités récentes et suivez votre parcours</p>
-          </div>
-          <div className="banner-arrow">
-            <ChevronRight size={24} />
-          </div>
-        </motion.div>
-        
-        {/* SECTION NOTIFICATIONS RÉCENTES */}
-        {notifications.length > 0 && (
-          <div className="recent-notifications">
-            <h3>
-              <Bell size={18} />
-              Notifications récentes
-              {unreadCount > 0 && <span className="unread-badge">{unreadCount} non lue(s)</span>}
-            </h3>
-            
-            <div className="recent-list">
-              {notifications.slice(0, 3).map(notif => (
-                <div 
-                  key={notif.id} 
-                  className={`recent-item ${notif.status !== 'read' ? 'unread' : ''}`}
-                  onClick={() => openNotification(notif)}
-                >
-                  <div className="recent-icon" style={{ background: `${getRoleColor(notif.user_role)}20`, color: getRoleColor(notif.user_role) }}>
-                    <Key size={16} />
+          <Home size={18} />
+          <span>Tableau de bord</span>
+        </button>
+        <button
+          className={`tab-nav-btn ${activeTab === 'agents' ? 'active' : ''}`}
+          onClick={() => setActiveTab('agents')}
+        >
+          <Users size={18} />
+          <span>Agents</span>
+        </button>
+        <button
+          className={`tab-nav-btn ${activeTab === 'distribution' ? 'active' : ''}`}
+          onClick={() => setActiveTab('distribution')}
+        >
+          <BarChart size={18} />
+          <span>Distribution</span>
+        </button>
+      </div>
+
+      {/* CONTENU DES TABS */}
+      <AnimatePresence mode="wait">
+        {activeTab === 'dashboard' && (
+          <motion.div
+            key="dashboard"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="tab-content"
+          >
+            {/* Cartes statistiques globales */}
+            {globalStats && !loadingStats && (
+              <div className="global-stats-grid">
+                <div className="global-stat-card">
+                  <div className="global-stat-icon" style={{ background: '#2563eb20', color: '#2563eb' }}>
+                    <Users size={24} />
                   </div>
-                  <div className="recent-content">
-                    <div className="recent-title">
-                      Mot de passe modifié
-                      {notif.status !== 'read' && <span className="new-badge">Nouveau</span>}
-                    </div>
-                    <div className="recent-reason">{notif.reason}</div>
-                    <div className="recent-date">{formatDate(notif.created_at)}</div>
+                  <div className="global-stat-info">
+                    <span className="global-stat-value">{globalStats.agents.total}</span>
+                    <span className="global-stat-label">Agents</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </motion.div>
+                <div className="global-stat-card">
+                  <div className="global-stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
+                    <UserCheck size={24} />
+                  </div>
+                  <div className="global-stat-info">
+                    <span className="global-stat-value">{globalStats.agents.actifs}</span>
+                    <span className="global-stat-label">Actifs</span>
+                  </div>
+                </div>
+                <div className="global-stat-card">
+                  <div className="global-stat-icon" style={{ background: '#ef444420', color: '#ef4444' }}>
+                    <AlertCircle size={24} />
+                  </div>
+                  <div className="global-stat-info">
+                    <span className="global-stat-value">{globalStats.agents.enInaptitude}</span>
+                    <span className="global-stat-label">En inaptitude</span>
+                  </div>
+                </div>
+                <div className="global-stat-card">
+                  <div className="global-stat-icon" style={{ background: '#f59e0b20', color: '#f59e0b' }}>
+                    <Activity size={24} />
+                  </div>
+                  <div className="global-stat-info">
+                    <span className="global-stat-value">{globalStats.agents.tauxActivite}%</span>
+                    <span className="global-stat-label">Taux activité</span>
+                  </div>
+                </div>
+                <div className="global-stat-card">
+                  <div className="global-stat-icon" style={{ background: '#8b5cf620', color: '#8b5cf6' }}>
+                    <Truck size={24} />
+                  </div>
+                  <div className="global-stat-info">
+                    <span className="global-stat-value">{globalStats.affectations.chauffeurs}</span>
+                    <span className="global-stat-label">Chauffeurs</span>
+                  </div>
+                </div>
+                <div className="global-stat-card">
+                  <div className="global-stat-icon" style={{ background: '#06b6d420', color: '#06b6d4' }}>
+                    <Calendar size={24} />
+                  </div>
+                  <div className="global-stat-info">
+                    <span className="global-stat-value">{globalStats.visites.aVenir}</span>
+                    <span className="global-stat-label">Visites à venir</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
-      {/* MODALE DE NOTIFICATION AMÉLIORÉE */}
+            {/* BANNIÈRE HISTORIQUE */}
+            <motion.div 
+              className="historique-banner"
+              onClick={handleHistorique}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <div className="banner-icon">
+                <History size={32} />
+              </div>
+              <div className="banner-content">
+                <h3>Consultez votre historique de connexions</h3>
+                <p>Retrouvez toutes vos activités récentes et suivez votre parcours</p>
+              </div>
+              <div className="banner-arrow">
+                <ChevronRight size={24} />
+              </div>
+            </motion.div>
+            
+            {/* SECTION NOTIFICATIONS RÉCENTES */}
+            {notifications.length > 0 && (
+              <div className="recent-notifications">
+                <h3>
+                  <Bell size={18} />
+                  Notifications récentes
+                  {unreadCount > 0 && <span className="unread-badge">{unreadCount} non lue(s)</span>}
+                </h3>
+                
+                <div className="recent-list">
+                  {notifications.slice(0, 3).map(notif => (
+                    <div 
+                      key={notif.id} 
+                      className={`recent-item ${notif.status !== 'read' ? 'unread' : ''}`}
+                      onClick={() => openNotification(notif)}
+                    >
+                      <div className="recent-icon" style={{ background: `${getRoleColor(notif.user_role)}20`, color: getRoleColor(notif.user_role) }}>
+                        <Key size={16} />
+                      </div>
+                      <div className="recent-content">
+                        <div className="recent-title">
+                          Mot de passe modifié
+                          {notif.status !== 'read' && <span className="new-badge">Nouveau</span>}
+                        </div>
+                        <div className="recent-reason">{notif.reason}</div>
+                        <div className="recent-date">{formatDate(notif.created_at)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {activeTab === 'agents' && (
+          <motion.div
+            key="agents"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="tab-content"
+          >
+            <AgentsList />
+          </motion.div>
+        )}
+
+        {activeTab === 'distribution' && (
+          <motion.div
+            key="distribution"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="tab-content"
+          >
+            <AffectationsView />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODALE DE NOTIFICATION */}
       <AnimatePresence>
         {showNotificationModal && selectedNotification && (
           <motion.div 

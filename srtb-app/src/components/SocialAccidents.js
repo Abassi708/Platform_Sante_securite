@@ -243,7 +243,7 @@ const SocialAccidents = () => {
   const fetchAgents = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/agents', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -259,7 +259,7 @@ const SocialAccidents = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/accidents', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/accidents`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -277,7 +277,7 @@ const SocialAccidents = () => {
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/accidents/stats', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/accidents/stats`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -329,8 +329,8 @@ const SocialAccidents = () => {
     try {
       const token = localStorage.getItem('token');
       const url = selectedAccident 
-        ? `http://localhost:5000/api/accidents/${selectedAccident.id_accident}`
-        : 'http://localhost:5000/api/accidents';
+        ? `${process.env.REACT_APP_API_URL}/api/accidents/${selectedAccident.id_accident}`
+        : `${process.env.REACT_APP_API_URL}/api/accidents`;
       const method = selectedAccident ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -387,7 +387,7 @@ const handleDeclarer = async (id) => {
       return;
     }
 
-    const response = await fetch(`http://localhost:5000/api/accidents/${id}/statut`, {
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/accidents/${id}/statut`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -435,7 +435,7 @@ const handleDeclarer = async (id) => {
   
   try {
     const token = localStorage.getItem('token');
-    const response = await fetch(`http://localhost:5000/api/accidents/${accidentToDelete.id_accident}`, {
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/accidents/${accidentToDelete.id_accident}`, {
       method: 'DELETE',
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -1080,29 +1080,36 @@ const handleDeclarer = async (id) => {
                 
                 {/* Agent concerné */}
                 <div className="form-section">
-                  <h3>
-                    <User size={16} />
-                    Agent concerné
-                  </h3>
-                  <div className="form-grid">
-                    <div className="form-group full-width">
-                      <label>
-                        <User size={14} />
-                        Matricule de l'agent <span className="required">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        className={formErrors.matricule_agent ? 'error' : ''}
-                        placeholder="Saisir le matricule de l'agent"
-                        value={formData.matricule_agent}
-                        onChange={(e) => setFormData({...formData, matricule_agent: e.target.value})}
-                      />
-                      {formErrors.matricule_agent && (
-                        <div className="error-message">{formErrors.matricule_agent}</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+  <h3>
+    <User size={16} />
+    Agent concerné
+  </h3>
+  <div className="form-grid">
+    <div className="form-group full-width">
+      <label>
+        <User size={14} />
+        Agent <span className="required">*</span>
+      </label>
+      <select
+        value={formData.matricule_agent}
+        onChange={(e) => setFormData({...formData, matricule_agent: e.target.value})}
+        className={formErrors.matricule_agent ? 'error' : ''}
+        required
+      >
+        <option value="">Sélectionner un agent</option>
+        {agents.map(agent => (
+          <option key={agent.matricule_agent} value={agent.matricule_agent}>
+            {agent.nom} {agent.prenom} - #{agent.matricule_agent} ({agent.code_affectation === 3 ? 'Chauffeur' : 'Autre'})
+          </option>
+        ))}
+      </select>
+      {formErrors.matricule_agent && (
+        <div className="error-message">{formErrors.matricule_agent}</div>
+      )}
+    </div>
+  </div>
+</div>
+
 
                 {/* Circonstances */}
                 <div className="form-section">

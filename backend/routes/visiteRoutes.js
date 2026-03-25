@@ -2,51 +2,147 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
-const { Planning, Visite, Agent } = require('../models');
+const db = require('../models');
 const { Op } = require('sequelize');
+const moment = require('moment');
+const planningService = require('../services/planningService');
+const notificationService = require('../services/notificationIntelligenteService');
+const convocationService = require('../services/convocationService');
 
-// ========== FONCTIONS UTILITAIRES ==========
+// Récupérer les modèles
+const Planning = db.local.Planning;
+const Visite = db.local.Visite;
+const Agent = db.global.Agent;
+const User = db.local.User;
+
+// ========== UTILITAIRES ==========
 function getNumeroSemaine(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
-  const week1 = new Date(d.getFullYear(), 0, 4);
-  return 1 + Math.round(((d - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+  return moment(date).isoWeek();
 }
 
-function getLundiSemaine(numeroSemaine, annee) {
-  const simple = new Date(annee, 0, 1 + (numeroSemaine - 1) * 7);
-  const dow = simple.getDay();
-  const ISOweekStart = simple;
-  if (dow <= 4) ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1);
-  else ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay());
-  return ISOweekStart;
+const TYPES_ANNULABLES = ['Reprise', 'Reclassement', 'Embauche'];
+
+function getActionsAutorisees(typeVisite, statut) {
+  if (statut !== 'Programmé') return [];
+  const base = ['effectuer', 'reprogrammer'];
+  if (TYPES_ANNULABLES.includes(typeVisite)) {
+    base.push('annuler');
+  }
+  return base;
 }
 
-// Jours fériés tunisiens 2026
-const joursFeries = [
-  '2026-01-01', // Jour de l'an
-  '2026-01-14', // Fête de la Révolution
-  '2026-03-20', // Fête de l'Indépendance
-  '2026-04-09', // Fête des Martyrs
-  '2026-05-01', // Fête du Travail
-  '2026-07-25', // Fête de la République
-  '2026-08-13', // Fête de la Femme
-  '2026-10-15', // Fête de l'Évacuation
-  '2026-03-31', // Aïd el-Fitr
-  '2026-04-01', // Aïd el-Fitr
-  '2026-06-07', // Aïd el-Adha
-  '2026-06-08', // Aïd el-Adha
-  '2026-06-28', // Ras el-Am el-Hijri
-  '2026-09-05'  // Mouled
-];
+// ========== HISTORIQUE PLANNING ==========
+router.get('/historique/planning', protect, async (req, res) => {
+  try {
+    const { matricule } = req.query;
+    const whereClause = { 
+      source: 'PLANNING',
+      type_action: { [Op.in]: ['PROGRAMMATION', 'EFFECTUEE', 'REPROGRAMMEE', 'ANNULEE', 'REAFFECTEE'] }
+    };
+    if (matricule) whereClause.matricule_agent = matricule;
 
-// ========== ROUTE POUR RÉCUPÉRER TOUS LES AGENTS ==========
+    const historique = await Visite.findAll({
+      where: whereClause,
+      order: [['created_at', 'DESC']],
+      limit: 500,
+      raw: true
+    });
+    
+    // Récupérer les agents pour les visites
+    const matricules = [...new Set(historique.map(v => v.matricule_agent))];
+    const agents = await Agent.findAll({
+      where: { matricule_agent: { [Op.in]: matricules } },
+      attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence'],
+      raw: true
+    });
+    
+    const agentsMap = new Map();
+    agents.forEach(agent => {
+      agentsMap.set(agent.matricule_agent, agent);
+    });
+    
+    const historiqueEnrichi = historique.map(v => ({
+      ...v,
+      visiteAgent: agentsMap.get(v.matricule_agent) || null
+    }));
+    
+    res.json({ success: true, historique: historiqueEnrichi });
+  } catch (error) {
+    console.error('❌ Erreur historique planning:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== HISTORIQUE FORMULAIRE ==========
+router.get('/historique/formulaire', protect, async (req, res) => {
+  try {
+    const { matricule } = req.query;
+    const whereClause = { source: 'FORMULAIRE' };
+    if (matricule) whereClause.matricule_agent = matricule;
+
+    const historique = await Visite.findAll({
+      where: whereClause,
+      order: [['date_visite', 'DESC'], ['created_at', 'DESC']],
+      limit: 500,
+      raw: true
+    });
+    
+    // Récupérer les agents pour les visites
+    const matricules = [...new Set(historique.map(v => v.matricule_agent))];
+    const agents = await Agent.findAll({
+      where: { matricule_agent: { [Op.in]: matricules } },
+      attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence'],
+      raw: true
+    });
+    
+    const agentsMap = new Map();
+    agents.forEach(agent => {
+      agentsMap.set(agent.matricule_agent, agent);
+    });
+    
+    const historiqueEnrichi = historique.map(v => ({
+      ...v,
+      visiteAgent: agentsMap.get(v.matricule_agent) || null
+    }));
+    
+    res.json({ success: true, historique: historiqueEnrichi });
+  } catch (error) {
+    console.error('❌ Erreur historique formulaire:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== STATISTIQUES SOURCES ==========
+router.get('/historique/stats-sources', protect, async (req, res) => {
+  try {
+    const stats = await Visite.findAll({
+      attributes: [
+        'source',
+        [Visite.sequelize.fn('COUNT', '*'), 'nombre']
+      ],
+      group: ['source'],
+      raw: true
+    });
+    res.json({ 
+      success: true, 
+      stats: stats.map(s => ({ source: s.source, nombre: parseInt(s.nombre) })) 
+    });
+  } catch (error) {
+    console.error('❌ Erreur stats sources:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== AGENTS ==========
 router.get('/agents', protect, async (req, res) => {
   try {
     const agents = await Agent.findAll({
-      attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence', 'code_affectation', 'statut', 'date_derniere_visite'],
-      order: [['nom', 'ASC']]
+      attributes: [
+        'matricule_agent', 'nom', 'prenom', 'code_agence', 'code_affectation',
+        'statut', 'date_derniere_visite', 'date_fin_inaptitude', 'date_prochaine_inaptitude'
+      ],
+      order: [['nom', 'ASC']],
+      raw: true
     });
     res.json({ success: true, agents });
   } catch (error) {
@@ -55,344 +151,147 @@ router.get('/agents', protect, async (req, res) => {
   }
 });
 
-// ========== RÉCUPÉRER LE PLANNING D'UNE SEMAINE ==========
-router.get('/planning/:semaine/:annee', protect, async (req, res) => {
+// ========== CRÉER UNE VISITE MANUELLEMENT (FORMULAIRE) ==========
+router.post('/visites', protect, async (req, res) => {
   try {
-    const { semaine, annee } = req.params;
-    console.log(`📅 Récupération planning semaine ${semaine}/${annee}`);
+    const visiteData = req.body;
     
-    const planning = await Planning.findAll({
-      where: { 
-        semaine: parseInt(semaine), 
-        annee: parseInt(annee) 
-      },
-      include: [{
-        model: Agent,
-        as: 'planningAgent',
-        attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence', 'code_affectation', 'date_derniere_visite']
-      }],
-      order: [['date_visite', 'ASC'], ['heure_visite', 'ASC']]
-    });
+    console.log('📦 Données reçues pour création visite:', visiteData);
     
-    console.log(`✅ ${planning.length} visites trouvées`);
-    
-    res.json({
-      success: true,
-      planning: planning || []
-    });
-    
-  } catch (error) {
-    console.error('❌ Erreur récupération planning:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// ========== GÉNÉRER UN NOUVEAU PLANNING INTELLIGENT ==========
-router.post('/planning/generer', protect, async (req, res) => {
-  try {
-    const { dateDebut } = req.body;
-    console.log('🔄 Génération intelligente du planning pour:', dateDebut);
-    
-    if (!dateDebut) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Date de début requise' 
-      });
+    if (!visiteData.matricule_agent) {
+      return res.status(400).json({ success: false, message: 'Matricule agent requis' });
     }
-
-    // Récupérer tous les agents actifs
-    const agents = await Agent.findAll({
-      where: { statut: 'actif' }
-    });
-
-    if (agents.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Aucun agent actif disponible'
-      });
-    }
-
-    // Calculer la semaine et l'année
-    const date = new Date(dateDebut);
-    const semaine = getNumeroSemaine(date);
-    const annee = date.getFullYear();
-    
-    // Vérifier si un planning existe déjà pour cette semaine
-    const existingPlannings = await Planning.count({
-      where: { semaine, annee }
-    });
-    
-    if (existingPlannings > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Un planning existe déjà pour cette semaine'
-      });
+    if (!visiteData.date_visite) {
+      return res.status(400).json({ success: false, message: 'Date de visite requise' });
     }
     
-    // ========== ALGORITHME INTELLIGENT DE SÉLECTION DES AGENTS ==========
-    
-    // Étape 1: Calculer la priorité pour chaque agent
-    const agentsAvecPriorite = agents.map(agent => {
-      let priorite = 0;
-      
-      // Critère 1: Date de dernière visite (plus c'est ancien, plus la priorité est élevée)
-      if (!agent.date_derniere_visite) {
-        priorite += 100; // Jamais visité = priorité max
-      } else {
-        const joursDepuisVisite = Math.floor(
-          (new Date() - new Date(agent.date_derniere_visite)) / (1000 * 60 * 60 * 24)
-        );
-        priorite += Math.min(joursDepuisVisite, 365); // Max 365 jours
-      }
-      
-      // Critère 2: Type d'affectation (terrain, chauffeur = priorité)
-      if (agent.code_affectation === 3) priorite += 30; // Terrain
-      if (agent.code_affectation === 5) priorite += 20; // Chauffeur
-      
-      // Critère 3: Inaptitude temporaire
-      if (agent.date_fin_inaptitude && new Date(agent.date_fin_inaptitude) > new Date()) {
-        priorite += 50;
-      }
-      
-      return {
-        ...agent.toJSON(),
-        priorite,
-        dejaProgramme: false,
-        jourProgramme: null
-      };
+    // Vérifier si l'agent existe
+    const agent = await Agent.findOne({
+      where: { matricule_agent: visiteData.matricule_agent }
     });
     
-    // Trier par priorité (décroissante)
-    agentsAvecPriorite.sort((a, b) => b.priorite - a.priorite);
-    
-    // Étape 2: Créer les créneaux disponibles
-    const jours = [1, 2, 3, 4]; // Mardi, Mercredi, Jeudi, Vendredi
-    const creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
-    
-    // Structure pour suivre les agents programmés par jour
-    const agentsParJour = {
-      [jours[0]]: [], // Mardi
-      [jours[1]]: [], // Mercredi
-      [jours[2]]: [], // Jeudi
-      [jours[3]]: []  // Vendredi
-    };
-    
-    const planningEntries = [];
-    
-    // Étape 3: Distribution intelligente des agents
-    for (const jourOffset of jours) {
-      const jourDate = new Date(date);
-      jourDate.setDate(date.getDate() + jourOffset);
-      const dateStr = jourDate.toISOString().split('T')[0];
-      
-      // Vérifier si c'est un jour ouvré (pas férié)
-      if (joursFeries.includes(dateStr)) {
-        console.log(`📆 Jour férié: ${dateStr} - pas de visites`);
-        continue;
-      }
-      
-      // Filtrer les agents disponibles pour ce jour
-      const agentsDisponibles = agentsAvecPriorite.filter(agent => 
-        !agent.dejaProgramme && !agentsParJour[jourOffset].includes(agent.matricule_agent)
-      );
-      
-      if (agentsDisponibles.length === 0) {
-        console.log(`⚠️ Plus d'agents disponibles pour ${dateStr}`);
-        continue;
-      }
-      
-      // Trier par priorité
-      agentsDisponibles.sort((a, b) => b.priorite - a.priorite);
-      
-      // Pour chaque créneau
-      for (const creneau of creneaux) {
-        if (agentsDisponibles.length === 0) break;
-        
-        // Prendre l'agent avec la plus haute priorité
-        const agentChoisi = agentsDisponibles.shift();
-        
-        // Marquer comme programmé
-        agentChoisi.dejaProgramme = true;
-        agentsParJour[jourOffset].push(agentChoisi.matricule_agent);
-        
-        planningEntries.push({
-          matricule_agent: agentChoisi.matricule_agent,
-          date_visite: dateStr,
-          heure_visite: creneau,
-          type_visite: 'Périodique',
-          statut: 'Programmé',
-          visite_effectuee: false,
-          reprogrammee: false,
-          priorite: agentChoisi.priorite,
-          semaine: semaine,
-          annee: annee,
-          created_by: req.user.id
-        });
-        
-        console.log(`   ✅ ${dateStr} ${creneau} - Agent ${agentChoisi.matricule_agent} (Agence ${agentChoisi.code_agence}, priorité ${agentChoisi.priorite})`);
-      }
-    }
-
-    // Sauvegarder en base
-    if (planningEntries.length > 0) {
-      await Planning.bulkCreate(planningEntries);
-    }
-
-    console.log(`✅ Planning intelligent généré avec ${planningEntries.length} visites`);
-    
-    res.json({
-      success: true,
-      message: `Planning généré avec ${planningEntries.length} visites selon les priorités`,
-      planning: planningEntries
-    });
-    
-  } catch (error) {
-    console.error('❌ Erreur génération planning:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// ========== RÉAFFECTATION INTELLIGENTE ==========
-router.post('/planning/:id/reaffecter', protect, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { motif } = req.body;
-    
-    console.log('🔄 Réaffectation intelligente planning ID:', id, 'Motif:', motif);
-    
-    const ancienPlanning = await Planning.findByPk(id);
-    if (!ancienPlanning) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Planning non trouvé' 
-      });
+    if (!agent) {
+      return res.status(404).json({ success: false, message: 'Agent non trouvé' });
     }
     
-    // Marquer comme reprogrammé
-    ancienPlanning.statut = 'Reporté';
-    ancienPlanning.reprogrammee = true;
-    ancienPlanning.motif_reprogrammation = motif;
-    await ancienPlanning.save();
-    
-    // Récupérer tous les agents actifs
-    const agents = await Agent.findAll({
-      where: { statut: 'actif' }
-    });
-    
-    // Calculer priorités pour la réaffectation
-    const agentsAvecPriorite = agents.map(agent => {
-      let priorite = 0;
-      
-      if (!agent.date_derniere_visite) {
-        priorite += 100;
-      } else {
-        const joursDepuisVisite = Math.floor(
-          (new Date() - new Date(agent.date_derniere_visite)) / (1000 * 60 * 60 * 24)
-        );
-        priorite += Math.min(joursDepuisVisite, 365);
-      }
-      
-      return {
-        ...agent.toJSON(),
-        priorite
-      };
-    });
-    
-    // Exclure l'agent actuel et ceux déjà programmés ce jour-là
-    const planningJour = await Planning.findAll({
+    // Vérifier si le créneau est déjà occupé
+    const existeDeja = await Planning.findOne({
       where: {
-        date_visite: ancienPlanning.date_visite,
-        statut: 'Programmé',
-        id_planning: { [Op.ne]: id }
+        date_visite: visiteData.date_visite,
+        heure_visite: visiteData.heure_visite || '09:00:00',
+        statut: 'Programmé'
       }
     });
-    
-    const exclus = planningJour.map(p => p.matricule_agent);
-    exclus.push(ancienPlanning.matricule_agent);
-    
-    const disponibles = agentsAvecPriorite.filter(a => !exclus.includes(a.matricule_agent));
-    
-    if (disponibles.length === 0) {
-      return res.status(400).json({ 
+
+    if (existeDeja) {
+      return res.status(409).json({ 
         success: false, 
-        message: 'Aucun agent disponible pour réaffectation' 
+        message: `Le créneau du ${visiteData.date_visite} à ${(visiteData.heure_visite || '09:00:00').substring(0,5)} est déjà occupé.` 
       });
     }
     
-    // Choisir le meilleur agent (priorité la plus haute)
-    disponibles.sort((a, b) => b.priorite - a.priorite);
-    const nouvelAgent = disponibles[0];
-    
-    // Créer nouvelle affectation
-    const nouveauPlanning = await Planning.create({
-      matricule_agent: nouvelAgent.matricule_agent,
-      date_visite: ancienPlanning.date_visite,
-      heure_visite: ancienPlanning.heure_visite,
-      type_visite: ancienPlanning.type_visite,
+    // Créer un planning
+    const planning = await Planning.create({
+      matricule_agent: visiteData.matricule_agent,
+      date_visite: visiteData.date_visite,
+      heure_visite: visiteData.heure_visite || '09:00:00',
+      type_visite: visiteData.type_visite || 'Périodique',
       statut: 'Programmé',
-      visite_effectuee: false,
-      reprogrammee: false,
-      visite_originale_id: ancienPlanning.id_planning,
-      semaine: ancienPlanning.semaine,
-      annee: ancienPlanning.annee,
-      priorite: nouvelAgent.priorite,
+      priorite: 100,
+      semaine: getNumeroSemaine(new Date(visiteData.date_visite)),
+      annee: new Date(visiteData.date_visite).getFullYear(),
+      created_by: req.user.id,
+      convocation_envoyee: false,
+      source_planification: 'manuel'
+    });
+    
+    // Enregistrer dans l'historique
+    const visite = await Visite.create({
+      matricule_agent: visiteData.matricule_agent,
+      date_visite: visiteData.date_visite,
+      heure_visite: visiteData.heure_visite || '09:00:00',
+      type_visite: visiteData.type_visite || 'Périodique',
+      medecin: visiteData.medecin || 'Dr. Mahmoud Khelifi',
+      observation: visiteData.observation || '',
+      resultat: visiteData.resultat || 'Apte',
+      id_planning: planning.id_planning,
+      type_action: 'SAISIE_MANUELLE',
+      nouveau_statut: 'Programmé',
+      motif_action: `Saisie manuelle via formulaire`,
+      details_action: JSON.stringify({ source: 'manuel', ...visiteData }),
+      source: 'FORMULAIRE',
       created_by: req.user.id
     });
     
-    console.log(`✅ Réaffectation: Agent ${nouvelAgent.matricule_agent} (priorité ${nouvelAgent.priorite}) remplace ${ancienPlanning.matricule_agent}`);
+    // Mettre à jour l'agent
+    await Agent.update(
+      { date_derniere_visite: visiteData.date_visite },
+      { where: { matricule_agent: visiteData.matricule_agent } }
+    );
     
-    res.json({
+    console.log(`✅ Visite manuelle créée pour agent #${visiteData.matricule_agent} le ${visiteData.date_visite}`);
+    
+    res.status(201).json({
       success: true,
-      message: 'Visite réaffectée avec succès',
-      planning: nouveauPlanning
+      message: 'Visite enregistrée avec succès',
+      visite,
+      planning
     });
     
   } catch (error) {
-    console.error('❌ Erreur réaffectation:', error);
+    console.error('❌ Erreur création visite manuelle:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// ========== RÉCUPÉRER LES VISITES ==========
+// ========== RÉCUPÉRER TOUTES LES VISITES (FORMULAIRE UNIQUEMENT) ==========
 router.get('/visites', protect, async (req, res) => {
   try {
-    const { limit = 1000, search, type, resultat, dateDebut, dateFin, agentId } = req.query;
-    console.log('📋 Récupération des visites');
+    const { page = 1, limit = 20, search, type, resultat, dateDebut, dateFin, agentId } = req.query;
+    const offset = (page - 1) * limit;
     
-    let whereClause = {};
-    
-    if (search) {
-      whereClause[Op.or] = [
-        { '$visiteAgent.nom$': { [Op.like]: `%${search}%` } },
-        { '$visiteAgent.prenom$': { [Op.like]: `%${search}%` } },
-        { medecin: { [Op.like]: `%${search}%` } }
-      ];
-    }
+    let whereClause = { source: 'FORMULAIRE' };
     
     if (type && type !== 'all') whereClause.type_visite = type;
     if (resultat && resultat !== 'all') whereClause.resultat = resultat;
     if (agentId && agentId !== 'all') whereClause.matricule_agent = agentId;
     
     if (dateDebut && dateFin) {
-      whereClause.date_visite = {
-        [Op.between]: [dateDebut, dateFin]
-      };
+      whereClause.date_visite = { [Op.between]: [dateDebut, dateFin] };
     }
     
-    const visites = await Visite.findAll({
+    const { count, rows } = await Visite.findAndCountAll({
       where: whereClause,
-      include: [{
-        model: Agent,
-        as: 'visiteAgent',
-        attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence']
-      }],
-      order: [['date_visite', 'DESC'], ['heure_visite', 'DESC']],
-      limit: parseInt(limit)
+      order: [['date_visite', 'DESC'], ['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      raw: true
     });
+    
+    // Récupérer les agents pour les visites
+    const matricules = [...new Set(rows.map(v => v.matricule_agent))];
+    const agents = await Agent.findAll({
+      where: { matricule_agent: { [Op.in]: matricules } },
+      attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence'],
+      raw: true
+    });
+    
+    const agentsMap = new Map();
+    agents.forEach(agent => {
+      agentsMap.set(agent.matricule_agent, agent);
+    });
+    
+    const visitesEnrichies = rows.map(v => ({
+      ...v,
+      visiteAgent: agentsMap.get(v.matricule_agent) || null
+    }));
     
     res.json({
       success: true,
-      visites: visites || []
+      total: count,
+      page: parseInt(page),
+      totalPages: Math.ceil(count / limit),
+      visites: visitesEnrichies
     });
     
   } catch (error) {
@@ -401,144 +300,116 @@ router.get('/visites', protect, async (req, res) => {
   }
 });
 
-// ========== STATISTIQUES DES VISITES ==========
-router.get('/visites/stats', protect, async (req, res) => {
+// ========== RÉCUPÉRER LE PLANNING D'UNE SEMAINE ==========
+router.get('/planning/:semaine/:annee', protect, async (req, res) => {
   try {
-    console.log('📊 Calcul des statistiques...');
+    const { semaine, annee } = req.params;
     
-    const total = await Visite.count();
+    console.log(`\n🔍 RECHERCHE PLANNING - Semaine ${semaine}/${annee}`);
     
-    const parTypeRaw = await Visite.findAll({
-      attributes: [
-        'type_visite',
-        [Visite.sequelize.fn('COUNT', '*'), 'count']
-      ],
-      group: ['type_visite'],
+    const planning = await Planning.findAll({
+      where: { semaine: parseInt(semaine), annee: parseInt(annee) },
+      order: [['date_visite', 'ASC'], ['heure_visite', 'ASC']],
       raw: true
     });
     
-    const parResultatRaw = await Visite.findAll({
-      attributes: [
-        'resultat',
-        [Visite.sequelize.fn('COUNT', '*'), 'count']
-      ],
-      group: ['resultat'],
+    console.log(`📊 ${planning.length} visite(s) trouvée(s) dans la table planning pour S${semaine}/${annee}`);
+    
+    if (planning.length > 0) {
+      planning.forEach(p => {
+        console.log(`   - ID:${p.id_planning} | Agent:${p.matricule_agent} | Date:${p.date_visite} | Type:${p.type_visite}`);
+      });
+    }
+    
+    // Récupérer les agents
+    const matricules = [...new Set(planning.map(p => p.matricule_agent))];
+    const agents = await Agent.findAll({
+      where: { matricule_agent: { [Op.in]: matricules } },
+      attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence', 'code_affectation', 'date_derniere_visite'],
       raw: true
     });
     
-    const aujourdhui = new Date();
-    const semaineActuelle = getNumeroSemaine(aujourdhui);
-    const anneeActuelle = aujourdhui.getFullYear();
-    
-    const planningSemaine = await Planning.count({
-      where: {
-        semaine: semaineActuelle,
-        annee: anneeActuelle
-      }
+    const agentsMap = new Map();
+    agents.forEach(agent => {
+      agentsMap.set(agent.matricule_agent, agent);
     });
     
-    const parMois = Array(12).fill(0);
-    const visitesMois = await Visite.findAll({
-      attributes: [
-        [Visite.sequelize.fn('MONTH', Visite.sequelize.col('date_visite')), 'mois'],
-        [Visite.sequelize.fn('COUNT', '*'), 'count']
-      ],
-      where: Visite.sequelize.where(
-        Visite.sequelize.fn('YEAR', Visite.sequelize.col('date_visite')),
-        anneeActuelle
-      ),
-      group: [Visite.sequelize.fn('MONTH', Visite.sequelize.col('date_visite'))],
-      raw: true
-    });
-    
-    visitesMois.forEach(item => {
-      const mois = parseInt(item.mois) - 1;
-      parMois[mois] = parseInt(item.count);
-    });
-    
-    const parType = parTypeRaw.map(item => ({
-      type_visite: item.type_visite || 'Non spécifié',
-      count: parseInt(item.count)
+    const planningEnrichi = planning.map(p => ({
+      ...p,
+      planningAgent: agentsMap.get(p.matricule_agent) || null,
+      actions_autorisees: getActionsAutorisees(p.type_visite, p.statut)
     }));
     
-    const parResultat = parResultatRaw.map(item => ({
-      resultat: item.resultat || 'Non spécifié',
-      count: parseInt(item.count)
-    }));
-    
-    res.json({
-      success: true,
-      stats: {
-        total,
-        parType,
-        parResultat,
-        planningSemaine,
-        parMois
+    // Vérifier spécifiquement l'agent 5015
+    const visiteAgent5015 = planningEnrichi.find(p => p.matricule_agent === 5015);
+    if (visiteAgent5015) {
+      console.log(`\n✅ Agent 5015 trouvé dans le planning S${semaine}/${annee}:`);
+      console.log(`   Date: ${visiteAgent5015.date_visite}`);
+      console.log(`   Heure: ${visiteAgent5015.heure_visite}`);
+      console.log(`   Type: ${visiteAgent5015.type_visite}`);
+    } else {
+      console.log(`\n⚠️ Agent 5015 NON trouvé dans le planning S${semaine}/${annee}`);
+      console.log(`   Vérifiez la semaine de la visite créée:`);
+      
+      // Chercher toutes les visites de l'agent 5015
+      const visites5015 = await Planning.findAll({
+        where: { matricule_agent: 5015 },
+        order: [['date_visite', 'DESC']],
+        raw: true
+      });
+      
+      if (visites5015.length > 0) {
+        console.log(`   Dernières visites de l'agent 5015:`);
+        visites5015.slice(0, 3).forEach(v => {
+          console.log(`      - ${v.date_visite} (S${v.semaine}/${v.annee}) - ${v.type_visite}`);
+        });
       }
-    });
+    }
     
+    res.json({ success: true, planning: planningEnrichi });
   } catch (error) {
-    console.error('❌ Erreur stats:', error);
+    console.error('❌ Erreur récupération planning:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// ========== CRÉER UNE VISITE ==========
-router.post('/visites', protect, async (req, res) => {
+// ========== GÉNÉRER PLANNING AUTO ==========
+router.post('/planning/generer', protect, async (req, res) => {
   try {
-    const visiteData = req.body;
-    console.log('📝 Création visite:', visiteData);
-    
-    if (!visiteData.matricule_agent) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Matricule agent requis' 
-      });
+    const { dateDebut } = req.body;
+    if (!dateDebut) {
+      return res.status(400).json({ success: false, message: 'Date de début requise' });
     }
-    
-    if (!visiteData.date_visite) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Date de visite requise' 
-      });
-    }
-    
-    if (!visiteData.medecin) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Médecin requis' 
-      });
-    }
-    
-    visiteData.created_by = req.user.id;
-    
-    const visite = await Visite.create(visiteData);
-    
-    await Agent.update(
-      { date_derniere_visite: visiteData.date_visite },
-      { where: { matricule_agent: visiteData.matricule_agent } }
-    );
-    
-    if (visiteData.id_planning) {
-      await Planning.update(
-        { 
-          visite_effectuee: true,
-          statut: 'Effectué'
-        },
-        { where: { id_planning: visiteData.id_planning } }
-      );
-    }
-    
-    console.log('✅ Visite créée avec ID:', visite.matricule_visite);
-    
-    res.status(201).json({
+
+    const planning = await planningService.genererPlanningSemaine(new Date(dateDebut), req.user.id);
+
+    res.json({
       success: true,
-      message: 'Visite enregistrée avec succès',
-      visite
+      message: `Planning automatique généré avec ${planning.length} visite(s) (Périodique + Reprise)`,
+      planning
+    });
+  } catch (error) {
+    console.error('❌ Erreur:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== VÉRIFIER SI UN CRÉNEAU EST DISPONIBLE ==========
+router.get('/planning/verifier-creneau', protect, async (req, res) => {
+  try {
+    const { date, heure } = req.query;
+    
+    if (!date || !heure) {
+      return res.status(400).json({ success: false, message: 'Date et heure requises' });
+    }
+    
+    const planningExistant = await Planning.findOne({
+      where: { date_visite: date, heure_visite: heure, statut: 'Programmé' }
     });
     
+    res.json({ success: true, occupe: planningExistant !== null, planning: planningExistant });
   } catch (error) {
-    console.error('❌ Erreur création visite:', error);
+    console.error('❌ Erreur vérification créneau:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -548,181 +419,806 @@ router.patch('/planning/:id/effectuer', protect, async (req, res) => {
   try {
     const { id } = req.params;
     const { medecin, observation, resultat } = req.body;
-    
-    console.log('✅ Marquage visite comme effectuée ID:', id);
-    
+
     const planning = await Planning.findByPk(id);
-    if (!planning) {
-      return res.status(404).json({ success: false, message: 'Planning non trouvé' });
+    if (!planning) return res.status(404).json({ success: false, message: 'Planning non trouvé' });
+
+    if (planning.statut === 'Effectué') {
+      return res.status(400).json({ success: false, message: 'Visite déjà marquée comme effectuée' });
     }
-    
+    if (planning.statut === 'Annulé') {
+      return res.status(400).json({ success: false, message: 'Impossible d\'effectuer une visite annulée' });
+    }
+
+    const ancienStatut = planning.statut;
+
     planning.visite_effectuee = true;
     planning.statut = 'Effectué';
     await planning.save();
-    
-    const visiteData = {
+
+    await Visite.create({
       matricule_agent: planning.matricule_agent,
       date_visite: planning.date_visite,
       heure_visite: planning.heure_visite,
       type_visite: planning.type_visite,
-      medecin: medecin || 'Médecin non spécifié',
+      medecin: medecin || 'Dr. Mahmoud Khelifi',
       observation: observation || '',
       resultat: resultat || 'Apte',
       id_planning: planning.id_planning,
+      type_action: 'EFFECTUEE',
+      ancien_statut: ancienStatut,
+      nouveau_statut: 'Effectué',
+      motif_action: `Visite effectuée — Résultat: ${resultat || 'Apte'}`,
+      details_action: JSON.stringify({ medecin, resultat, observation }),
+      source: 'PLANNING',
       created_by: req.user.id
-    };
-    
-    const visite = await Visite.create(visiteData);
-    
-    await Agent.update(
-      { date_derniere_visite: planning.date_visite },
-      { where: { matricule_agent: planning.matricule_agent } }
-    );
-    
-    console.log('✅ Visite créée dans l\'historique avec ID:', visite.matricule_visite);
-    
-    res.json({
-      success: true,
-      message: 'Visite marquée comme effectuée et enregistrée dans l\'historique',
-      planning,
-      visite
     });
-    
+
+    if (planning.type_visite === 'Périodique') {
+      await Agent.update(
+        { date_derniere_visite: planning.date_visite },
+        { where: { matricule_agent: planning.matricule_agent } }
+      );
+    }
+
+    if (planning.type_visite === 'Reprise' && resultat && resultat.startsWith('Apte')) {
+      await Agent.update(
+        { date_fin_inaptitude: null, date_debut_inaptitude: null },
+        { where: { matricule_agent: planning.matricule_agent } }
+      );
+    }
+
+    res.json({ success: true, message: 'Visite marquée comme effectuée', planning });
   } catch (error) {
     console.error('❌ Erreur:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// ========== ANNULER UNE VISITE ==========
+// ========== ANNULATION (uniquement Reprise, Reclassement, Embauche) ==========
 router.patch('/planning/:id/annuler', protect, async (req, res) => {
   try {
     const { id } = req.params;
     const { motif } = req.body;
-    
+
     const planning = await Planning.findByPk(id);
-    if (!planning) {
-      return res.status(404).json({ success: false, message: 'Planning non trouvé' });
+    if (!planning) return res.status(404).json({ success: false, message: 'Planning non trouvé' });
+
+    if (planning.type_visite === 'Périodique') {
+      return res.status(400).json({ success: false, message: 'Les visites périodiques ne peuvent pas être annulées.' });
     }
-    
+
+    if (!TYPES_ANNULABLES.includes(planning.type_visite)) {
+      return res.status(400).json({ success: false, message: `Le type de visite "${planning.type_visite}" ne peut pas être annulé` });
+    }
+
+    if (planning.statut === 'Annulé') return res.status(400).json({ success: false, message: 'Visite déjà annulée' });
+    if (planning.statut === 'Effectué') return res.status(400).json({ success: false, message: 'Impossible d\'annuler une visite déjà effectuée' });
+
+    const ancienStatut = planning.statut;
     planning.statut = 'Annulé';
     planning.motif_annulation = motif || 'Non spécifié';
     await planning.save();
-    
-    res.json({
-      success: true,
-      message: 'Visite annulée avec succès',
-      planning
+
+    await Visite.create({
+      matricule_agent: planning.matricule_agent,
+      date_visite: planning.date_visite,
+      heure_visite: planning.heure_visite,
+      type_visite: planning.type_visite,
+      id_planning: planning.id_planning,
+      type_action: 'ANNULEE',
+      ancien_statut: ancienStatut,
+      nouveau_statut: 'Annulé',
+      motif_action: motif || 'Annulation non spécifiée',
+      details_action: JSON.stringify({ date_annulation: new Date().toISOString(), motif }),
+      source: 'PLANNING',
+      created_by: req.user.id
     });
-    
+
+    res.json({ success: true, message: 'Visite annulée avec succès', planning });
   } catch (error) {
-    console.error('❌ Erreur annulation:', error);
+    console.error('❌ Erreur:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// ========== MODIFIER UNE VISITE ==========
-router.put('/visites/:id', protect, async (req, res) => {
+// ========== REPROGRAMMATION MANUELLE ==========
+router.post('/planning/:id/reprogrammer', protect, async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
-    
-    console.log('📝 Modification visite ID:', id, updateData);
-    
-    const visite = await Visite.findByPk(id);
-    
-    if (!visite) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Visite non trouvée' 
-      });
+    const { nouvelle_date, nouvelle_heure, motif, source } = req.body;
+
+    if (!nouvelle_date || !nouvelle_heure) {
+      return res.status(400).json({ success: false, message: 'Nouvelle date et heure requises' });
     }
-    
-    await visite.update(updateData);
-    
-    console.log('✅ Visite modifiée ID:', id);
-    
-    res.json({
-      success: true,
-      message: 'Visite modifiée avec succès',
-      visite
-    });
-    
-  } catch (error) {
-    console.error('❌ Erreur modification visite:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// ========== SUPPRIMER UNE VISITE ==========
-router.delete('/visites/:id', protect, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    console.log('🗑️ Suppression visite ID:', id);
-    
-    const visite = await Visite.findByPk(id);
-    
-    if (!visite) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Visite non trouvée' 
-      });
+    if (!motif || motif.trim() === '') {
+      return res.status(400).json({ success: false, message: 'Motif de reprogrammation requis' });
     }
-    
-    await visite.destroy();
-    
-    console.log('✅ Visite supprimée ID:', id);
-    
+
+    const planning = await Planning.findByPk(id);
+    if (!planning) return res.status(404).json({ success: false, message: 'Planning non trouvé' });
+
+    if (planning.statut === 'Effectué') {
+      return res.status(400).json({ success: false, message: 'Impossible de reprogrammer une visite déjà effectuée' });
+    }
+    if (planning.statut === 'Annulé') {
+      return res.status(400).json({ success: false, message: 'Impossible de reprogrammer une visite annulée' });
+    }
+
+    const nouvelleDateObj = new Date(nouvelle_date);
+    if (!(await planningService.estJourOuvre(nouvelleDateObj))) {
+      return res.status(400).json({ success: false, message: 'La nouvelle date n\'est pas un jour ouvré' });
+    }
+
+    const creneauOccupe = await Planning.findOne({
+      where: { date_visite: nouvelle_date, heure_visite: nouvelle_heure, statut: 'Programmé' }
+    });
+    if (creneauOccupe) {
+      return res.status(409).json({ success: false, message: `Le créneau du ${nouvelle_date} à ${nouvelle_heure.substring(0,5)} est déjà occupé.` });
+    }
+
+    const sourceReprog = source === 'auto' ? 'auto' : 'manuel';
+    const ancienStatut = planning.statut;
+
+    planning.statut = 'Reporté';
+    planning.reprogrammee = true;
+    planning.source_reprogrammation = sourceReprog;
+    planning.motif_reprogrammation = motif;
+    planning.date_reprogrammation = new Date();
+    planning.creneau_bloque = true;
+    planning.nouvelle_date_visite = nouvelle_date;
+    planning.nouvelle_heure_visite = nouvelle_heure;
+    await planning.save();
+
+    const semaine = planningService.getNumeroSemaine(nouvelleDateObj);
+    const annee = nouvelleDateObj.getFullYear();
+
+    const nouveauPlanning = await Planning.create({
+      matricule_agent: planning.matricule_agent,
+      date_visite: nouvelle_date,
+      heure_visite: nouvelle_heure,
+      type_visite: planning.type_visite,
+      statut: 'Programmé',
+      priorite: (planning.priorite || 0) + 20,
+      visite_originale_id: planning.id_planning,
+      semaine, annee,
+      created_by: req.user.id,
+      convocation_envoyee: false,
+      source_planification: sourceReprog === 'auto' ? 'auto' : 'manuel'
+    });
+
+    await Visite.create({
+      matricule_agent: planning.matricule_agent,
+      date_visite: planning.date_visite,
+      heure_visite: planning.heure_visite,
+      type_visite: planning.type_visite,
+      id_planning: planning.id_planning,
+      type_action: 'REPROGRAMMEE',
+      ancien_statut: ancienStatut,
+      nouveau_statut: 'Reporté',
+      motif_action: `${motif} (${sourceReprog})`,
+      details_action: JSON.stringify({ source: sourceReprog, ancienne_date: planning.date_visite, nouvelle_date, nouveau_planning_id: nouveauPlanning.id_planning, motif }),
+      source: 'PLANNING',
+      created_by: req.user.id
+    });
+
     res.json({
       success: true,
-      message: 'Visite supprimée avec succès'
+      message: `Visite reprogrammée avec succès (mode ${sourceReprog === 'auto' ? 'automatique' : 'manuel'})`,
+      data: {
+        ancien_planning: { id: planning.id_planning, date: planning.date_visite, heure: planning.heure_visite },
+        nouveau_planning: { id: nouveauPlanning.id_planning, date: nouvelle_date, heure: nouvelle_heure }
+      }
     });
     
   } catch (error) {
-    console.error('❌ Erreur suppression visite:', error);
+    console.error('❌ Erreur reprogrammation:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
-// ========== SUPPRIMER UN PLANNING ==========
-router.delete('/planning/:id', protect, async (req, res) => {
+// ========== REPROGRAMMATION AUTOMATIQUE ==========
+router.post('/planning/:id/reprogrammer-auto', protect, async (req, res) => {
   try {
     const { id } = req.params;
     
-    console.log('🗑️ Suppression planning ID:', id);
+    console.log(`🔄 Reprogrammation auto du planning #${id}`);
     
     const planning = await Planning.findByPk(id);
+    if (!planning) return res.status(404).json({ success: false, message: 'Planning non trouvé' });
     
-    if (!planning) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Planning non trouvé' 
-      });
+    if (planning.statut === 'Effectué') {
+      return res.status(400).json({ success: false, message: 'Impossible de reprogrammer une visite déjà effectuée' });
+    }
+    if (planning.statut === 'Annulé') {
+      return res.status(400).json({ success: false, message: 'Impossible de reprogrammer une visite annulée' });
     }
     
-    const visitesLiees = await Visite.count({
-      where: { id_planning: id }
+    const creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
+    const dateDebut = new Date(planning.date_visite);
+    dateDebut.setDate(dateDebut.getDate() + 1);
+    
+    console.log(`🔍 Date originale: ${planning.date_visite}, recherche à partir de: ${dateDebut.toISOString().split('T')[0]}`);
+    
+    let nouvelleDate = null;
+    let nouvelleHeure = null;
+    
+    for (let i = 0; i <= 30; i++) {
+      const dateTest = new Date(dateDebut);
+      dateTest.setDate(dateDebut.getDate() + i);
+      
+      if (!(await planningService.estJourOuvre(dateTest))) continue;
+      
+      const dateStr = dateTest.toISOString().split('T')[0];
+      
+      for (const heure of creneaux) {
+        const existe = await Planning.findOne({
+          where: { date_visite: dateStr, heure_visite: heure, statut: 'Programmé' }
+        });
+        
+        if (!existe) {
+          nouvelleDate = dateTest;
+          nouvelleHeure = heure;
+          console.log(`✅ Créneau trouvé: ${dateStr} à ${heure}`);
+          break;
+        }
+      }
+      if (nouvelleDate) break;
+    }
+    
+    if (!nouvelleDate) {
+      return res.status(400).json({ success: false, message: 'Aucun créneau disponible dans les 30 jours' });
+    }
+    
+    const nouvelleDateStr = nouvelleDate.toISOString().split('T')[0];
+    
+    planning.statut = 'Reporté';
+    planning.reprogrammee = true;
+    planning.source_reprogrammation = 'auto';
+    planning.motif_reprogrammation = `Reprogrammation automatique vers le ${nouvelleDateStr} à ${nouvelleHeure.substring(0,5)}`;
+    planning.date_reprogrammation = new Date();
+    planning.creneau_bloque = true;
+    planning.nouvelle_date_visite = nouvelleDateStr;
+    planning.nouvelle_heure_visite = nouvelleHeure;
+    await planning.save();
+    
+    const semaine = planningService.getNumeroSemaine(nouvelleDate);
+    const annee = nouvelleDate.getFullYear();
+    
+    const nouveauPlanning = await Planning.create({
+      matricule_agent: planning.matricule_agent,
+      date_visite: nouvelleDateStr,
+      heure_visite: nouvelleHeure,
+      type_visite: planning.type_visite,
+      statut: 'Programmé',
+      priorite: (planning.priorite || 0) + 20,
+      visite_originale_id: planning.id_planning,
+      semaine, annee,
+      created_by: req.user.id,
+      convocation_envoyee: false,
+      source_planification: 'auto'
     });
     
-    if (visitesLiees > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Impossible de supprimer ce planning car des visites y sont liées' 
-      });
-    }
-    
-    await planning.destroy();
-    
-    console.log('✅ Planning supprimé ID:', id);
+    await Visite.create({
+      matricule_agent: planning.matricule_agent,
+      date_visite: planning.date_visite,
+      heure_visite: planning.heure_visite,
+      type_visite: planning.type_visite,
+      id_planning: planning.id_planning,
+      type_action: 'REPROGRAMMEE',
+      ancien_statut: planning.statut,
+      nouveau_statut: 'Reporté',
+      motif_action: `Reprogrammation automatique vers ${nouvelleDateStr}`,
+      details_action: JSON.stringify({ source: 'auto', ancienne_date: planning.date_visite, nouvelle_date: nouvelleDateStr, nouveau_planning_id: nouveauPlanning.id_planning }),
+      source: 'PLANNING',
+      created_by: req.user.id
+    });
     
     res.json({
       success: true,
-      message: 'Planning supprimé avec succès'
+      message: `Visite reprogrammée automatiquement du ${planning.date_visite} vers le ${nouvelleDateStr} à ${nouvelleHeure.substring(0,5)}`,
+      data: { nouvelle_date: nouvelleDateStr, nouvelle_heure: nouvelleHeure }
     });
     
   } catch (error) {
-    console.error('❌ Erreur suppression planning:', error);
+    console.error('❌ Erreur reprogrammation auto:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== PLANIFICATION MANUELLE RECLASSEMENT ==========
+router.post('/planifier-reclassement', protect, async (req, res) => {
+  try {
+    const { matricule_agent, date_visite, heure_visite, motif } = req.body;
+    
+    if (!matricule_agent) return res.status(400).json({ success: false, message: 'Matricule agent requis' });
+    if (!date_visite) return res.status(400).json({ success: false, message: 'Date de visite requise' });
+
+    const agent = await Agent.findByPk(matricule_agent);
+    if (!agent) return res.status(404).json({ success: false, message: 'Agent non trouvé' });
+
+    // Vérifier si le créneau est déjà occupé
+    const existeDeja = await Planning.findOne({
+      where: {
+        date_visite: date_visite,
+        heure_visite: heure_visite || '09:00:00',
+        statut: 'Programmé'
+      }
+    });
+
+    if (existeDeja) {
+      return res.status(409).json({ 
+        success: false, 
+        message: `Le créneau du ${date_visite} à ${(heure_visite || '09:00:00').substring(0,5)} est déjà occupé.` 
+      });
+    }
+
+    const planning = await Planning.create({
+      matricule_agent: matricule_agent,
+      date_visite: date_visite,
+      heure_visite: heure_visite || '09:00:00',
+      type_visite: 'Reclassement',
+      statut: 'Programmé',
+      priorite: 200,
+      semaine: planningService.getNumeroSemaine(new Date(date_visite)),
+      annee: new Date(date_visite).getFullYear(),
+      created_by: req.user.id,
+      convocation_envoyee: false,
+      motif_reprogrammation: motif || 'Visite de reclassement programmée manuellement',
+      source_planification: 'manuel'
+    });
+    
+    // Enregistrer dans l'historique
+    await Visite.create({
+      matricule_agent: matricule_agent,
+      date_visite: date_visite,
+      heure_visite: heure_visite || '09:00:00',
+      type_visite: 'Reclassement',
+      id_planning: planning.id_planning,
+      type_action: 'SAISIE_MANUELLE',
+      nouveau_statut: 'Programmé',
+      motif_action: `Planification manuelle - Reclassement${motif ? ' - ' + motif : ''}`,
+      details_action: JSON.stringify({ source: 'manuel', motif }),
+      source: 'FORMULAIRE',
+      created_by: req.user.id
+    });
+    
+    res.json({ success: true, message: 'Visite de reclassement planifiée', planning });
+  } catch (error) {
+    console.error('❌ Erreur planification reclassement:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== PLANIFICATION MANUELLE EMBAUCHE ==========
+router.post('/planifier-embauche', protect, async (req, res) => {
+  try {
+    const { matricule_agent, date_visite, heure_visite, motif } = req.body;
+
+    if (!matricule_agent) return res.status(400).json({ success: false, message: 'Matricule agent requis' });
+    if (!date_visite) return res.status(400).json({ success: false, message: 'Date de visite requise' });
+
+    const agent = await Agent.findByPk(matricule_agent);
+    if (!agent) return res.status(404).json({ success: false, message: 'Agent non trouvé' });
+
+    const planning = await Planning.create({
+      matricule_agent: matricule_agent,
+      date_visite: date_visite,
+      heure_visite: heure_visite || '09:00:00',
+      type_visite: 'Embauche',
+      statut: 'Programmé',
+      priorite: 200,
+      semaine: planningService.getNumeroSemaine(new Date(date_visite)),
+      annee: new Date(date_visite).getFullYear(),
+      created_by: req.user.id,
+      convocation_envoyee: false,
+      motif_reprogrammation: motif || "Visite d'embauche programmée manuellement",
+      source_planification: 'manuel'
+    });
+    
+    await Visite.create({
+      matricule_agent: matricule_agent,
+      date_visite: date_visite,
+      heure_visite: heure_visite || '09:00:00',
+      type_visite: 'Embauche',
+      id_planning: planning.id_planning,
+      type_action: 'SAISIE_MANUELLE',
+      nouveau_statut: 'Programmé',
+      motif_action: `Planification manuelle - Embauche${motif ? ' - ' + motif : ''}`,
+      details_action: JSON.stringify({ source: 'manuel', motif }),
+      source: 'FORMULAIRE',
+      created_by: req.user.id
+    });
+    
+    res.json({ success: true, message: "Visite d'embauche planifiée", planning });
+  } catch (error) {
+    console.error("❌ Erreur planification embauche:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== RÉCUPÉRER LES VISITES PAR TYPE ==========
+router.get('/planning/reclassements', protect, async (req, res) => {
+  try {
+    const plannings = await Planning.findAll({
+      where: { type_visite: 'Reclassement', date_visite: { [Op.gte]: new Date() }, statut: 'Programmé' },
+      order: [['date_visite', 'ASC']],
+      raw: true
+    });
+    
+    // Récupérer les agents
+    const matricules = [...new Set(plannings.map(p => p.matricule_agent))];
+    const agents = await Agent.findAll({
+      where: { matricule_agent: { [Op.in]: matricules } },
+      attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence', 'code_affectation'],
+      raw: true
+    });
+    
+    const agentsMap = new Map();
+    agents.forEach(agent => {
+      agentsMap.set(agent.matricule_agent, agent);
+    });
+    
+    const planningEnrichi = plannings.map(p => ({
+      ...p,
+      planningAgent: agentsMap.get(p.matricule_agent) || null
+    }));
+    
+    res.json({ success: true, planning: planningEnrichi });
+  } catch (error) {
+    console.error('❌ Erreur:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/planning/embauches', protect, async (req, res) => {
+  try {
+    const plannings = await Planning.findAll({
+      where: { type_visite: 'Embauche', date_visite: { [Op.gte]: new Date() }, statut: 'Programmé' },
+      order: [['date_visite', 'ASC']],
+      raw: true
+    });
+    
+    const matricules = [...new Set(plannings.map(p => p.matricule_agent))];
+    const agents = await Agent.findAll({
+      where: { matricule_agent: { [Op.in]: matricules } },
+      attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence', 'code_affectation'],
+      raw: true
+    });
+    
+    const agentsMap = new Map();
+    agents.forEach(agent => {
+      agentsMap.set(agent.matricule_agent, agent);
+    });
+    
+    const planningEnrichi = plannings.map(p => ({
+      ...p,
+      planningAgent: agentsMap.get(p.matricule_agent) || null
+    }));
+    
+    res.json({ success: true, planning: planningEnrichi });
+  } catch (error) {
+    console.error('❌ Erreur:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== CONVOCATIONS ==========
+router.get('/planning/convocations-a-envoyer', protect, async (req, res) => {
+  try {
+    const dans7Jours = new Date();
+    dans7Jours.setDate(dans7Jours.getDate() + 7);
+    const dateDebut = new Date(dans7Jours);
+    dateDebut.setHours(0, 0, 0, 0);
+    const dateFin = new Date(dans7Jours);
+    dateFin.setHours(23, 59, 59, 999);
+
+    const plannings = await Planning.findAll({
+      where: {
+        date_visite: { [Op.between]: [dateDebut, dateFin] },
+        convocation_envoyee: false,
+        statut: 'Programmé'
+      },
+      order: [['date_visite', 'ASC'], ['heure_visite', 'ASC']],
+      raw: true
+    });
+    
+    const matricules = [...new Set(plannings.map(p => p.matricule_agent))];
+    const agents = await Agent.findAll({
+      where: { matricule_agent: { [Op.in]: matricules } },
+      attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence', 'code_affectation'],
+      raw: true
+    });
+    
+    const agentsMap = new Map();
+    agents.forEach(agent => {
+      agentsMap.set(agent.matricule_agent, agent);
+    });
+    
+    const planningsEnrichis = plannings.map(p => ({
+      ...p,
+      planningAgent: agentsMap.get(p.matricule_agent) || null
+    }));
+    
+    res.json({ success: true, convocations: planningsEnrichis, count: planningsEnrichis.length });
+  } catch (error) {
+    console.error('❌ Erreur:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/planning/envoyer-convocation', protect, async (req, res) => {
+  try {
+    const { id_planning } = req.body;
+    if (!id_planning) return res.status(400).json({ success: false, message: 'ID planning requis' });
+    const result = await convocationService.envoyerConvocationPlanning(id_planning);
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Erreur:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.post('/planning/envoyer-convocations-groupees', protect, async (req, res) => {
+  try {
+    const { ids_planning } = req.body;
+    if (!ids_planning || !Array.isArray(ids_planning) || ids_planning.length === 0) {
+      return res.status(400).json({ success: false, message: "Liste d'IDs planning requise" });
+    }
+    const result = await convocationService.envoyerConvocationsGroupees(ids_planning);
+    res.json(result);
+  } catch (error) {
+    console.error('❌ Erreur:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/planning/convocations-stats', protect, async (req, res) => {
+  try {
+    const stats = await convocationService.getStatsConvocations();
+    res.json({ success: true, stats });
+  } catch (error) {
+    console.error('❌ Erreur:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/planning/debug/stats', protect, async (req, res) => {
+  try {
+    console.log('\n🔍 DEBUG STATISTIQUES PLANNING');
+    console.log('='.repeat(60));
+    
+    const totalEnvoyees = await Planning.count({
+      where: { convocation_envoyee: true }
+    });
+    console.log(`📊 Total convocations envoyées: ${totalEnvoyees}`);
+    
+    const totalProgrammees = await Planning.count({
+      where: { statut: 'Programmé', date_visite: { [Op.gte]: new Date() } }
+    });
+    console.log(`📊 Total visites programmées futures: ${totalProgrammees}`);
+    
+    const totalNonEnvoyees = await Planning.count({
+      where: {
+        convocation_envoyee: false,
+        statut: 'Programmé',
+        date_visite: { [Op.gte]: new Date() }
+      }
+    });
+    console.log(`📊 Total convocations à envoyer: ${totalNonEnvoyees}`);
+    
+    const dans7Jours = new Date();
+    dans7Jours.setDate(dans7Jours.getDate() + 7);
+    const dateDebut = new Date(dans7Jours);
+    dateDebut.setHours(0, 0, 0, 0);
+    const dateFin = new Date(dans7Jours);
+    dateFin.setHours(23, 59, 59, 999);
+    
+    const aEnvoyerJ7 = await Planning.count({
+      where: {
+        date_visite: { [Op.between]: [dateDebut, dateFin] },
+        convocation_envoyee: false,
+        statut: 'Programmé'
+      }
+    });
+    console.log(`📊 Convocations J+7: ${aEnvoyerJ7}`);
+    
+    console.log('='.repeat(60));
+    
+    res.json({
+      success: true,
+      stats: {
+        total_envoyees: totalEnvoyees,
+        total_programmees: totalProgrammees,
+        total_a_envoyer: totalNonEnvoyees,
+        a_envoyer_j7: aEnvoyerJ7
+      }
+    });
+  } catch (error) {
+    console.error('❌ Erreur debug stats:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+// ========== DEBUG STATISTIQUES CONVOCATIONS ==========
+router.get('/planning/convocations-stats/debug', protect, async (req, res) => {
+  try {
+    console.log('\n🔍 DEBUG STATS CONVOCATIONS (SQL Direct)');
+    console.log('='.repeat(60));
+    
+    const { sequelizeLocal } = require('../config/database');
+    
+    // Récupérer toutes les stats manuellement avec SQL direct
+    const [results] = await sequelizeLocal.query(`
+      SELECT 
+        COUNT(*) as total_visites,
+        SUM(CASE WHEN convocation_envoyee = 1 THEN 1 ELSE 0 END) as total_envoyees,
+        SUM(CASE WHEN convocation_envoyee = 0 AND statut = 'Programmé' AND date_visite >= CURDATE() THEN 1 ELSE 0 END) as total_a_envoyer,
+        SUM(CASE WHEN convocation_envoyee = 0 AND statut = 'Programmé' 
+          AND date_visite BETWEEN DATE_ADD(CURDATE(), INTERVAL 7 DAY) AND DATE_ADD(CURDATE(), INTERVAL 8 DAY) 
+          THEN 1 ELSE 0 END) as a_envoyer_j7,
+        SUM(CASE WHEN statut = 'Programmé' AND date_visite >= CURDATE() THEN 1 ELSE 0 END) as total_programmees
+      FROM planning
+      WHERE statut IN ('Programmé', 'Effectué')
+    `);
+    
+    const stats = results[0];
+    
+    console.log('📊 Résultats SQL direct:');
+    console.log(`   Total visites: ${stats.total_visites}`);
+    console.log(`   Total envoyées: ${stats.total_envoyees}`);
+    console.log(`   Total à envoyer: ${stats.total_a_envoyer}`);
+    console.log(`   À envoyer J+7: ${stats.a_envoyer_j7}`);
+    console.log(`   Total programmées: ${stats.total_programmees}`);
+    
+    const tauxEnvoi = stats.total_programmees > 0 
+      ? Math.round((stats.total_envoyees / stats.total_programmees) * 100) 
+      : 0;
+    
+    console.log(`   Taux d'envoi: ${tauxEnvoi}%`);
+    console.log('='.repeat(60));
+    
+    res.json({
+      success: true,
+      stats: {
+        total_visites: parseInt(stats.total_visites),
+        total_envoyees: parseInt(stats.total_envoyees),
+        total_a_envoyer: parseInt(stats.total_a_envoyer),
+        a_envoyer_j7: parseInt(stats.a_envoyer_j7),
+        total_programmees: parseInt(stats.total_programmees),
+        taux_envoi: tauxEnvoi
+      },
+      date_actuelle: new Date().toISOString().split('T')[0],
+      date_j7: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
+    
+  } catch (error) {
+    console.error('❌ Erreur debug stats:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/planning/test-date', protect, async (req, res) => {
+  const maintenant = new Date();
+  const dans7Jours = new Date();
+  dans7Jours.setDate(maintenant.getDate() + 7);
+  
+  const planningsJ7 = await Planning.findAll({
+    where: {
+      date_visite: {
+        [Op.gte]: dans7Jours.toISOString().split('T')[0],
+        [Op.lt]: new Date(dans7Jours.setDate(dans7Jours.getDate() + 1)).toISOString().split('T')[0]
+      }
+    },
+    attributes: ['id_planning', 'date_visite', 'statut', 'convocation_envoyee'],
+    raw: true
+  });
+  
+  res.json({
+    maintenant: maintenant.toISOString(),
+    dans7Jours: dans7Jours.toISOString(),
+    planningsJ7: planningsJ7,
+    total: planningsJ7.length
+  });
+});
+// ========== STATISTIQUES VISITES ==========
+router.get('/visites/stats', protect, async (req, res) => {
+  try {
+    const { source } = req.query;
+    
+    let whereClause = {};
+    if (source === 'FORMULAIRE') {
+      whereClause = { source: 'FORMULAIRE', type_action: 'SAISIE_MANUELLE' };
+    }
+    
+    const total = await Visite.count({ where: whereClause });
+    
+    const parType = await Visite.findAll({
+      where: whereClause,
+      attributes: ['type_visite', [Visite.sequelize.fn('COUNT', '*'), 'count']],
+      group: ['type_visite'],
+      raw: true
+    });
+    
+    const parResultat = await Visite.findAll({
+      where: whereClause,
+      attributes: ['resultat', [Visite.sequelize.fn('COUNT', '*'), 'count']],
+      group: ['resultat'],
+      raw: true
+    });
+    
+    const aujourdhui = new Date();
+    const semaineActuelle = getNumeroSemaine(aujourdhui);
+    const anneeActuelle = aujourdhui.getFullYear();
+    
+    const planningSemaine = await Planning.count({
+      where: { semaine: semaineActuelle, annee: anneeActuelle }
+    });
+    
+    const annee = aujourdhui.getFullYear();
+    const visitesMois = await Visite.findAll({
+      where: whereClause,
+      attributes: [
+        [Visite.sequelize.fn('MONTH', Visite.sequelize.col('date_visite')), 'mois'],
+        [Visite.sequelize.fn('COUNT', '*'), 'count']
+      ],
+      where: {
+        ...whereClause,
+        [Op.and]: [
+          Visite.sequelize.where(Visite.sequelize.fn('YEAR', Visite.sequelize.col('date_visite')), annee)
+        ]
+      },
+      group: [Visite.sequelize.fn('MONTH', Visite.sequelize.col('date_visite'))],
+      raw: true
+    });
+    
+    const parMois = Array(12).fill(0);
+    visitesMois.forEach(item => {
+      const mois = parseInt(item.mois) - 1;
+      parMois[mois] = parseInt(item.count);
+    });
+    
+    const aptes = parResultat.find(r => r.resultat === 'Apte')?.count || 0;
+    const reserves = parResultat.find(r => r.resultat === 'Apte avec réserves')?.count || 0;
+    const inaptes = (parResultat.find(r => r.resultat === 'Inapte temporaire')?.count || 0) + 
+                    (parResultat.find(r => r.resultat === 'Inapte définitif')?.count || 0);
+    
+    res.json({
+      success: true,
+      stats: {
+        total,
+        aptes,
+        reserves,
+        inaptes,
+        parType: parType.map(p => ({ type: p.type_visite, count: p.count })),
+        parResultat: parResultat.map(r => ({ resultat: r.resultat, count: r.count })),
+        planningSemaine,
+        parMois
+      }
+    });
+  } catch (error) {
+    console.error('❌ Erreur stats visites:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/visites/stats-globales', protect, async (req, res) => {
+  try {
+    const total = await Visite.count();
+    const planningTotal = await Planning.count();
+    const formTotal = await Visite.count({ where: { source: 'FORMULAIRE' } });
+    const planningActions = await Visite.count({ where: { source: 'PLANNING' } });
+    
+    res.json({
+      success: true,
+      stats: {
+        total_visites: total,
+        planning_total: planningTotal,
+        formulaire_total: formTotal,
+        planning_actions: planningActions
+      }
+    });
+  } catch (error) {
+    console.error('❌ Erreur stats globales:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

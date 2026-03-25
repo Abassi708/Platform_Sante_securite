@@ -67,7 +67,7 @@ const AgentDashboard = () => {
     setLoadingNotifications(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/notifications/user/${userId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/user/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -91,7 +91,7 @@ const AgentDashboard = () => {
   const markAsRead = async (notificationId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}/read`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}/read`, {
         method: 'PUT',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -118,7 +118,7 @@ const AgentDashboard = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/notifications/${notificationId}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

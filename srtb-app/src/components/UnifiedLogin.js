@@ -143,7 +143,7 @@ const UnifiedLogin = () => {
 
     try {
       // CORRECTION: Utiliser "Login" au lieu de "email" pour correspondre au backend
-      const response = await axios.post(`http://localhost:5000/api/auth/${selectedRole.id}/login`, {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/auth/${selectedRole.id}/login`, {
         Login: email,  // ← Changé de "email" à "Login"
         password
       });
@@ -183,7 +183,7 @@ const UnifiedLogin = () => {
     setSuccess('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/otp/demander', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/otp/demander`, {
         email,
         role: selectedRole.id
       });
@@ -220,7 +220,7 @@ const UnifiedLogin = () => {
     setSuccess('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/otp/verifier', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/otp/verifier`, {
         email,
         role: selectedRole.id,
         code: otpCode
@@ -266,7 +266,7 @@ const UnifiedLogin = () => {
     setSuccess('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/password/forgot-password', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/password/forgot-password`, {
         email: forgotEmail
       });
 
@@ -290,7 +290,7 @@ const UnifiedLogin = () => {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/password/resend-code', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/password/resend-code`, {
         email: forgotEmail
       });
 
@@ -333,7 +333,7 @@ const UnifiedLogin = () => {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/password/reset-password', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/password/reset-password`, {
         email: forgotEmail,
         code: forgotCode,
         newPassword: newPassword

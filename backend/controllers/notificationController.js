@@ -1,7 +1,10 @@
-// controllers/notificationController.js
-const Notification = require('../models/Notification');
-const User = require('../models/User');
+// backend/controllers/notificationController.js
+const db = require('../models'); // ← AJOUTER CETTE LIGNE
 const { sendResetEmail } = require('../config/emailConfig');
+
+// Récupérer les modèles
+const Notification = db.local.Notification;
+const User = db.local.User;
 
 // ========== ENVOYER UNE NOTIFICATION + EMAIL ==========
 const sendPasswordNotification = async (req, res) => {
@@ -10,7 +13,6 @@ const sendPasswordNotification = async (req, res) => {
     
     console.log('📝 Envoi de notification à l\'utilisateur:', user_id);
     
-    // Vérifier que user_id est valide
     if (!user_id) {
       return res.status(400).json({ message: 'ID utilisateur manquant' });
     }
@@ -22,13 +24,11 @@ const sendPasswordNotification = async (req, res) => {
     
     const admin = await User.findByPk(req.user.id);
     
-    // Sauvegarder le mot de passe en clair pour l'email
     const plainPassword = new_password;
     
-    // 1. CRÉER LA NOTIFICATION
     const notification = await Notification.create({
       id_utilisateur: user.id_utilisateur,
-      email_utilisateur: user.Login,  // ← C'est ici que ça plantait
+      email_utilisateur: user.Login,
       role_utilisateur: user.Role,
       matricule_utilisateur: user.matricule_agent,
       nouveau_motpasse: new_password,
@@ -40,7 +40,6 @@ const sendPasswordNotification = async (req, res) => {
     
     console.log('✅ Notification créée avec ID:', notification.id);
     
-    // 2. RÉPONDRE IMMÉDIATEMENT au frontend
     res.json({
       success: true,
       message: 'Notification créée avec succès (email en cours d\'envoi)',
@@ -58,9 +57,6 @@ const sendPasswordNotification = async (req, res) => {
         created_at: notification.created_at
       }
     });
-    
-    // 3. ENVOYER L'EMAIL EN ARRIÈRE-PLAN
-    console.log('📧 Envoi de l\'email en arrière-plan à:', user.Login);
     
     setImmediate(async () => {
       try {
@@ -85,7 +81,6 @@ const sendPasswordNotification = async (req, res) => {
     
   } catch (error) {
     console.error('❌ Erreur envoi notification:', error);
-    console.error('❌ Stack trace:', error.stack);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 };
@@ -95,7 +90,6 @@ const getUserNotifications = async (req, res) => {
   try {
     const { userId } = req.params;
     
-    // Vérification d'autorisation
     if (req.user.id !== parseInt(userId) && req.user.Role !== 'admin') {
       return res.status(403).json({ 
         success: false,

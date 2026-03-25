@@ -1,80 +1,76 @@
 // backend/models/index.js
-const sequelize = require('../config/database');
-const Agent = require('./Agent');
-const Planning = require('./Planning');
-const Visite = require('./Visite');
-const User = require('./User');
-const Accident = require('./Accident');
+const fs = require('fs');
+const path = require('path');
+const { sequelizeGlobal, sequelizeLocal } = require('../config/database');
 
-// ========== ASSOCIATIONS POUR PLANNING ==========
-Planning.belongsTo(Agent, {
-  foreignKey: 'matricule_agent',
-  targetKey: 'matricule_agent',
-  as: 'planningAgent'  // ← Alias unique
+const db = {
+  global: {},
+  local: {},
+  sequelizeGlobal,
+  sequelizeLocal,
+  Sequelize: require('sequelize')
+};
+
+// ========== CHARGER LES MODÈLES DE LA BASE GLOBALE ==========
+const globalModels = ['Agent', 'Agence', 'Affectation'];
+
+globalModels.forEach(modelName => {
+  try {
+    const modelPath = path.join(__dirname, `${modelName}.js`);
+    if (fs.existsSync(modelPath)) {
+      const modelFn = require(modelPath);
+      const model = modelFn(sequelizeGlobal);
+      db.global[modelName] = model;
+      console.log(`✅ Modèle GLOBAL chargé: ${modelName}`);
+    }
+  } catch (error) {
+    console.error(`❌ Erreur chargement modèle GLOBAL ${modelName}:`, error.message);
+  }
 });
 
-Agent.hasMany(Planning, {
-  foreignKey: 'matricule_agent',
-  sourceKey: 'matricule_agent',
-  as: 'agentPlannings'  // ← Alias unique
+// ========== CHARGER LES MODÈLES DE LA BASE LOCALE ==========
+const localModels = ['Accident', 'Planning', 'Visite', 'User', 'Historique', 'Notification', 'NotificationIntelligente', 'CodeOTP'];
+
+localModels.forEach(modelName => {
+  try {
+    const modelPath = path.join(__dirname, `${modelName}.js`);
+    if (fs.existsSync(modelPath)) {
+      const modelFn = require(modelPath);
+      const model = modelFn(sequelizeLocal);
+      db.local[modelName] = model;
+      console.log(`✅ Modèle LOCAL chargé: ${modelName}`);
+    }
+  } catch (error) {
+    console.error(`❌ Erreur chargement modèle LOCAL ${modelName}:`, error.message);
+  }
 });
 
-// ========== ASSOCIATIONS POUR VISITE ==========
-Visite.belongsTo(Agent, {
-  foreignKey: 'matricule_agent',
-  targetKey: 'matricule_agent',
-  as: 'visiteAgent'  // ← Alias unique
+// ========== APPLIQUER LES ASSOCIATIONS (SANS CROSS-DATABASE JOIN) ==========
+// Les associations cross-database ne sont pas supportées directement par Sequelize
+// Nous devons donc les gérer manuellement dans les requêtes
+
+Object.keys(db.global).forEach(modelName => {
+  if (db.global[modelName].associate) {
+    db.global[modelName].associate(db);
+    console.log(`🔗 Associations GLOBAL appliquées: ${modelName}`);
+  }
 });
 
-Agent.hasMany(Visite, {
-  foreignKey: 'matricule_agent',
-  sourceKey: 'matricule_agent',
-  as: 'agentVisites'  // ← Alias unique
+Object.keys(db.local).forEach(modelName => {
+  if (db.local[modelName].associate) {
+    // Pour les associations locales, on les garde
+    db.local[modelName].associate(db);
+    console.log(`🔗 Associations LOCAL appliquées: ${modelName}`);
+  }
 });
 
-Visite.belongsTo(Planning, {
-  foreignKey: 'id_planning',
-  targetKey: 'id_planning',
-  as: 'visitePlanning'  // ← Alias unique
-});
-
-Planning.hasMany(Visite, {
-  foreignKey: 'id_planning',
-  sourceKey: 'id_planning',
-  as: 'planningVisites'  // ← Alias unique
-});
-
-// ========== ASSOCIATIONS POUR ACCIDENT ==========
-Accident.belongsTo(Agent, {
-  foreignKey: 'matricule_agent',
-  targetKey: 'matricule_agent',
-  as: 'accidentAgent'  // ← Alias unique
-});
-
-Agent.hasMany(Accident, {
-  foreignKey: 'matricule_agent',
-  sourceKey: 'matricule_agent',
-  as: 'agentAccidents'  // ← Alias unique
-});
-
-// ========== ASSOCIATIONS POUR USER ==========
-User.hasMany(Planning, {
-  foreignKey: 'created_by',
-  sourceKey: 'id_utilisateur',
-  as: 'userPlannings'  // ← Alias unique
-});
-
-User.hasMany(Visite, {
-  foreignKey: 'created_by',
-  sourceKey: 'id_utilisateur',
-  as: 'userVisites'  // ← Alias unique
-});
-
+// ========== EXPORTER LES MODÈLES ==========
 module.exports = {
-  sequelize,
-  Agent,
-  Planning,
-  Visite,
-  User,
-  Accident
+  ...db.global,
+  ...db.local,
+  global: db.global,
+  local: db.local,
+  sequelizeGlobal,
+  sequelizeLocal,
+  Sequelize: require('sequelize')
 };

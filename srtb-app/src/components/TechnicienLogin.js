@@ -150,7 +150,7 @@ const TechnicienLogin = () => {
     try {
       console.log('📡 Demande OTP technicien pour:', emailAddress);
       
-      const response = await fetch('http://localhost:5000/api/otp/demander', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/otp/demander`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailAddress })
@@ -219,7 +219,7 @@ const TechnicienLogin = () => {
     try {
       console.log('📡 Vérification OTP technicien pour:', otpEmail);
       
-      const response = await fetch('http://localhost:5000/api/otp/verifier', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/otp/verifier`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -339,7 +339,7 @@ const TechnicienLogin = () => {
     try {
       console.log('📡 Tentative de connexion technicien...');
       
-      const response = await fetch('http://localhost:5000/api/auth/technicien/login', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/technicien/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

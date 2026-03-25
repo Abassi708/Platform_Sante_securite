@@ -2,7 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import RoleSelection from './components/RoleSelection';
-import HomePage from './components/HomePage'; // ← IMPORTEZ HomePage
+import HomePage from './components/HomePage';
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
 import TechnicienLogin from './components/TechnicienLogin';
@@ -13,15 +13,15 @@ import AgentLogin from './components/AgentLogin';
 import AgentDashboard from './components/AgentDashboard';
 import HistoriqueConnexions from './components/HistoriqueConnexions';
 import UnifiedLogin from './components/UnifiedLogin';
+import HistoriqueVisitesPage from './components/visites/HistoriqueVisites';
+import NotificationsIntelligentesPage from './components/NotificationsIntelligentesPage';
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* ========== PAGE D'ACCUEIL PRINCIPALE ========== */}
+        {/* ========== PAGE D'ACCUEIL ========== */}
         <Route path="/" element={<RoleSelection />} />
-        
-        {/* ========== PAGE D'ACCUEIL ALTERNATIVE ========== */}
         <Route path="/home" element={<HomePage />} />
         <Route path="/accueil" element={<HomePage />} />
         
@@ -39,6 +39,8 @@ function App() {
         <Route path="/social" element={<SocialLogin />} />
         <Route path="/social/dashboard" element={<SocialDashboard />} />
         <Route path="/social/historique" element={<HistoriqueConnexions />} />
+        <Route path="/social/historique-visites" element={<HistoriqueVisitesPage />} />
+        <Route path="/social/notifications" element={<NotificationsIntelligentesPage />} />
         
         {/* ========== ROUTES AGENT ========== */}
         <Route path="/agent" element={<AgentLogin />} />

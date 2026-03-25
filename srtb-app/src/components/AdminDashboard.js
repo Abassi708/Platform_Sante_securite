@@ -280,7 +280,7 @@ const AdminDashboard = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/auth/users', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/users`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -331,7 +331,7 @@ const AdminDashboard = () => {
   const fetchOtpStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/otp/stats', {
+      const response = await fetch('`${process.env.REACT_APP_API_URL}/api/otp/stats', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -376,7 +376,7 @@ const AdminDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch('http://localhost:5000/api/auth/stats/connexions?period=week', {
+      const response = await fetch('`${process.env.REACT_APP_API_URL}/api/auth/stats/connexions?period=week', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -720,12 +720,12 @@ const AdminDashboard = () => {
       const token = localStorage.getItem('token');
       
       // Récupérer les stats pour la période 1
-      const response1 = await fetch(`http://localhost:5000/api/auth/stats/connexions?period=${period1.type}`, {
+      const response1 = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/stats/connexions?period=${period1.type}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
       // Récupérer les stats pour la période 2
-      const response2 = await fetch(`http://localhost:5000/api/auth/stats/connexions?period=${period2.type}`, {
+      const response2 = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/stats/connexions?period=${period2.type}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -1100,7 +1100,7 @@ const AdminDashboard = () => {
         matricule: formData.matricule 
       });
 
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch('${process.env.REACT_APP_API_URL}/api/auth/register', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1152,7 +1152,7 @@ const AdminDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch(`http://localhost:5000/api/auth/users/${selectedUser.id}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/users/${selectedUser.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1209,7 +1209,7 @@ const AdminDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch(`http://localhost:5000/api/auth/users/${userToDelete.id}`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/users/${userToDelete.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -1246,7 +1246,7 @@ const AdminDashboard = () => {
       const user = users.find(u => u.id === userId);
       const newStatus = user.status === 'active' ? 'inactive' : 'active';
 
-      const response = await fetch(`http://localhost:5000/api/auth/users/${userId}/status`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/users/${userId}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1346,9 +1346,9 @@ const AdminDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       
-      console.log('📝 Envoi requête à:', `http://localhost:5000/api/auth/users/${userId}/reset-password`);
+      console.log('📝 Envoi requête à:', `${process.env.REACT_APP_API_URL}/api/auth/users/${userId}/reset-password`);
       
-      const response = await fetch(`http://localhost:5000/api/auth/users/${userId}/reset-password`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/users/${userId}/reset-password`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1418,7 +1418,7 @@ const AdminDashboard = () => {
       
       const userId = selectedResetUser.id || selectedResetUser.Id_utilisateur;
       
-      const response = await fetch('http://localhost:5000/api/notifications/send-password', {
+      const response = await fetch('${process.env.REACT_APP_API_URL}/api/notifications/send-password', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1480,7 +1480,7 @@ const AdminDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch(`http://localhost:5000/api/auth/users/bulk`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/users/bulk`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -146,7 +146,7 @@ const AgentLogin = () => {
     try {
       console.log('📡 Demande OTP agent pour:', emailAddress);
       
-      const response = await fetch('http://localhost:5000/api/otp/demander', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/otp/demander`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailAddress })
@@ -215,7 +215,7 @@ const AgentLogin = () => {
     try {
       console.log('📡 Vérification OTP agent pour:', otpEmail);
       
-      const response = await fetch('http://localhost:5000/api/otp/verifier', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/otp/verifier`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -335,7 +335,7 @@ const AgentLogin = () => {
     try {
       console.log('📡 Tentative de connexion agent...');
       
-      const response = await fetch('http://localhost:5000/api/auth/agent/login', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/agent/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

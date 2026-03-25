@@ -1,19 +1,22 @@
 // backend/middleware/authMiddleware.js
 const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+const db = require('../models');  // ← AJOUTER CETTE LIGNE
 
-// backend/middleware/authMiddleware.js
+// ✅ Récupérer le bon modèle User
+const User = db.local.User;
+
 const protect = async (req, res, next) => {
   let token;
 
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      console.log('🔑 Token reçu:', token.substring(0, 20) + '...'); // Log pour déboguer
+      console.log('🔑 Token reçu:', token.substring(0, 20) + '...');
       
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       console.log('✅ Token décodé:', decoded);
       
+      // ✅ Utiliser le bon modèle User
       const user = await User.findByPk(decoded.id);
       
       if (!user) {
@@ -33,4 +36,5 @@ const protect = async (req, res, next) => {
     return res.status(401).json({ message: 'Non autorisé' });
   }
 };
-module.exports = { protect }; 
+
+module.exports = { protect };

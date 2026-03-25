@@ -153,7 +153,7 @@ const SocialLogin = () => {
     try {
       console.log('📡 Demande OTP social pour:', emailAddress);
       
-      const response = await fetch('http://localhost:5000/api/otp/demander', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/otp/demander`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailAddress })
@@ -222,7 +222,7 @@ const SocialLogin = () => {
     try {
       console.log('📡 Vérification OTP social pour:', otpEmail);
       
-      const response = await fetch('http://localhost:5000/api/otp/verifier', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/otp/verifier`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -341,7 +341,7 @@ const handleSubmit = async (e) => {
   setError('');
 
   try {
-    const response = await fetch('http://localhost:5000/api/auth/social/login', {
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/social/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
