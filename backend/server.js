@@ -4,6 +4,7 @@ const cors = require('cors');
 require('dotenv').config();
 const { sequelizeGlobal, sequelizeLocal, testConnections } = require('./config/database');
 
+
 // ========== IMPORT DES MODÈLES ==========
 const db = require('./models');
 
@@ -18,6 +19,10 @@ const notificationIntelligenteRoutes = require('./routes/notificationIntelligent
 const previsionsRoutes = require('./routes/previsionsRoutes');
 const planningRoutes = require('./routes/planningRoutes');
 const technicienRoutes = require('./routes/technicienRoutes');
+const documentRoutes = require('./routes/documentRoutes');
+const chatbotRoutes = require('./routes/chatbotRoutes');
+const chartRoutes = require('./routes/chartRoutes');
+
 
 // ========== IMPORT DES CRONS ==========
 require('./cron/planningCron');
@@ -26,6 +31,7 @@ require('./cron/convocationCron');
 require('./cron/autoPlanningCron');
 
 const app = express();
+
 
 // ========== CONFIGURATION CORS ==========
 const allowedOrigins = [
@@ -60,6 +66,9 @@ app.use(cors({
 // ========== MIDDLEWARES ==========
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/documents', documentRoutes);
+app.use('/api/charts', chartRoutes);
 
 app.use((req, res, next) => {
   console.log(`📡 ${req.method} ${req.url} - ${new Date().toLocaleTimeString()}`);

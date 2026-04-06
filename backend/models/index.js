@@ -29,7 +29,8 @@ globalModels.forEach(modelName => {
 });
 
 // ========== CHARGER LES MODÈLES DE LA BASE LOCALE ==========
-const localModels = ['Accident', 'Planning', 'Visite', 'User', 'Historique', 'Notification', 'NotificationIntelligente', 'CodeOTP'];
+// ✅ AJOUTER 'ChatHistory' DANS LA LISTE
+const localModels = ['Accident', 'Planning', 'Visite', 'User', 'Historique', 'Notification', 'NotificationIntelligente', 'CodeOTP', 'ChatHistory'];
 
 localModels.forEach(modelName => {
   try {
@@ -39,6 +40,8 @@ localModels.forEach(modelName => {
       const model = modelFn(sequelizeLocal);
       db.local[modelName] = model;
       console.log(`✅ Modèle LOCAL chargé: ${modelName}`);
+    } else {
+      console.log(`⚠️ Modèle LOCAL non trouvé: ${modelName}.js`);
     }
   } catch (error) {
     console.error(`❌ Erreur chargement modèle LOCAL ${modelName}:`, error.message);

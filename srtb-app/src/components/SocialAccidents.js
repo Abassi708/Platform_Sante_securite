@@ -52,7 +52,7 @@ import {
   FileSignature,
   FileCheck,
   FileWarning,
-  FilePlus,      // ← AJOUTEZ CELUI-CI
+  FilePlus,
   FileMinus,
   List,
   Grid,
@@ -75,7 +75,7 @@ import {
   Star,
   Heart as HeartIcon,
   Award as AwardIcon,
-  Zap,           // ← AJOUTEZ CELUI-CI
+  Zap,
   Thermometer,
   Wind,
   Droplet,
@@ -96,9 +96,18 @@ import {
   Wifi,
   Cable,
   CircuitBoard,
-  Hash
+  Hash,
+  CalendarDays,
+  CalendarRange,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+  Fingerprint,
+  History
 } from 'lucide-react';
 import '../styles/SocialAccidents.css';
+
+const API_URL = 'http://localhost:5000';
 
 const SocialAccidents = () => {
   // ========== ÉTATS PRINCIPAUX ==========
@@ -194,10 +203,23 @@ const SocialAccidents = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Chargement initial PARALLÈLE (plus rapide)
   useEffect(() => {
-    fetchAgents();
-    fetchAccidents();
-    fetchStats();
+    const init = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchAgents(),
+          fetchAccidents()
+        ]);
+      } catch (err) {
+        console.error('Erreur chargement:', err);
+        setError('Erreur de chargement des données');
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
   }, []);
 
   // ========== FILTRAGE ==========
@@ -243,49 +265,66 @@ const SocialAccidents = () => {
   const fetchAgents = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`, {
+      const response = await fetch(`${API_URL}/api/agents`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
       if (data.success) {
         setAgents(data.agents);
       }
+      return data;
     } catch (err) {
       console.error('Erreur chargement agents:', err);
+      throw err;
     }
   };
 
   const fetchAccidents = async () => {
-    setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/accidents`, {
+      const response = await fetch(`${API_URL}/api/accidents`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
       const data = await response.json();
-      if (data.success) {
-        setAccidents(data.accidents);
-        setFilteredAccidents(data.accidents);
+      
+      if (data.success && Array.isArray(data.accidents)) {
+        const accidentsAvecAgent = data.accidents.map(acc => ({
+          ...acc,
+          agent: acc.accidentAgent || null
+        }));
+        
+        setAccidents(accidentsAvecAgent);
+        setFilteredAccidents(accidentsAvecAgent);
+        
+        const total = accidentsAvecAgent.length;
+        const declares = accidentsAvecAgent.filter(a => a.statut === 'declare').length;
+        const brouillons = accidentsAvecAgent.filter(a => a.statut === 'brouillon').length;
+        
+        const parGravite = {
+          faible: accidentsAvecAgent.filter(a => a.gravite === 'Faible').length,
+          moyenne: accidentsAvecAgent.filter(a => a.gravite === 'Moyenne').length,
+          elevee: accidentsAvecAgent.filter(a => a.gravite === 'Élevée').length,
+          critique: accidentsAvecAgent.filter(a => a.gravite === 'Critique').length
+        };
+        
+        const parMois = Array(12).fill(0);
+        accidentsAvecAgent.forEach(acc => {
+          if (acc.date_accident) {
+            const mois = new Date(acc.date_accident).getMonth();
+            if (!isNaN(mois) && mois >= 0 && mois < 12) {
+              parMois[mois]++;
+            }
+          }
+        });
+        
+        setStats({ total, declares, brouillons, parGravite, parMois });
       }
+      return data;
     } catch (err) {
-      setError('Erreur de chargement des accidents');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/accidents/stats`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success) {
-        setStats(data.stats);
-      }
-    } catch (err) {
-      console.error('Erreur chargement stats:', err);
+      console.error('Erreur chargement accidents:', err);
+      setError('Erreur de connexion au serveur');
+      throw err;
     }
   };
 
@@ -304,7 +343,6 @@ const SocialAccidents = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Vérifier si l'accident est déjà déclaré (pour modification)
     if (selectedAccident && selectedAccident.statut === 'declare') {
       showNotification({ 
         type: 'error', 
@@ -329,8 +367,8 @@ const SocialAccidents = () => {
     try {
       const token = localStorage.getItem('token');
       const url = selectedAccident 
-        ? `${process.env.REACT_APP_API_URL}/api/accidents/${selectedAccident.id_accident}`
-        : `${process.env.REACT_APP_API_URL}/api/accidents`;
+        ? `${API_URL}/api/accidents/${selectedAccident.id_accident}`
+        : `${API_URL}/api/accidents`;
       const method = selectedAccident ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -356,16 +394,22 @@ const SocialAccidents = () => {
           title: '✅ Succès',
           message: selectedAccident ? 'Accident modifié avec succès' : 'Accident créé avec succès'
         });
-        fetchAccidents();
-        fetchStats();
+        await fetchAccidents();
         resetForm();
         setActiveView('list');
+      } else {
+        showNotification({ 
+          type: 'error', 
+          title: '❌ Erreur', 
+          message: data.message || 'Erreur lors de l\'enregistrement' 
+        });
       }
     } catch (err) {
+      console.error('Erreur:', err);
       showNotification({ 
         type: 'error', 
         title: '❌ Erreur', 
-        message: 'Erreur lors de l\'enregistrement' 
+        message: 'Erreur de connexion au serveur' 
       });
     } finally {
       setSaving(false);
@@ -373,102 +417,93 @@ const SocialAccidents = () => {
   };
 
   // ========== DÉCLARER À LA CNAM ==========
-const handleDeclarer = async (id) => {
-  try {
-    console.log('🟢 Déclaration CNAM pour ID:', id);
-    
-    const token = localStorage.getItem('token');
-    if (!token) {
-      showNotification({ 
-        type: 'error', 
-        title: '❌ Erreur', 
-        message: 'Session expirée' 
-      });
-      return;
-    }
+  const handleDeclarer = async (id) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        showNotification({ 
+          type: 'error', 
+          title: '❌ Erreur', 
+          message: 'Session expirée' 
+        });
+        return;
+      }
 
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/accidents/${id}/statut`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ statut: 'declare' })
-    });
-    
-    console.log('📦 Status:', response.status);
-    const data = await response.json();
-    console.log('📦 Réponse:', data);
-    
-    if (response.ok && data.success) {
-      showNotification({ 
-        type: 'success', 
-        title: '✅ Succès', 
-        message: 'Accident déclaré à la CNAM' 
+      const response = await fetch(`${API_URL}/api/accidents/${id}/statut`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ statut: 'declare' })
       });
       
-      await fetchAccidents();
-      await fetchStats();
+      const data = await response.json();
       
-      if (showDetailsModal) setShowDetailsModal(false);
-    } else {
+      if (response.ok && data.success) {
+        showNotification({ 
+          type: 'success', 
+          title: '✅ Succès', 
+          message: 'Accident déclaré à la CNAM' 
+        });
+        await fetchAccidents();
+        if (showDetailsModal) setShowDetailsModal(false);
+      } else {
+        showNotification({ 
+          type: 'error', 
+          title: '❌ Erreur', 
+          message: data.message || 'Erreur inconnue' 
+        });
+      }
+    } catch (err) {
+      console.error('❌ Erreur:', err);
       showNotification({ 
         type: 'error', 
         title: '❌ Erreur', 
-        message: data.message || 'Erreur inconnue' 
+        message: 'Erreur de connexion' 
       });
     }
-  } catch (err) {
-    console.error('❌ Erreur:', err);
-    showNotification({ 
-      type: 'error', 
-      title: '❌ Erreur', 
-      message: 'Erreur de connexion' 
-    });
-  }
-};
+  };
+  
   // ========== SUPPRIMER UN ACCIDENT ==========
   const handleDelete = async () => {
-  if (!accidentToDelete) return;
-  
-  console.log('🗑️ Tentative suppression:', accidentToDelete);
-  
-  try {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/accidents/${accidentToDelete.id_accident}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
+    if (!accidentToDelete) return;
     
-    console.log('📦 Status:', response.status);
-    const data = await response.json();
-    console.log('📦 Réponse:', data);
-    
-    if (response.ok) {
-      showNotification({ 
-        type: 'success', 
-        title: '✅ Succès', 
-        message: 'Accident supprimé' 
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/accidents/${accidentToDelete.id_accident}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      fetchAccidents();
-      setShowDeleteModal(false);
-      setAccidentToDelete(null);
-    } else {
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        showNotification({ 
+          type: 'success', 
+          title: '✅ Succès', 
+          message: 'Accident supprimé' 
+        });
+        await fetchAccidents();
+        setShowDeleteModal(false);
+        setAccidentToDelete(null);
+      } else {
+        showNotification({ 
+          type: 'error', 
+          title: '❌ Erreur', 
+          message: data.message || 'Erreur inconnue' 
+        });
+      }
+    } catch (err) {
+      console.error('❌ Erreur:', err);
       showNotification({ 
         type: 'error', 
         title: '❌ Erreur', 
-        message: data.message || 'Erreur inconnue' 
+        message: 'Erreur de connexion' 
       });
     }
-  } catch (err) {
-    console.error('❌ Erreur:', err);
-    showNotification({ 
-      type: 'error', 
-      title: '❌ Erreur', 
-      message: 'Erreur de connexion' 
-    });
-  }
-};
+  };
+  
   // ========== FONCTIONS UTILITAIRES ==========
   const showNotification = ({ type, title, message }) => {
     setNotification({ show: true, type, title, message });
@@ -502,7 +537,6 @@ const handleDeclarer = async (id) => {
   };
 
   const editAccident = (accident) => {
-    // Vérifier si l'accident est déjà déclaré
     if (accident.statut === 'declare') {
       showNotification({ 
         type: 'error', 
@@ -590,6 +624,37 @@ const handleDeclarer = async (id) => {
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredAccidents.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredAccidents.length / itemsPerPage);
+
+  // Calcul du top 5 des agents les plus accidentés
+  const getTopAgents = () => {
+    if (!accidents.length) return [];
+    
+    const agentAccidentCount = {};
+    accidents.forEach(acc => {
+      const agentId = acc.matricule_agent;
+      const agentName = acc.agent?.nom && acc.agent?.prenom 
+        ? `${acc.agent.nom} ${acc.agent.prenom}` 
+        : `Agent ${agentId}`;
+      
+      if (!agentAccidentCount[agentId]) {
+        agentAccidentCount[agentId] = {
+          id: agentId,
+          name: agentName,
+          count: 0,
+          totalJoursArret: 0
+        };
+      }
+      agentAccidentCount[agentId].count++;
+      agentAccidentCount[agentId].totalJoursArret += (acc.jour_arret || 0);
+    });
+    
+    return Object.values(agentAccidentCount)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  };
+
+  const topAgents = getTopAgents();
+  const maxCount = topAgents.length > 0 ? Math.max(...topAgents.map(a => a.count), 1) : 1;
 
   // ========== RENDU ==========
   return (
@@ -1080,36 +1145,35 @@ const handleDeclarer = async (id) => {
                 
                 {/* Agent concerné */}
                 <div className="form-section">
-  <h3>
-    <User size={16} />
-    Agent concerné
-  </h3>
-  <div className="form-grid">
-    <div className="form-group full-width">
-      <label>
-        <User size={14} />
-        Agent <span className="required">*</span>
-      </label>
-      <select
-        value={formData.matricule_agent}
-        onChange={(e) => setFormData({...formData, matricule_agent: e.target.value})}
-        className={formErrors.matricule_agent ? 'error' : ''}
-        required
-      >
-        <option value="">Sélectionner un agent</option>
-        {agents.map(agent => (
-          <option key={agent.matricule_agent} value={agent.matricule_agent}>
-            {agent.nom} {agent.prenom} - #{agent.matricule_agent} ({agent.code_affectation === 3 ? 'Chauffeur' : 'Autre'})
-          </option>
-        ))}
-      </select>
-      {formErrors.matricule_agent && (
-        <div className="error-message">{formErrors.matricule_agent}</div>
-      )}
-    </div>
-  </div>
-</div>
-
+                  <h3>
+                    <User size={16} />
+                    Agent concerné
+                  </h3>
+                  <div className="form-grid">
+                    <div className="form-group full-width">
+                      <label>
+                        <User size={14} />
+                        Agent <span className="required">*</span>
+                      </label>
+                      <select
+                        value={formData.matricule_agent}
+                        onChange={(e) => setFormData({...formData, matricule_agent: e.target.value})}
+                        className={formErrors.matricule_agent ? 'error' : ''}
+                        required
+                      >
+                        <option value="">Sélectionner un agent</option>
+                        {agents.map(agent => (
+                          <option key={agent.matricule_agent} value={agent.matricule_agent}>
+                            {agent.nom} {agent.prenom} - #{agent.matricule_agent} ({agent.code_affectation === 3 ? 'Chauffeur' : 'Autre'})
+                          </option>
+                        ))}
+                      </select>
+                      {formErrors.matricule_agent && (
+                        <div className="error-message">{formErrors.matricule_agent}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
 
                 {/* Circonstances */}
                 <div className="form-section">
@@ -1390,132 +1454,240 @@ const handleDeclarer = async (id) => {
           </motion.div>
         )}
 
-        {/* VUE STATISTIQUES */}
+        {/* ========== VUE STATISTIQUES - AVEC 4 CARTES SEULEMENT ========== */}
         {activeView === 'stats' && (
           <motion.div
-            className="stats-dashboard"
+            className="stats-dashboard-premium"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="stats-overview">
-              <div className="stat-large-card" style={{ background: 'linear-gradient(135deg, #2563eb, #1e40af)' }}>
-                <div className="stat-large-icon">
-                  <FileText size={24} />
-                </div>
-                <div className="stat-large-content">
-                  <div className="stat-large-label">Total accidents</div>
-                  <div className="stat-large-value">{stats.total}</div>
-                  <div className="stat-large-footer">depuis le début</div>
-                </div>
-              </div>
-
-              <div className="stat-large-card" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-                <div className="stat-large-icon">
-                  <CheckCircle size={24} />
-                </div>
-                <div className="stat-large-content">
-                  <div className="stat-large-label">Déclarés CNAM</div>
-                  <div className="stat-large-value">{stats.declares}</div>
-                  <div className="stat-large-footer">accidents déclarés</div>
-                </div>
-              </div>
-
-              <div className="stat-large-card" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
-                <div className="stat-large-icon">
-                  <Clock size={24} />
-                </div>
-                <div className="stat-large-content">
-                  <div className="stat-large-label">Brouillons</div>
-                  <div className="stat-large-value">{stats.brouillons}</div>
-                  <div className="stat-large-footer">en attente</div>
-                </div>
-              </div>
-
-              <div className="stat-large-card" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>
-                <div className="stat-large-icon">
-                  <AlertTriangle size={24} />
-                </div>
-                <div className="stat-large-content">
-                  <div className="stat-large-label">Gravité critique</div>
-                  <div className="stat-large-value">{stats.parGravite?.critique || 0}</div>
-                  <div className="stat-large-footer">accidents graves</div>
-                </div>
+            <div className="stats-premium-header">
+              <div className="stats-title-section">
+                <h2>Statistiques des accidents</h2>
+                <p className="stats-subtitle">Vue d'ensemble complète</p>
               </div>
             </div>
 
-            <div className="stats-charts">
-              <div className="chart-card">
-                <h3>
-                  <PieChart size={18} />
-                  Répartition par gravité
-                </h3>
-                <div className="gravite-distribution">
-                  <div className="gravite-item">
-                    <span className="gravite-label">
-                      <span className="gravite-dot" style={{ background: '#10b981' }}></span>
-                      Faible
-                    </span>
-                    <div className="gravite-bar">
-                      <div className="gravite-bar-fill faible" style={{ width: `${(stats.parGravite?.faible / stats.total * 100) || 0}%` }}></div>
-                    </div>
-                    <span className="gravite-count">{stats.parGravite?.faible || 0}</span>
-                  </div>
-                  <div className="gravite-item">
-                    <span className="gravite-label">
-                      <span className="gravite-dot" style={{ background: '#f59e0b' }}></span>
-                      Moyenne
-                    </span>
-                    <div className="gravite-bar">
-                      <div className="gravite-bar-fill moyenne" style={{ width: `${(stats.parGravite?.moyenne / stats.total * 100) || 0}%` }}></div>
-                    </div>
-                    <span className="gravite-count">{stats.parGravite?.moyenne || 0}</span>
-                  </div>
-                  <div className="gravite-item">
-                    <span className="gravite-label">
-                      <span className="gravite-dot" style={{ background: '#f97316' }}></span>
-                      Élevée
-                    </span>
-                    <div className="gravite-bar">
-                      <div className="gravite-bar-fill elevee" style={{ width: `${(stats.parGravite?.elevee / stats.total * 100) || 0}%` }}></div>
-                    </div>
-                    <span className="gravite-count">{stats.parGravite?.elevee || 0}</span>
-                  </div>
-                  <div className="gravite-item">
-                    <span className="gravite-label">
-                      <span className="gravite-dot" style={{ background: '#ef4444' }}></span>
-                      Critique
-                    </span>
-                    <div className="gravite-bar">
-                      <div className="gravite-bar-fill critique" style={{ width: `${(stats.parGravite?.critique / stats.total * 100) || 0}%` }}></div>
-                    </div>
-                    <span className="gravite-count">{stats.parGravite?.critique || 0}</span>
-                  </div>
-                </div>
+            {loading ? (
+              <div className="stats-loading">
+                <div className="spinner"></div>
+                <p>Chargement des statistiques...</p>
               </div>
+            ) : (
+              <>
+                {/* 4 KPI CARDS - SUPPRESSION DE TOTAL ACCIDENTS ET MOYENNE */}
+                <div className="kpi-premium-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+                  {/* Carte 1: Déclarés CNAM */}
+                  <div className="kpi-premium-card green">
+                    <div className="kpi-premium-icon">
+                      <CheckCircle size={24} />
+                    </div>
+                    <div className="kpi-premium-content">
+                      <span className="kpi-premium-label">Déclarés CNAM</span>
+                      <span className="kpi-premium-value">{stats.declares}</span>
+                    </div>
+                  </div>
 
-              <div className="chart-card">
-                <h3>
-                  <TrendingUp size={18} />
-                  Évolution mensuelle
-                </h3>
-                <div className="bar-chart">
-                  {stats.parMois?.map((count, index) => (
-                    <div key={index} className="bar-item">
-                      <div 
-                        className="bar" 
-                        style={{ 
-                          height: `${(count / Math.max(...stats.parMois, 1)) * 150}px`,
-                          background: 'linear-gradient(180deg, #2563eb, #1e40af)'
-                        }}
-                      ></div>
-                      <span className="bar-value">{count}</span>
-                      <span className="bar-label">{new Date(2024, index, 1).toLocaleString('fr-FR', { month: 'short' })}</span>
+                  {/* Carte 2: Brouillons */}
+                  <div className="kpi-premium-card orange">
+                    <div className="kpi-premium-icon">
+                      <Clock size={24} />
                     </div>
-                  ))}
+                    <div className="kpi-premium-content">
+                      <span className="kpi-premium-label">Brouillons</span>
+                      <span className="kpi-premium-value">{stats.brouillons}</span>
+                    </div>
+                  </div>
+
+                  {/* Carte 3: Total jours d'arrêt */}
+                  <div className="kpi-premium-card blue">
+                    <div className="kpi-premium-icon">
+                      <CalendarDays size={24} />
+                    </div>
+                    <div className="kpi-premium-content">
+                      <span className="kpi-premium-label">Total jours d'arrêt</span>
+                      <span className="kpi-premium-value">
+                        {accidents.reduce((sum, a) => sum + (a.jour_arret || 0), 0)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Carte 4: Taux déclaration */}
+                  <div className="kpi-premium-card purple">
+                    <div className="kpi-premium-icon">
+                      <PieChart size={24} />
+                    </div>
+                    <div className="kpi-premium-content">
+                      <span className="kpi-premium-label">Taux déclaration</span>
+                      <span className="kpi-premium-value">
+                        {stats.total > 0 ? Math.round((stats.declares / stats.total) * 100) : 0}%
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+
+                {/* GRAPHIQUES */}
+                <div className="charts-premium-grid">
+                  {/* Graphique 1: Répartition par gravité (Donut Chart) */}
+                  <div className="chart-premium-card">
+                    <div className="chart-premium-header">
+                      <h3>Répartition par gravité</h3>
+                      <span className="chart-premium-badge">Total: {stats.total} accidents</span>
+                    </div>
+                    <div className="chart-premium-content donut-container">
+                      <div className="donut-chart">
+                        <svg viewBox="0 0 100 100" className="donut-svg">
+                          {stats.total > 0 ? (
+                            <>
+                              {(() => {
+                                const total = stats.total;
+                                const circumference = 2 * Math.PI * 40;
+                                
+                                const faiblePercent = stats.parGravite.faible / total;
+                                const moyennePercent = stats.parGravite.moyenne / total;
+                                const eleveePercent = stats.parGravite.elevee / total;
+                                const critiquePercent = stats.parGravite.critique / total;
+                                
+                                let faibleOffset = 0;
+                                let moyenneOffset = faiblePercent * circumference;
+                                let eleveeOffset = moyenneOffset + (moyennePercent * circumference);
+                                let critiqueOffset = eleveeOffset + (eleveePercent * circumference);
+                                
+                                return (
+                                  <>
+                                    {faiblePercent > 0 && (
+                                      <circle
+                                        cx="50" cy="50" r="40"
+                                        fill="transparent" stroke="#10b981" strokeWidth="15"
+                                        strokeDasharray={`${circumference * faiblePercent} ${circumference}`}
+                                        strokeDashoffset={-faibleOffset} strokeLinecap="butt"
+                                      />
+                                    )}
+                                    {moyennePercent > 0 && (
+                                      <circle
+                                        cx="50" cy="50" r="40"
+                                        fill="transparent" stroke="#f59e0b" strokeWidth="15"
+                                        strokeDasharray={`${circumference * moyennePercent} ${circumference}`}
+                                        strokeDashoffset={-moyenneOffset} strokeLinecap="butt"
+                                      />
+                                    )}
+                                    {eleveePercent > 0 && (
+                                      <circle
+                                        cx="50" cy="50" r="40"
+                                        fill="transparent" stroke="#f97316" strokeWidth="15"
+                                        strokeDasharray={`${circumference * eleveePercent} ${circumference}`}
+                                        strokeDashoffset={-eleveeOffset} strokeLinecap="butt"
+                                      />
+                                    )}
+                                    {critiquePercent > 0 && (
+                                      <circle
+                                        cx="50" cy="50" r="40"
+                                        fill="transparent" stroke="#ef4444" strokeWidth="15"
+                                        strokeDasharray={`${circumference * critiquePercent} ${circumference}`}
+                                        strokeDashoffset={-critiqueOffset} strokeLinecap="butt"
+                                      />
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </>
+                          ) : (
+                            <circle cx="50" cy="50" r="40" fill="transparent" stroke="#e2e8f0" strokeWidth="15"
+                              strokeDasharray={`${2 * Math.PI * 40} ${2 * Math.PI * 40}`} strokeDashoffset="0" strokeLinecap="round"
+                            />
+                          )}
+                          <circle cx="50" cy="50" r="25" fill="var(--bg-card, white)" />
+                        </svg>
+                        <div className="donut-center">
+                          <span className="donut-total">{stats.total}</span>
+                          <span className="donut-label">total</span>
+                        </div>
+                      </div>
+                      
+                      <div className="donut-legend">
+                        <div className="legend-item">
+                          <span className="legend-color faible"></span>
+                          <span className="legend-label">Faible</span>
+                          <span className="legend-value">{stats.parGravite.faible}</span>
+                        </div>
+                        <div className="legend-item">
+                          <span className="legend-color moyenne"></span>
+                          <span className="legend-label">Moyenne</span>
+                          <span className="legend-value">{stats.parGravite.moyenne}</span>
+                        </div>
+                        <div className="legend-item">
+                          <span className="legend-color elevee"></span>
+                          <span className="legend-label">Élevée</span>
+                          <span className="legend-value">{stats.parGravite.elevee}</span>
+                        </div>
+                        <div className="legend-item">
+                          <span className="legend-color critique"></span>
+                          <span className="legend-label">Critique</span>
+                          <span className="legend-value">{stats.parGravite.critique}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Graphique 2: Top 5 des agents les plus accidentés */}
+                  <div className="chart-premium-card">
+                    <div className="chart-premium-header">
+                      <h3>
+                        <Users size={16} />
+                        Agents les plus accidentés
+                      </h3>
+                      <span className="chart-premium-badge">Top {topAgents.length}</span>
+                    </div>
+                    <div className="chart-premium-content">
+                      {topAgents.length === 0 ? (
+                        <div className="empty-chart">
+                          <Users size={48} />
+                          <p>Aucun accident enregistré</p>
+                        </div>
+                      ) : (
+                        <div className="top-agents-list">
+                          {topAgents.map((agent, index) => {
+                            const percentage = (agent.count / maxCount) * 100;
+                            const barColor = index === 0 ? '#ef4444' : index === 1 ? '#f97316' : index === 2 ? '#f59e0b' : '#3b82f6';
+                            
+                            return (
+                              <div key={agent.id} className="agent-rank-item">
+                                <div className="rank-number">
+                                  <span className={`rank-badge rank-${index + 1}`}>{index + 1}</span>
+                                </div>
+                                <div className="agent-rank-info">
+                                  <div className="agent-rank-name">{agent.name}</div>
+                                  <div className="agent-rank-stats">
+                                    <span className="agent-rank-count">
+                                      <AlertTriangle size={12} /> {agent.count} accident{agent.count > 1 ? 's' : ''}
+                                    </span>
+                                    <span className="agent-rank-days">
+                                      <Clock size={12} /> {agent.totalJoursArret} jours d'arrêt
+                                    </span>
+                                  </div>
+                                  <div className="agent-rank-bar-container">
+                                    <div 
+                                      className="agent-rank-bar" 
+                                      style={{ 
+                                        width: `${percentage}%`,
+                                        background: `linear-gradient(90deg, ${barColor}, ${barColor}dd)`
+                                      }}
+                                    >
+                                      <span className="agent-rank-percentage">{Math.round(percentage)}%</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </motion.div>
         )}
       </div>
@@ -1565,21 +1737,15 @@ const handleDeclarer = async (id) => {
 
               <div className="details-grid">
                 <div className="detail-card">
-                  <div className="detail-icon">
-                    <Calendar size={16} />
-                  </div>
+                  <div className="detail-icon"><Calendar size={16} /></div>
                   <div className="detail-content">
                     <div className="detail-label">Date & Heure</div>
-                    <div className="detail-value">
-                      {formatDateTime(selectedAccident.date_accident, selectedAccident.heure_accident)}
-                    </div>
+                    <div className="detail-value">{formatDateTime(selectedAccident.date_accident, selectedAccident.heure_accident)}</div>
                   </div>
                 </div>
 
                 <div className="detail-card">
-                  <div className="detail-icon">
-                    <MapPin size={16} />
-                  </div>
+                  <div className="detail-icon"><MapPin size={16} /></div>
                   <div className="detail-content">
                     <div className="detail-label">Lieu</div>
                     <div className="detail-value">{selectedAccident.lieu_accident || 'Non spécifié'}</div>
@@ -1587,22 +1753,16 @@ const handleDeclarer = async (id) => {
                 </div>
 
                 <div className="detail-card">
-                  <div className="detail-icon">
-                    <Activity size={16} />
-                  </div>
+                  <div className="detail-icon"><Activity size={16} /></div>
                   <div className="detail-content">
                     <div className="detail-label">Blessures</div>
                     <div className="detail-value">{selectedAccident.nature_blessures || 'Non spécifiées'}</div>
-                    {selectedAccident.endroit_blessures && (
-                      <div className="detail-sub">{selectedAccident.endroit_blessures}</div>
-                    )}
+                    {selectedAccident.endroit_blessures && <div className="detail-sub">{selectedAccident.endroit_blessures}</div>}
                   </div>
                 </div>
 
                 <div className="detail-card">
-                  <div className="detail-icon">
-                    <Clock size={16} />
-                  </div>
+                  <div className="detail-icon"><Clock size={16} /></div>
                   <div className="detail-content">
                     <div className="detail-label">Arrêt de travail</div>
                     <div className="detail-value">{selectedAccident.jour_arret || 0} jours</div>
@@ -1610,9 +1770,7 @@ const handleDeclarer = async (id) => {
                 </div>
 
                 <div className="detail-card full-width">
-                  <div className="detail-icon">
-                    <Info size={16} />
-                  </div>
+                  <div className="detail-icon"><Info size={16} /></div>
                   <div className="detail-content">
                     <div className="detail-label">Conditions</div>
                     <div className="detail-value">{selectedAccident.condition_accident || 'Non spécifiées'}</div>
@@ -1621,9 +1779,7 @@ const handleDeclarer = async (id) => {
 
                 {selectedAccident.facteurs_materiels && (
                   <div className="detail-card full-width">
-                    <div className="detail-icon">
-                      <Zap size={16} />
-                    </div>
+                    <div className="detail-icon"><Zap size={16} /></div>
                     <div className="detail-content">
                       <div className="detail-label">Facteurs matériels</div>
                       <div className="detail-value">{selectedAccident.facteurs_materiels}</div>
@@ -1632,50 +1788,30 @@ const handleDeclarer = async (id) => {
                 )}
 
                 <div className="detail-card">
-                  <div className="detail-icon">
-                    <Users size={16} />
-                  </div>
+                  <div className="detail-icon"><Users size={16} /></div>
                   <div className="detail-content">
                     <div className="detail-label">Témoins</div>
                     <div className="detail-value witnesses">
-                      {selectedAccident.temoin1 && (
-                        <span className="witness-item">
-                          <User size={12} /> {selectedAccident.temoin1}
-                        </span>
-                      )}
-                      {selectedAccident.temoin2 && (
-                        <span className="witness-item">
-                          <User size={12} /> {selectedAccident.temoin2}
-                        </span>
-                      )}
-                      {!selectedAccident.temoin1 && !selectedAccident.temoin2 && (
-                        <span>Aucun témoin</span>
-                      )}
+                      {selectedAccident.temoin1 && <span className="witness-item"><User size={12} /> {selectedAccident.temoin1}</span>}
+                      {selectedAccident.temoin2 && <span className="witness-item"><User size={12} /> {selectedAccident.temoin2}</span>}
+                      {!selectedAccident.temoin1 && !selectedAccident.temoin2 && <span>Aucun témoin</span>}
                     </div>
                   </div>
                 </div>
 
                 <div className="detail-card">
-                  <div className="detail-icon">
-                    <FileText size={16} />
-                  </div>
+                  <div className="detail-icon"><FileText size={16} /></div>
                   <div className="detail-content">
                     <div className="detail-label">Procès-verbal</div>
                     <div className="detail-value">
-                      {selectedAccident.pv_existe ? (
-                        <>
-                          PV n°{selectedAccident.numero_pv} du {formatDate(selectedAccident.date_pv)}
-                        </>
-                      ) : 'Non'}
+                      {selectedAccident.pv_existe ? `PV n°${selectedAccident.numero_pv} du ${formatDate(selectedAccident.date_pv)}` : 'Non'}
                     </div>
                   </div>
                 </div>
 
                 {selectedAccident.tiers_responsable && (
                   <div className="detail-card">
-                    <div className="detail-icon">
-                      <Briefcase size={16} />
-                    </div>
+                    <div className="detail-icon"><Briefcase size={16} /></div>
                     <div className="detail-content">
                       <div className="detail-label">Tiers responsable</div>
                       <div className="detail-value">{selectedAccident.nom_tiers || 'Non spécifié'}</div>
@@ -1685,9 +1821,7 @@ const handleDeclarer = async (id) => {
 
                 {selectedAccident.date_declaration_cnam && selectedAccident.statut === 'declare' && (
                   <div className="detail-card">
-                    <div className="detail-icon">
-                      <Send size={16} />
-                    </div>
+                    <div className="detail-icon"><Send size={16} /></div>
                     <div className="detail-content">
                       <div className="detail-label">Déclaration CNAM</div>
                       <div className="detail-value">{selectedAccident.date_declaration_cnam}</div>
@@ -1698,32 +1832,19 @@ const handleDeclarer = async (id) => {
             </div>
             
             <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowDetailsModal(false)}>
-                Fermer
-              </button>
-              
+              <button className="btn-secondary" onClick={() => setShowDetailsModal(false)}>Fermer</button>
               {selectedAccident.statut === 'brouillon' && (
                 <>
-                  <button className="btn-primary" onClick={() => {
-                    setShowDetailsModal(false);
-                    editAccident(selectedAccident);
-                  }}>
+                  <button className="btn-primary" onClick={() => { setShowDetailsModal(false); editAccident(selectedAccident); }}>
                     <Edit size={16} /> Modifier
                   </button>
-                  <button className="btn-primary" onClick={() => {
-                    setShowDetailsModal(false);
-                    handleDeclarer(selectedAccident.id_accident);
-                  }}>
+                  <button className="btn-primary" onClick={() => { setShowDetailsModal(false); handleDeclarer(selectedAccident.id_accident); }}>
                     <Send size={16} /> Déclarer à la CNAM
                   </button>
                 </>
               )}
-              
               {selectedAccident.statut === 'declare' && (
-                <div className="declare-info">
-                  <CheckCircle size={16} color="#10b981" />
-                  <span>Accident déclaré à la CNAM - Aucune modification possible</span>
-                </div>
+                <div className="declare-info"><CheckCircle size={16} color="#10b981" /><span>Accident déclaré à la CNAM - Aucune modification possible</span></div>
               )}
             </div>
           </div>
@@ -1735,15 +1856,10 @@ const handleDeclarer = async (id) => {
         <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
           <div className="modal-content small" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header warning">
-              <div className="modal-header-icon warning">
-                <AlertTriangle size={24} />
-              </div>
+              <div className="modal-header-icon warning"><AlertTriangle size={24} /></div>
               <h2>Confirmer la suppression</h2>
-              <button className="modal-close" onClick={() => setShowDeleteModal(false)}>
-                <X size={18} />
-              </button>
+              <button className="modal-close" onClick={() => setShowDeleteModal(false)}><X size={18} /></button>
             </div>
-            
             <div className="modal-body">
               <div className="delete-confirm-content">
                 <p>Êtes-vous sûr de vouloir supprimer cet accident ?</p>
@@ -1755,14 +1871,9 @@ const handleDeclarer = async (id) => {
                 <p className="delete-warning">Cette action est irréversible.</p>
               </div>
             </div>
-            
             <div className="modal-footer">
-              <button className="btn-secondary" onClick={() => setShowDeleteModal(false)}>
-                Annuler
-              </button>
-              <button className="btn-danger" onClick={handleDelete}>
-                <Trash2 size={16} /> Supprimer
-              </button>
+              <button className="btn-secondary" onClick={() => setShowDeleteModal(false)}>Annuler</button>
+              <button className="btn-danger" onClick={handleDelete}><Trash2 size={16} /> Supprimer</button>
             </div>
           </div>
         </div>

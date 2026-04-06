@@ -21,7 +21,7 @@ function App() {
     <Router>
       <Routes>
         {/* ========== PAGE D'ACCUEIL ========== */}
-        <Route path="/" element={<RoleSelection />} />
+        <Route path="/" element={<HomePage />} />
         <Route path="/home" element={<HomePage />} />
         <Route path="/accueil" element={<HomePage />} />
         
@@ -50,7 +50,7 @@ function App() {
         <Route path="/unified-login" element={<UnifiedLogin />} />
         
         {/* ========== REDIRECTION ========== */}
-        <Route path="*" element={<RoleSelection />} />
+        <Route path="*" element={<HomePage />} />
       </Routes>
     </Router>
   );

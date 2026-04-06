@@ -1,7 +1,9 @@
+/* src/styles/AgentLogin.css */
+
 /* Import fonts */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-/* Reset - CE RESET EST GLOBAL, C'EST NORMAL */
+/* Reset - GLOBAL (normal) */
 * {
   margin: 0;
   padding: 0;
@@ -254,7 +256,7 @@
   height: 14px;
 }
 
-/* Carte principale */
+/* Carte principale - MÊMES DIMENSIONS QUE ADMIN */
 .agent-container .agent-card {
   background: rgba(255, 255, 255, 0.02);
   backdrop-filter: blur(20px);
@@ -262,23 +264,23 @@
   border-radius: 30px;
   width: 100%;
   max-width: 460px;
-  padding: 30px;
+  padding: 20px 30px;
   position: relative;
   z-index: 30;
   box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.5);
 }
 
-/* En-tête */
+/* En-tête - hauteur réduite comme ADMIN */
 .agent-container .agent-header {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .agent-container .agent-logo {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
 .agent-container .logo-text {
@@ -304,7 +306,7 @@
   font-size: 22px;
   font-weight: 700;
   color: #F1F5F9;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
   letter-spacing: -0.5px;
 }
 
@@ -313,13 +315,13 @@
   color: #94a3b8;
 }
 
-/* Mini statistiques */
+/* Mini statistiques - hauteur réduite comme ADMIN */
 .agent-container .stats-mini {
   display: flex;
   justify-content: center;
   gap: 15px;
-  margin-top: 15px;
-  padding: 10px 15px;
+  margin-top: 10px;
+  padding: 8px 15px;
   background: rgba(139, 92, 246, 0.05);
   border-radius: 30px;
   border: 1px solid rgba(139, 92, 246, 0.1);
@@ -339,11 +341,11 @@
   color: #8B5CF6;
 }
 
-/* Méthodes de connexion */
+/* Méthodes de connexion - hauteur réduite comme ADMIN */
 .agent-container .login-methods {
   display: flex;
   gap: 8px;
-  margin-bottom: 25px;
+  margin-bottom: 18px;
   flex-wrap: wrap;
   justify-content: center;
 }
@@ -352,7 +354,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 6px 14px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(139, 92, 246, 0.2);
   border-radius: 30px;
@@ -418,13 +420,13 @@
   border-radius: 20px;
 }
 
-/* Formulaire */
+/* Formulaire - hauteur réduite comme ADMIN */
 .agent-container .agent-form {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .agent-container .agent-field {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .agent-container .agent-field label {
@@ -452,7 +454,7 @@
 
 .agent-container .field-container input {
   width: 100%;
-  height: 45px;
+  height: 42px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(139, 92, 246, 0.2);
   border-radius: 16px;
@@ -517,12 +519,12 @@
   color: #8B5CF6;
 }
 
-/* Options */
+/* Options - hauteur réduite comme ADMIN */
 .agent-container .agent-options {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .agent-container .agent-checkbox {
@@ -599,13 +601,13 @@
   text-decoration: none;
 }
 
-/* Erreur */
+/* Erreur - hauteur réduite comme ADMIN */
 .agent-container .agent-error {
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.2);
   border-radius: 12px;
-  padding: 10px 12px;
-  margin-bottom: 15px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -613,13 +615,13 @@
   font-size: 12px;
 }
 
-/* Bouton principal */
+/* Bouton principal - hauteur réduite comme ADMIN */
 .agent-container .agent-button {
   width: 100%;
-  height: 45px;
+  height: 42px;
   background: linear-gradient(135deg, #0A1929, #8B5CF6);
   border: none;
-  border-radius: 23px;
+  border-radius: 21px;
   color: #F1F5F9;
   font-size: 14px;
   font-weight: 600;
@@ -689,14 +691,14 @@
   50% { transform: scale(1.3); opacity: 1; }
 }
 
-/* Interface OTP */
+/* Interface OTP - hauteur réduite comme ADMIN */
 .agent-container .otp-interface {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .agent-container .otp-icon {
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   animation: pulse 2s infinite;
   color: #8B5CF6;
   width: 32px;
@@ -712,25 +714,25 @@
   color: #F1F5F9;
   font-size: 18px;
   font-weight: 600;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .agent-container .otp-interface p {
   color: #94a3b8;
   font-size: 13px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .agent-container .otp-inputs {
   display: flex;
   gap: 6px;
   justify-content: center;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .agent-container .otp-digit {
   width: 42px;
-  height: 50px;
+  height: 48px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(139, 92, 246, 0.2);
   border-radius: 12px;
@@ -756,7 +758,7 @@
   gap: 6px;
   color: #94a3b8;
   font-size: 12px;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .agent-container .otp-timer svg {
@@ -769,7 +771,7 @@
   display: flex;
   gap: 15px;
   justify-content: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .agent-container .otp-resend,
@@ -799,7 +801,7 @@
 
 .agent-container .otp-success {
   text-align: center;
-  margin: 20px 0;
+  margin: 14px 0;
 }
 
 .agent-container .otp-success svg {
@@ -815,11 +817,11 @@
 }
 
 .agent-container .otp-hint {
-  margin-top: 15px;
+  margin-top: 10px;
   font-size: 11px;
   color: #94a3b8;
   border-top: 1px dashed rgba(139, 92, 246, 0.2);
-  padding-top: 12px;
+  padding-top: 10px;
 }
 
 .agent-container .otp-hint strong {
@@ -829,14 +831,14 @@
   border-radius: 12px;
 }
 
-/* Interface QR Code */
+/* Interface QR Code - hauteur réduite comme ADMIN */
 .agent-container .qrcode-interface {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .agent-container .qrcode-icon {
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   animation: pulse 2s infinite;
   color: #8B5CF6;
   width: 32px;
@@ -846,21 +848,21 @@
 .agent-container .qrcode-interface h3 {
   color: #F1F5F9;
   font-size: 18px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .agent-container .qrcode-container {
-  padding: 20px;
+  padding: 16px;
   background: rgba(255, 255, 255, 0.02);
   border-radius: 25px;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .agent-container .qrcode-placeholder {
   position: relative;
   width: 160px;
   height: 160px;
-  margin: 0 auto 15px;
+  margin: 0 auto 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -898,7 +900,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin: 15px 0 5px;
+  margin: 10px 0 5px;
   padding: 8px 12px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 30px;
@@ -964,7 +966,7 @@
 }
 
 .agent-container .qrcode-back {
-  padding: 10px 25px;
+  padding: 8px 25px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 22px;
@@ -980,14 +982,14 @@
   background: rgba(139, 92, 246, 0.05);
 }
 
-/* Interface biométrique */
+/* Interface biométrique - hauteur réduite comme ADMIN */
 .agent-container .biometric-interface {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .agent-container .biometric-icon {
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   animation: fingerprintPulse 2s infinite;
   color: #8B5CF6;
   width: 48px;
@@ -1002,14 +1004,14 @@
 .agent-container .biometric-interface h3 {
   color: #F1F5F9;
   font-size: 18px;
-  margin-bottom: 25px;
+  margin-bottom: 18px;
 }
 
 .agent-container .biometric-scanner {
   position: relative;
   width: 140px;
   height: 140px;
-  margin: 20px auto;
+  margin: 14px auto;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1053,7 +1055,7 @@
 }
 
 .agent-container .biometric-back {
-  margin-top: 20px;
+  margin-top: 14px;
   padding: 8px 25px;
   background: none;
   border: 1px solid rgba(139, 92, 246, 0.3);
@@ -1072,13 +1074,13 @@
 
 .agent-container .biometric-success {
   text-align: center;
-  margin: 30px 0;
+  margin: 22px 0;
 }
 
 .agent-container .biometric-success svg {
   width: 60px;
   height: 60px;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   animation: successPop 0.5s;
   color: #8B5CF6;
 }
@@ -1089,37 +1091,37 @@
   font-weight: 500;
 }
 
-/* Interface mot de passe oublié */
+/* Interface mot de passe oublié - hauteur réduite comme ADMIN */
 .agent-container .forgot-interface {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .agent-container .forgot-interface h3 {
   color: #F1F5F9;
   font-size: 18px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   text-align: center;
 }
 
 .agent-container .forgot-interface p {
   color: #94a3b8;
   font-size: 13px;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
   text-align: center;
 }
 
 .agent-container .forgot-actions {
   display: flex;
   gap: 8px;
-  margin-top: 15px;
+  margin-top: 10px;
 }
 
 .agent-container .forgot-submit {
   flex: 2;
-  height: 42px;
+  height: 38px;
   background: linear-gradient(135deg, #0A1929, #8B5CF6);
   border: none;
-  border-radius: 21px;
+  border-radius: 19px;
   color: white;
   font-size: 13px;
   font-weight: 600;
@@ -1134,10 +1136,10 @@
 
 .agent-container .forgot-cancel {
   flex: 1;
-  height: 42px;
+  height: 38px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 21px;
+  border-radius: 19px;
   color: #94a3b8;
   font-size: 13px;
   cursor: pointer;
@@ -1152,13 +1154,13 @@
 
 .agent-container .reset-success {
   text-align: center;
-  padding: 15px;
+  padding: 10px;
 }
 
 .agent-container .reset-success svg {
-  width: 45px;
-  height: 45px;
-  margin-bottom: 12px;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 8px;
   animation: successPop 0.5s;
   color: #8B5CF6;
 }
@@ -1166,14 +1168,14 @@
 .agent-container .reset-success p {
   color: #94a3b8;
   font-size: 13px;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
 .agent-container .reset-close {
-  padding: 8px 25px;
+  padding: 6px 22px;
   background: rgba(139, 92, 246, 0.1);
   border: 1px solid #8B5CF6;
-  border-radius: 21px;
+  border-radius: 19px;
   color: #8B5CF6;
   font-size: 13px;
   cursor: pointer;
@@ -1185,10 +1187,10 @@
   color: white;
 }
 
-/* Support */
+/* Support - hauteur réduite comme ADMIN */
 .agent-container .agent-support {
   position: relative;
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .agent-container .support-button {
@@ -1196,7 +1198,7 @@
   background: none;
   border: 1px dashed rgba(139, 92, 246, 0.3);
   border-radius: 25px;
-  padding: 10px;
+  padding: 8px;
   color: #94a3b8;
   font-size: 12px;
   cursor: pointer;
@@ -1229,7 +1231,7 @@
   backdrop-filter: blur(10px);
   border: 1px solid rgba(139, 92, 246, 0.2);
   border-radius: 18px;
-  padding: 15px;
+  padding: 12px;
   box-shadow: 0 15px 30px -10px rgba(0, 0, 0, 0.5);
   z-index: 100;
 }
@@ -1237,7 +1239,7 @@
 .agent-container .support-panel h4 {
   color: #F1F5F9;
   font-size: 13px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   text-align: center;
 }
 
@@ -1245,7 +1247,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 0;
+  padding: 6px 0;
   color: #94a3b8;
   font-size: 12px;
   border-bottom: 1px solid rgba(139, 92, 246, 0.1);
@@ -1265,22 +1267,22 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px solid rgba(139, 92, 246, 0.2);
   color: #8B5CF6;
   font-size: 10px;
 }
 
-/* Sécurité */
+/* Sécurité - hauteur réduite comme ADMIN */
 .agent-container .agent-security {
   display: flex;
   justify-content: center;
   gap: 10px;
-  padding: 12px 0;
+  padding: 8px 0;
   border-top: 1px solid rgba(139, 92, 246, 0.1);
   border-bottom: 1px solid rgba(139, 92, 246, 0.1);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
 }
 
@@ -1312,7 +1314,7 @@
   color: #8B5CF6;
 }
 
-/* Footer */
+/* Footer - hauteur réduite comme ADMIN */
 .agent-container .agent-footer {
   text-align: center;
   color: #94a3b8;
@@ -1338,7 +1340,7 @@
   background: #8B5CF6;
 }
 
-/* Responsive */
+/* Responsive - MÊME QUE ADMIN */
 @media (max-width: 768px) {
   .agent-container .floating-world,
   .agent-container .info-badge,
@@ -1348,7 +1350,7 @@
   
   .agent-container .agent-card {
     margin: 15px;
-    padding: 25px;
+    padding: 20px;
   }
   
   .agent-container .stats-mini {
@@ -1362,7 +1364,7 @@
   }
   
   .agent-container .method-button {
-    padding: 8px 12px;
+    padding: 6px 12px;
     font-size: 12px;
   }
 }
@@ -1391,8 +1393,8 @@
   }
   
   .agent-container .otp-digit {
-    width: 38px;
-    height: 45px;
+    width: 40px;
+    height: 44px;
     font-size: 18px;
   }
   

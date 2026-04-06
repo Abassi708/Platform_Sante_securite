@@ -1,7 +1,8 @@
 // backend/routes/passwordRoutes.js
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
+const db = require('../models');
+const User = db.local.User;
 const bcrypt = require('bcryptjs');
 const { sendResetEmail } = require('../config/emailConfig');
 
@@ -22,14 +23,36 @@ setInterval(() => {
 // Route pour demander un code de réinitialisation
 router.post('/forgot-password', async (req, res) => {
   try {
+    console.log('=== DÉBUT FORGOT-PASSWORD ===');
+    console.log('1. Body reçu:', req.body);
+    
     const { email } = req.body;
     
-    console.log('📧 Demande de code de réinitialisation pour:', email);
+    if (!email) {
+      console.log('2. Email manquant');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Email requis' 
+      });
+    }
+    
+    console.log('3. Email reçu:', email);
+    console.log('4. Type de User:', typeof User);
+    console.log('5. User.findOne existe?', typeof User.findOne);
     
     // Vérifier si l'utilisateur existe
+    console.log('6. Recherche utilisateur...');
     const user = await User.findOne({ where: { Login: email } });
     
+    console.log('7. Résultat recherche:', user ? 'Utilisateur trouvé' : 'Aucun utilisateur');
+    
+    if (user) {
+      console.log('8. ID utilisateur:', user.id_utilisateur);
+      console.log('9. Login:', user.Login);
+    }
+    
     if (!user) {
+      console.log('10. Utilisateur non trouvé - retour 404');
       return res.status(404).json({ 
         success: false, 
         message: 'Aucun compte trouvé avec cet email' 
@@ -38,160 +61,72 @@ router.post('/forgot-password', async (req, res) => {
 
     // Générer un code à 6 chiffres
     const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log('11. Code généré:', resetCode);
     
     // Stocker le code avec expiration (15 minutes)
     resetCodes.set(email, {
       code: resetCode,
-      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+      expires: Date.now() + 15 * 60 * 1000,
       attempts: 0,
       userId: user.id_utilisateur
     });
+    console.log('12. Code stocké en mémoire');
 
-    console.log(`🔐 Code généré pour ${email}: ${resetCode}`);
-
-    // Envoyer l'email avec le code en utilisant ta fonction existante
-    // Ou envoyer directement
+    // Préparer l'email
+    console.log('13. Import du transporteur...');
+    let transporter;
+    try {
+      const emailConfig = require('../config/emailConfig');
+      transporter = emailConfig.transporter;
+      console.log('14. Transporteur importé avec succès');
+    } catch (err) {
+      console.error('14. Erreur import emailConfig:', err.message);
+      throw err;
+    }
+    
     const mailOptions = {
-      from: '"SRTB HSE" <securite@srtb.tn>',
+      from: `"SRTB HSE" <${process.env.EMAIL_USER}>`,
       to: email,
       subject: '🔐 Code de réinitialisation - SRTB HSE',
+      text: `Votre code de réinitialisation est: ${resetCode}\nValable 15 minutes.`,
       html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-              background-color: #f4f4f4;
-              margin: 0;
-              padding: 0;
-            }
-            .container {
-              max-width: 500px;
-              margin: 30px auto;
-              background: white;
-              border-radius: 16px;
-              box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-              overflow: hidden;
-            }
-            .header {
-              background: linear-gradient(135deg, #2563eb, #1e40af);
-              color: white;
-              padding: 30px;
-              text-align: center;
-            }
-            .header h1 {
-              margin: 0;
-              font-size: 28px;
-            }
-            .header p {
-              margin: 10px 0 0;
-              opacity: 0.9;
-            }
-            .content {
-              padding: 40px 30px;
-              text-align: center;
-            }
-            .code-label {
-              color: #64748b;
-              font-size: 14px;
-              text-transform: uppercase;
-              letter-spacing: 1px;
-              margin-bottom: 10px;
-            }
-            .code-box {
-              background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-              border: 2px dashed #2563eb;
-              border-radius: 20px;
-              padding: 20px;
-              margin: 20px 0;
-            }
-            .code {
-              font-size: 48px;
-              font-weight: bold;
-              color: #2563eb;
-              letter-spacing: 8px;
-              font-family: monospace;
-            }
-            .info {
-              background: #e0f2fe;
-              padding: 15px;
-              border-radius: 12px;
-              margin: 20px 0;
-              color: #0369a1;
-              font-size: 14px;
-            }
-            .warning {
-              background: #fee2e2;
-              padding: 15px;
-              border-radius: 12px;
-              margin: 20px 0;
-              color: #991b1b;
-              font-size: 13px;
-            }
-            .footer {
-              text-align: center;
-              padding: 20px;
-              color: #64748b;
-              font-size: 12px;
-              border-top: 1px solid #e2e8f0;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>SRTB HSE</h1>
-              <p>Réinitialisation de mot de passe</p>
-            </div>
-            
-            <div class="content">
-              <p>Bonjour <strong>${user.Login}</strong>,</p>
-              
-              <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
-              
-              <div class="code-label">Votre code de réinitialisation</div>
-              
-              <div class="code-box">
-                <div class="code">${resetCode}</div>
-              </div>
-              
-              <div class="info">
-                ⏰ Ce code est valable pendant <strong>15 minutes</strong>
-              </div>
-              
-              <p>Utilisez ce code pour réinitialiser votre mot de passe.</p>
-              
-              <div class="warning">
-                ⚠️ Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.
-              </div>
-            </div>
-            
-            <div class="footer">
-              <p>© ${new Date().getFullYear()} SRTB - Société Régionale de Transport de Bizerte</p>
-              <p>Email automatique - Merci de ne pas répondre</p>
-            </div>
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">SRTB HSE</h2>
+          <p>Bonjour ${user.Login},</p>
+          <p>Votre code de réinitialisation est :</p>
+          <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; letter-spacing: 5px; font-weight: bold;">
+            ${resetCode}
           </div>
-        </body>
-        </html>
+          <p>Ce code expire dans 15 minutes.</p>
+          <hr>
+          <p style="color: #6b7280; font-size: 12px;">Email automatique, ne pas répondre</p>
+        </div>
       `
     };
-
-    // Utiliser ton transporteur existant
-    const transporter = require('../config/emailConfig').transporter;
-    await transporter.sendMail(mailOptions);
-
+    
+    console.log('15. Envoi de l\'email...');
+    const info = await transporter.sendMail(mailOptions);
+    console.log('16. Email envoyé! ID:', info.messageId);
+    
     res.json({ 
       success: true, 
-      message: 'Code de réinitialisation envoyé par email',
+      message: 'Code envoyé par email',
       email: email
     });
+    
+    console.log('=== FIN SUCCÈS ===\n');
 
   } catch (error) {
-    console.error('❌ Erreur forgot password:', error);
+    console.error('=== ERREUR DÉTAILLÉE ===');
+    console.error('Message:', error.message);
+    console.error('Code:', error.code);
+    console.error('Stack:', error.stack);
+    console.error('========================\n');
+    
     res.status(500).json({ 
       success: false, 
-      message: 'Erreur lors de l\'envoi du code' 
+      message: 'Erreur lors de l\'envoi du code',
+      error: error.message
     });
   }
 });
@@ -315,31 +250,15 @@ router.post('/resend-code', async (req, res) => {
       to: email,
       subject: '🔐 Nouveau code de réinitialisation - SRTB HSE',
       html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            /* Mêmes styles que ci-dessus */
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>SRTB HSE</h1>
-              <p>Nouveau code de réinitialisation</p>
-            </div>
-            <div class="content">
-              <p>Voici votre nouveau code de réinitialisation :</p>
-              <div class="code-box">
-                <div class="code">${resetCode}</div>
-              </div>
-              <div class="info">
-                ⏰ Valable 15 minutes
-              </div>
-            </div>
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+          <h2 style="color: #2563eb;">SRTB HSE</h2>
+          <p>Bonjour ${user.Login},</p>
+          <p>Votre nouveau code de réinitialisation est :</p>
+          <div style="background: #f3f4f6; padding: 20px; text-align: center; font-size: 32px; letter-spacing: 5px; font-weight: bold;">
+            ${resetCode}
           </div>
-        </body>
-        </html>
+          <p>Ce code expire dans 15 minutes.</p>
+        </div>
       `
     };
 

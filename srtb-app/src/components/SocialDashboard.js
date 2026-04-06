@@ -9,28 +9,32 @@ import {
   AlertTriangle, FileText, Plus, BarChart3, Home, Activity, Zap,
   Bell as BellIcon, TrendingUp, Calendar as CalendarIcon, Settings,
   Download, Filter, ChevronDown, Star, Briefcase, Shield, Truck,
-  Send, RefreshCw, MapPin
+  Send, RefreshCw, MapPin, LayoutDashboard, Stethoscope, UserCircle,
+  BriefcaseMedical, CalendarDays, ExternalLink, LifeBuoy, Award as AwardIcon,
+  Target, TrendingUp as TrendingUpIcon, Users as UsersIcon, FolderOpen,
+  Building2, Hospital, Scale, Bone, Brain, Footprints
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SocialAccidents from './SocialAccidents';
 import PlanningPage from './visites/PlanningPage';
 import GestionVisitesPage from './visites/GestionVisitesPage';
 import HistoriqueVisites from './visites/HistoriqueVisites';
+import HistoriqueConnexions from './HistoriqueConnexions'; // ⬅️ NOUVEAU COMPOSANT
 import NotificationsIntelligentesPage from './NotificationsIntelligentesPage';
 import ConvocationsPage from './visites/ConvocationsPage';
 import '../styles/SocialDashboard.css';
 import NotificationBadge from './NotificationBadge';
 
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 const SocialDashboard = () => {
   const navigate = useNavigate();
+  
+  // ========== ÉTATS ==========
   const [user, setUser] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [greeting, setGreeting] = useState('');
-  
-  // ========== ONGLET ACTIF ==========
   const [activeTab, setActiveTab] = useState('dashboard');
-  
-  // ========== SOUS-ONGLET POUR LES VISITES ==========
   const [visitesSubTab, setVisitesSubTab] = useState('planning');
   
   // ========== STATS ==========
@@ -59,6 +63,14 @@ const SocialDashboard = () => {
   const [selectedPasswordNotif, setSelectedPasswordNotif] = useState(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // ========== NOTIFICATIONS GÉNÉRALES ==========
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState(null);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
 
   // ========== REFS POUR LES BOUTONS ==========
   const passwordButtonRef = useRef(null);
@@ -90,6 +102,7 @@ const SocialDashboard = () => {
       
       if (parsedUser.id) {
         fetchPasswordNotifications(parsedUser.id);
+        fetchNotifications(parsedUser.id);
       }
       
       chargerDonneesDashboard();
@@ -115,56 +128,52 @@ const SocialDashboard = () => {
 
   // ========== CHARGER STATISTIQUES ==========
   const chargerStats = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    
-    // Agents
-    const agentsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const agentsData = await agentsResponse.json();
-    
-    // Visites TOTAL (sans filtre source)
-    const visitesResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/visites/stats`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const visitesData = await visitesResponse.json();
-    
-    // Planning
-    const planningResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/13/2026`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const planningData = await planningResponse.json();
-    
-    // Accidents
-    const accidentsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/accidents/stats`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const accidentsData = await accidentsResponse.json();
-    
-    const agents = agentsData.agents || [];
-    const planning = planningData.planning || [];
-    
-    const totalVisites = visitesData.stats?.total || 0;
-    const chauffeurs = agents.filter(a => a.code_affectation === 3).length;
-    
-    const visitesEffectuees = planning.filter(v => v.visite_effectuee === true || v.visite_effectuee === 1).length;
-    const visitesRetard = planning.filter(v => !v.visite_effectuee && new Date(v.date_visite) < new Date()).length;
-    const tauxRealisation = planning.length > 0 ? Math.round((visitesEffectuees / planning.length) * 100) : 0;
-    
-    setStats({
-      total_agents: agents.length,
-      chauffeurs: chauffeurs,
-      visites_mois: totalVisites,
-      visites_retard: visitesRetard,
-      accidents_mois: accidentsData.stats?.total || 0,
-      taux_realisation: tauxRealisation
-    });
-    
-  } catch (err) {
-    console.error('Erreur stats:', err);
-  }
-};
+    try {
+      const token = localStorage.getItem('token');
+      
+      const agentsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const agentsData = await agentsResponse.json();
+      
+      const visitesResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/visites/stats`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const visitesData = await visitesResponse.json();
+      
+      const planningResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/13/2026`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const planningData = await planningResponse.json();
+      
+      const accidentsResponse = await fetch(`${process.env.REACT_APP_API_URL}/api/accidents/stats`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const accidentsData = await accidentsResponse.json();
+      
+      const agents = agentsData.agents || [];
+      const planning = planningData.planning || [];
+      
+      const totalVisites = visitesData.stats?.total || 0;
+      const chauffeurs = agents.filter(a => a.code_affectation === 3).length;
+      
+      const visitesEffectuees = planning.filter(v => v.visite_effectuee === true || v.visite_effectuee === 1).length;
+      const visitesRetard = planning.filter(v => !v.visite_effectuee && new Date(v.date_visite) < new Date()).length;
+      const tauxRealisation = planning.length > 0 ? Math.round((visitesEffectuees / planning.length) * 100) : 0;
+      
+      setStats({
+        total_agents: agents.length,
+        chauffeurs: chauffeurs,
+        visites_mois: totalVisites,
+        visites_retard: visitesRetard,
+        accidents_mois: accidentsData.stats?.total || 0,
+        taux_realisation: tauxRealisation
+      });
+      
+    } catch (err) {
+      console.error('Erreur stats:', err);
+    }
+  };
 
   // ========== CHARGER PRÉVISIONS ==========
   const chargerPrevisions = async () => {
@@ -202,6 +211,56 @@ const SocialDashboard = () => {
       }
     } catch (err) {
       console.error('Erreur stats avancées:', err);
+    }
+  };
+
+  // ========== NOTIFICATIONS GÉNÉRALES ==========
+  const fetchNotifications = async (userId) => {
+    setLoadingNotifications(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/api/notifications/user/${userId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        setNotifications(data.notifications || []);
+        setUnreadCount((data.notifications || []).filter(n => n.status !== 'read').length);
+      }
+    } catch (err) {
+      console.error('Erreur notifications:', err);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  const markAsRead = async (notificationId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`${API_URL}/api/notifications/${notificationId}/read`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+      });
+      setNotifications(notifications.map(n => n.id === notificationId ? { ...n, status: 'read' } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error('Erreur marquage:', err);
+    }
+  };
+
+  const deleteNotification = async (notificationId) => {
+    if (!window.confirm('Supprimer cette notification ?')) return;
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`${API_URL}/api/notifications/${notificationId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const updated = notifications.filter(n => n.id !== notificationId);
+      setNotifications(updated);
+      setUnreadCount(updated.filter(n => n.status !== 'read').length);
+    } catch (err) {
+      console.error('Erreur suppression:', err);
     }
   };
 
@@ -256,7 +315,7 @@ const SocialDashboard = () => {
     }
   };
 
-  // ========== MARQUER COMME LUE ==========
+  // ========== MARQUER COMME LUE (MOT DE PASSE) ==========
   const markPasswordAsRead = async (notificationId) => {
     try {
       const token = localStorage.getItem('token');
@@ -273,7 +332,7 @@ const SocialDashboard = () => {
     }
   };
 
-  // ========== SUPPRIMER ==========
+  // ========== SUPPRIMER (MOT DE PASSE) ==========
   const deletePasswordNotification = async (notificationId) => {
     if (!window.confirm('Supprimer cette notification ?')) return;
     try {
@@ -290,7 +349,7 @@ const SocialDashboard = () => {
     }
   };
 
-  // ========== OUVRIR NOTIFICATION ==========
+  // ========== OUVRIR NOTIFICATION (MOT DE PASSE) ==========
   const openPasswordNotification = async (notification) => {
     try {
       const token = localStorage.getItem('token');
@@ -330,6 +389,18 @@ const SocialDashboard = () => {
     return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return 'Non renseigné';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('fr-FR', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   // ========== FONCTIONS UTILITAIRES ==========
   const getRoleIcon = (role) => {
     switch(role) {
@@ -354,6 +425,26 @@ const SocialDashboard = () => {
     return labels[role] || role;
   };
 
+  // ========== STATISTIQUES CALCULÉES ==========
+  const calculatedStats = {
+    totalVisites: stats.visites_mois,
+    totalAccidents: stats.accidents_mois,
+    tauxAptitude: stats.taux_realisation,
+    joursSansAccident: stats.visites_retard === 0 ? 30 : 5,
+  };
+
+  // ========== ALERTES ==========
+  const alerts = (() => {
+    const list = [];
+    if (stats.visites_retard > 0) {
+      list.push({ type: 'danger', icon: '🔴', title: 'Visites en retard', message: `${stats.visites_retard} visite(s) en retard` });
+    }
+    if (stats.accidents_mois > 3) {
+      list.push({ type: 'warning', icon: '⚠️', title: 'Accidents fréquents', message: `${stats.accidents_mois} accidents ce mois` });
+    }
+    return list;
+  })();
+
   // ========== COMPOSANT PORTAL ==========
   const Portal = ({ children }) => {
     const [container] = useState(() => document.createElement('div'));
@@ -364,48 +455,95 @@ const SocialDashboard = () => {
     return ReactDOM.createPortal(children, container);
   };
 
-  // ========== RENDU ==========
+  // ========== ONGLETS (AJOUT DE L'ONGLET CONNEXIONS) ==========
+  const tabs = [
+    { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, color: 'white' },
+    { id: 'accidents', label: 'Accidents', icon: AlertCircle, color: '#ef4444' },
+    { id: 'visites', label: 'Visites médicales', icon: Stethoscope, color: '#10b981' },
+    { id: 'convocations', label: 'Convocations', icon: Send, color: '#f59e0b' },
+    { id: 'historique', label: 'Historique', icon: History, color: 'white' },
+    { id: 'connexions', label: 'Connexions', icon: LogOut, color: '#06b6d4' },     
+    { id: 'alertes', label: 'Alertes', icon: Bell, color: '#ec4899' }
+  ];
+
+  // ========== AFFICHAGE CHARGEMENT ==========
+  if (previsionsLoading) {
+    return (
+      <div className="sd-loading-container">
+        <div className="sd-loading-spinner"></div>
+        <p>Chargement de votre espace...</p>
+      </div>
+    );
+  }
+
+  // ========== RENDU PRINCIPAL ==========
   return (
     <div className="social-dashboard">
       
       {/* HEADER */}
-      <motion.div 
-        className="dashboard-header"
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        <div className="header-left">
-          <div className="logo-icon">
-            <Heart size={28} color="white" />
-          </div>
-          <div>
-            <h1>Service Social</h1>
-            <p className="header-greeting">{greeting}, <strong>{user?.email?.split('@')[0] || 'Social'}</strong></p>
-            <p className="user-id-info">ID: {user?.id || 'inconnu'} • Rôle: {getRoleLabel(user?.role)}</p>
+      <header className="sd-header">
+        <div className="sd-header-left">
+          <div className="sd-logo">
+            <Heart size={32} color="#3b82f6" />
+            <div>
+              <h1>Service Social</h1>
+              <p>{greeting}, {user?.email?.split('@')[0] || 'Social'}</p>
+            </div>
           </div>
         </div>
         
-        <div className="header-right">
-          <div className="datetime">
-            <Clock size={14} /> <span>{currentTime.toLocaleTimeString('fr-FR')}</span>
-            <Calendar size={14} /> <span>{currentTime.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+        <div className="sd-header-right">
+          <div className="sd-datetime">
+            <Clock size={14} />
+            <span>{currentTime.toLocaleTimeString('fr-FR')}</span>
+            <Calendar size={14} />
+            <span>{currentTime.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
           </div>
           
-          {/* NOTIFICATIONS PLANNING (INTELLIGENTES) */}
-          <NotificationBadge />
+          {/* NOTIFICATIONS GÉNÉRALES */}
+          <div className="sd-notifications-wrapper">
+            <button className={`sd-notif-btn ${unreadCount > 0 ? 'has-notif' : ''}`} onClick={() => setShowNotifications(!showNotifications)}>
+              <Bell size={18} />
+              {unreadCount > 0 && <span className="sd-notif-badge">{unreadCount}</span>}
+            </button>
+            <AnimatePresence>
+              {showNotifications && (
+                <motion.div className="sd-notif-dropdown" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                  <div className="sd-notif-header">
+                    <h3>Notifications</h3>
+                    <button onClick={() => setShowNotifications(false)}><X size={16} /></button>
+                  </div>
+                  <div className="sd-notif-list">
+                    {loadingNotifications ? <div className="sd-spinner"></div> :
+                     notifications.length === 0 ? <div className="sd-notif-empty"><Bell size={32} /><p>Aucune notification</p></div> :
+                     notifications.slice(0, 5).map(notif => (
+                       <div key={notif.id} className={`sd-notif-item ${notif.status !== 'read' ? 'unread' : ''}`} onClick={() => { setSelectedNotification(notif); setShowNotificationModal(true); if (notif.status !== 'read') markAsRead(notif.id); }}>
+                         <div className="sd-notif-icon"><Bell size={14} /></div>
+                         <div className="sd-notif-content">
+                           <div className="sd-notif-title">{notif.titre || 'Notification'}</div>
+                           <div className="sd-notif-msg">{notif.message?.substring(0, 50)}...</div>
+                           <div className="sd-notif-time">{formatDate(notif.created_at)}</div>
+                         </div>
+                         {notif.status !== 'read' && <span className="sd-notif-dot"></span>}
+                       </div>
+                     ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           
           {/* NOTIFICATIONS MOT DE PASSE */}
-          <div className="password-notifications-wrapper">
+          <div className="sd-password-notifications-wrapper">
             <button 
               ref={passwordButtonRef}
-              className={`btn-icon notification-btn ${unreadPasswordCount > 0 ? 'has-notifications' : ''}`}
+              className={`sd-btn-icon sd-notification-btn ${unreadPasswordCount > 0 ? 'has-notifications' : ''}`}
               onClick={handlePasswordDropdownToggle}
               title="Notifications mot de passe"
             >
               <Key size={18} />
               {unreadPasswordCount > 0 && (
-                <span className="notification-badge">{unreadPasswordCount > 9 ? '9+' : unreadPasswordCount}</span>
+                <span className="sd-notification-badge">{unreadPasswordCount > 9 ? '9+' : unreadPasswordCount}</span>
               )}
             </button>
             
@@ -413,9 +551,9 @@ const SocialDashboard = () => {
               {showPasswordDropdown && (
                 <Portal>
                   <>
-                    <div className="dropdown-backdrop" onClick={() => setShowPasswordDropdown(false)} />
+                    <div className="sd-dropdown-backdrop" onClick={() => setShowPasswordDropdown(false)} />
                     <motion.div 
-                      className="notifications-dropdown portal-dropdown"
+                      className="sd-notifications-dropdown sd-portal-dropdown"
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
@@ -428,30 +566,30 @@ const SocialDashboard = () => {
                         maxWidth: '400px'
                       }}
                     >
-                      <div className="notifications-header">
+                      <div className="sd-notifications-header">
                         <h3>Mots de passe ({passwordNotifications.length})</h3>
                         <button onClick={() => setShowPasswordDropdown(false)}><X size={16} /></button>
                       </div>
-                      <div className="notifications-list">
+                      <div className="sd-notifications-list">
                         {loadingPasswordNotifs ? (
-                          <div className="notifications-loading"><div className="spinner"></div></div>
+                          <div className="sd-notifications-loading"><div className="sd-spinner"></div></div>
                         ) : passwordNotifications.length === 0 ? (
-                          <div className="notifications-empty"><Key size={32} /><p>Aucune notification</p></div>
+                          <div className="sd-notifications-empty"><Key size={32} /><p>Aucune notification</p></div>
                         ) : (
                           passwordNotifications.slice(0, 5).map(notif => (
-                            <div key={notif.id} className={`notification-item ${notif.status === 'lu' ? '' : 'unread'}`} onClick={() => openPasswordNotification(notif)}>
-                              <div className="notification-icon"><Key size={16} /></div>
-                              <div className="notification-content">
-                                <div className="notification-title">Mot de passe modifié</div>
-                                <div className="notification-message">{notif.reason?.substring(0, 50)}...</div>
-                                <div className="notification-time">{formatDate(notif.created_at)}</div>
+                            <div key={notif.id} className={`sd-notification-item ${notif.status === 'lu' ? '' : 'unread'}`} onClick={() => openPasswordNotification(notif)}>
+                              <div className="sd-notification-icon"><Key size={16} /></div>
+                              <div className="sd-notification-content">
+                                <div className="sd-notification-title">Mot de passe modifié</div>
+                                <div className="sd-notification-message">{notif.reason?.substring(0, 50)}...</div>
+                                <div className="sd-notification-time">{formatDate(notif.created_at)}</div>
                               </div>
-                              {notif.status !== 'lu' && <span className="notification-dot"></span>}
+                              {notif.status !== 'lu' && <span className="sd-notification-dot"></span>}
                             </div>
                           ))
                         )}
                         {passwordNotifications.length > 5 && (
-                          <button className="view-all-btn" onClick={() => setShowPasswordDropdown(false)}>
+                          <button className="sd-view-all-btn" onClick={() => setShowPasswordDropdown(false)}>
                             Voir toutes ({passwordNotifications.length})
                           </button>
                         )}
@@ -463,198 +601,202 @@ const SocialDashboard = () => {
             </AnimatePresence>
           </div>
           
-          {/* MENU PRINCIPAL */}
-          <div className="dashboard-menu">
-            <button className={`menu-btn ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-              <Home size={18} /> <span>Accueil</span>
-            </button>
-            
-            <button className={`menu-btn ${activeTab === 'accidents' ? 'active' : ''}`} onClick={() => setActiveTab('accidents')}>
-              <AlertTriangle size={18} /> <span>Accidents</span>
-            </button>
-            
-            <button className={`menu-btn ${activeTab === 'visites' ? 'active' : ''}`} onClick={() => setActiveTab('visites')}>
-              <Activity size={18} /> <span>Visites</span>
-            </button>
-            
-        
-            <button className={`menu-btn ${activeTab === 'convocations' ? 'active' : ''}`} onClick={() => setActiveTab('convocations')}>
-              <Send size={18} /> <span>Convocations</span>
-            </button>
-            
-            <button className={`menu-btn ${activeTab === 'historiqueVisites' ? 'active' : ''}`} onClick={() => setActiveTab('historiqueVisites')}>
-              <History size={18} /> <span>Historique</span>
-            </button>
-
-            <button className="menu-btn" onClick={() => navigate('/social/historique')}>
-              <BarChart3 size={18} /> <span>Connexions</span>
-            </button>
-
-            <button className={`menu-btn ${activeTab === 'notifications' ? 'active' : ''}`} onClick={() => setActiveTab('notifications')}>
-              <BellIcon size={18} /> <span>Alertes</span>
-            </button>
-          </div>
-          
-          <button className="btn-icon logout-btn" onClick={handleLogout} title="Déconnexion">
+          <button className="sd-logout-btn" onClick={handleLogout}>
             <LogOut size={18} />
+            <span>Déconnexion</span>
           </button>
         </div>
-      </motion.div>
+      </header>
 
-      {/* ========== CONTENU PRINCIPAL ========== */}
-      <motion.div 
-        className="dashboard-content"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-      >
-        
-        {/* ACCUEIL */}
-        {activeTab === 'dashboard' && (
-          <>
-            {/* BANDEAU PRÉVISIONS */}
-            {previsions && previsions.stats && previsions.stats.total_a_planifier > 0 && (
-              <motion.div className="previsions-alert" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} onClick={() => { setActiveTab('visites'); setVisitesSubTab('planning'); }}>
-                <div className="previsions-alert-content">
-                  <TrendingUp size={24} />
-                  <div>
-                    <strong>{previsions.stats.total_a_planifier} agent(s) à programmer</strong>
-                    <span>{previsions.stats.urgents > 0 && `⚠️ ${previsions.stats.urgents} urgent(s)`}{previsions.stats.chauffeurs > 0 && ` • 🚛 ${previsions.stats.chauffeurs} chauffeur(s)`}</span>
+      {/* ONGLETS DE NAVIGATION */}
+      <nav className="sd-tabs-nav">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            className={`sd-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            <tab.icon size={18} style={{ color: activeTab === tab.id ? tab.color : '#6b7280' }} />
+            <span>{tab.label}</span>
+            {activeTab === tab.id && <motion.div className="sd-tab-indicator" layoutId="tabIndicator" />}
+          </button>
+        ))}
+      </nav>
+
+      {/* CONTENU PRINCIPAL */}
+      <main className="sd-main-content">
+        <AnimatePresence mode="wait">
+          <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
+            
+            {/* ========== ONGLET 1 : TABLEAU DE BORD ========== */}
+            {activeTab === 'dashboard' && (
+              <div className="sd-tab-panel">
+                {/* KPI Cards */}
+                <div className="sd-kpi-grid">
+                  <div className="sd-kpi-card">
+                    <div className="sd-kpi-icon" style={{ background: '#e0e7ff', color: 'blue' }}><Users size={20} /></div>
+                    <div className="sd-kpi-info">
+                      <span className="sd-kpi-label">Agents actifs</span>
+                      <span className="sd-kpi-value">{stats.total_agents}</span>
+                    </div>
                   </div>
-                  <ChevronRight size={20} />
+                  <div className="sd-kpi-card">
+                    <div className="sd-kpi-icon" style={{ background: '#d1fae5', color: '#10b981' }}><Activity size={20} /></div>
+                    <div className="sd-kpi-info">
+                      <span className="sd-kpi-label">Visites ce mois</span>
+                      <span className="sd-kpi-value">{stats.visites_mois}</span>
+                    </div>
+                  </div>
+                  <div className="sd-kpi-card">
+                    <div className="sd-kpi-icon" style={{ background: '#fee2e2', color: '#ef4444' }}><AlertCircle size={20} /></div>
+                    <div className="sd-kpi-info">
+                      <span className="sd-kpi-label">Accidents</span>
+                      <span className="sd-kpi-value">{stats.accidents_mois}</span>
+                    </div>
+                  </div>
+                  <div className="sd-kpi-card">
+                    <div className="sd-kpi-icon" style={{ background: '#fef3c7', color: '#f59e0b' }}><Clock size={20} /></div>
+                    <div className="sd-kpi-info">
+                      <span className="sd-kpi-label">Visites en retard</span>
+                      <span className="sd-kpi-value">{stats.visites_retard}</span>
+                    </div>
+                  </div>
                 </div>
-              </motion.div>
+
+                {/* Bandeau prévisions */}
+                {previsions && previsions.stats && previsions.stats.total_a_planifier > 0 && (
+                  <div className="sd-previsions-banner" onClick={() => setActiveTab('visites')}>
+                    <div className="sd-previsions-content">
+                      <TrendingUp size={24} />
+                      <div>
+                        <strong>{previsions.stats.total_a_planifier} agent(s) à programmer</strong>
+                        <span>{previsions.stats.urgents > 0 && `⚠️ ${previsions.stats.urgents} urgent(s)`}</span>
+                      </div>
+                      <ChevronRight size={20} />
+                    </div>
+                  </div>
+                )}
+
+                {/* Alertes */}
+                {alerts.length > 0 && (
+                  <div className="sd-alerts-section">
+                    <h3><AlertTriangle size={16} /> Alertes</h3>
+                    {alerts.map((alert, i) => (
+                      <div key={i} className={`sd-alert-card ${alert.type}`}>
+                        <span className="sd-alert-icon">{alert.icon}</span>
+                        <div>
+                          <div className="sd-alert-title">{alert.title}</div>
+                          <div className="sd-alert-msg">{alert.message}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Actions rapides */}
+                <div className="sd-quick-actions">
+                  <h3><ExternalLink size={16} /> Accès rapides</h3>
+                  <div className="sd-actions-grid">
+                    <button className="sd-action-btn" onClick={() => setActiveTab('accidents')}><AlertCircle size={18} /><span>Gestion accidents</span></button>
+                    <button className="sd-action-btn" onClick={() => setActiveTab('visites')}><Stethoscope size={18} /><span>Planning visites</span></button>
+                    <button className="sd-action-btn" onClick={() => setActiveTab('convocations')}><Send size={18} /><span>Convocations</span></button>
+                  </div>
+                </div>
+
+                {/* Info médecin */}
+                <div className="sd-medecin-info">
+                  <div className="sd-medecin-icon"><User size={24} /></div>
+                  <div className="sd-medecin-content">
+                    <strong>Médecin traitant</strong>
+                    <span>Dr. Mahmoud Khelifi - Médecin du travail agréé</span>
+                    <small>Toutes les visites médicales sont effectuées par le Dr. Khelifi</small>
+                  </div>
+                </div>
+              </div>
             )}
 
-            {/* STATS CARDS */}
-            <div className="stats-grid">
-              <motion.div className="stat-card" whileHover={{ y: -4 }}>
-                <div className="stat-icon" style={{ background: '#3b82f620', color: '#3b82f6' }}><Users size={24} /></div>
-                <div className="stat-content"><span className="stat-label">AGENTS ACTIFS</span><span className="stat-value">{stats.total_agents}</span><span className="stat-sub">{stats.chauffeurs} chauffeurs</span></div>
-              </motion.div>
-              
-              <motion.div className="stat-card" whileHover={{ y: -4 }}>
-                <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}><Activity size={24} /></div>
-                <div className="stat-content"><span className="stat-label">VISITES CE MOIS</span><span className="stat-value">{stats.visites_mois}</span><span className="stat-sub">Taux: {stats.taux_realisation}%</span></div>
-              </motion.div>
-              
-              <motion.div className="stat-card" whileHover={{ y: -4 }}>
-                <div className="stat-icon" style={{ background: '#ef444420', color: '#ef4444' }}><AlertTriangle size={24} /></div>
-                <div className="stat-content"><span className="stat-label">ACCIDENTS</span><span className="stat-value">{stats.accidents_mois}</span><span className="stat-sub">Ce mois</span></div>
-              </motion.div>
-              
-              <motion.div className="stat-card" whileHover={{ y: -4 }}>
-                <div className="stat-icon" style={{ background: '#f59e0b20', color: '#f59e0b' }}><Clock size={24} /></div>
-                <div className="stat-content"><span className="stat-label">VISITES EN RETARD</span><span className="stat-value">{stats.visites_retard}</span><span className="stat-sub">À traiter</span></div>
-              </motion.div>
-            </div>
+            {/* ========== ONGLET 2 : ACCIDENTS ========== */}
+            {activeTab === 'accidents' && <SocialAccidents />}
 
-            {/* BANNIÈRES D'ACCÈS RAPIDE */}
-            <div className="quick-access-grid">
-              <div className="quick-access-card" onClick={() => setActiveTab('accidents')}>
-                <div className="quick-icon" style={{ background: '#ef444420', color: '#ef4444' }}><AlertTriangle size={32} /></div>
-                <div className="quick-content"><h3>Gestion des accidents</h3><p>Déclarez et suivez les accidents du travail</p></div>
-                <ChevronRight size={20} className="quick-arrow" />
+            {/* ========== ONGLET 3 : VISITES MÉDICALES ========== */}
+            {activeTab === 'visites' && (
+              <div className="sd-visites-container">
+                <div className="sd-visites-submenu">
+                  <button className={`sd-submenu-btn ${visitesSubTab === 'planning' ? 'active' : ''}`} onClick={() => setVisitesSubTab('planning')}>
+                    <CalendarIcon size={16} /> Planning
+                  </button>
+                  <button className={`sd-submenu-btn ${visitesSubTab === 'gestion' ? 'active' : ''}`} onClick={() => setVisitesSubTab('gestion')}>
+                    <FileText size={16} /> Gestion & Historique
+                  </button>
+                </div>
+                {visitesSubTab === 'planning' ? <PlanningPage /> : <GestionVisitesPage />}
               </div>
-              
-              <div className="quick-access-card" onClick={() => { setActiveTab('visites'); setVisitesSubTab('planning'); }}>
-                <div className="quick-icon" style={{ background: '#3b82f620', color: '#3b82f6' }}><CalendarIcon size={32} /></div>
-                <div className="quick-content"><h3>Planning des visites</h3><p>Gérez le planning médical intelligent</p></div>
-                <ChevronRight size={20} className="quick-arrow" />
+            )}
+
+            {/* ========== ONGLET 4 : CONVOCATIONS ========== */}
+            {activeTab === 'convocations' && <ConvocationsPage />}
+
+            {/* ========== ONGLET 5 : HISTORIQUE DES VISITES ========== */}
+            {activeTab === 'historique' && <HistoriqueVisites />}
+
+            {/* ========== ONGLET 6 : CONNEXIONS (NOUVEAU) ========== */}
+            {activeTab === 'connexions' && <HistoriqueConnexions />}
+
+            {/* ========== ONGLET 7 : ALERTES ========== */}
+            {activeTab === 'alertes' && <NotificationsIntelligentesPage />}
+
+          </motion.div>
+        </AnimatePresence>
+      </main>
+
+      {/* MODALE NOTIFICATION */}
+      <AnimatePresence>
+        {showNotificationModal && selectedNotification && (
+          <motion.div className="sd-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowNotificationModal(false)}>
+            <motion.div className="sd-modal-content" initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} onClick={e => e.stopPropagation()}>
+              <div className="sd-modal-header">
+                <h2><Bell size={18} /> Notification</h2>
+                <button onClick={() => setShowNotificationModal(false)}><X size={18} /></button>
               </div>
-              
-              
-              
-              <div className="quick-access-card" onClick={() => setActiveTab('convocations')}>
-                <div className="quick-icon" style={{ background: '#10b98120', color: '#10b981' }}><Send size={32} /></div>
-                <div className="quick-content"><h3>Convocations GRH</h3><p>Envoyez les convocations au service GRH</p></div>
-                <ChevronRight size={20} className="quick-arrow" />
+              <div className="sd-modal-body">
+                <div><label>Date :</label><span>{formatDateTime(selectedNotification.created_at)}</span></div>
+                <div><label>Message :</label><span>{selectedNotification.message}</span></div>
               </div>
-            </div>
-
-            {/* INFO MÉDECIN */}
-            <div className="medecin-info">
-              <div className="medecin-icon"><User size={24} /></div>
-              <div className="medecin-content">
-                <strong>Médecin traitant</strong>
-                <span>Dr. Mahmoud Khelifi - Médecin du travail agréé</span>
-                <small>Toutes les visites médicales sont effectuées par le Dr. Khelifi</small>
+              <div className="sd-modal-footer">
+                <button className="sd-btn-delete" onClick={() => { deleteNotification(selectedNotification.id); setShowNotificationModal(false); }}><Trash2 size={14} /> Supprimer</button>
+                <button className="sd-btn-close" onClick={() => setShowNotificationModal(false)}>Fermer</button>
               </div>
-            </div>
-          </>
-        )}
-
-        {/* ACCIDENTS */}
-        {activeTab === 'accidents' && <SocialAccidents />}
-
-        {/* VISITES MÉDICALES */}
-        {activeTab === 'visites' && (
-          <div className="visites-container">
-            <div className="visites-submenu">
-              <button className={`submenu-btn ${visitesSubTab === 'planning' ? 'active' : ''}`} onClick={() => setVisitesSubTab('planning')}>
-                <CalendarIcon size={18} /> Planning
-              </button>
-              <button className={`submenu-btn ${visitesSubTab === 'gestion' ? 'active' : ''}`} onClick={() => setVisitesSubTab('gestion')}>
-                <FileText size={18} /> Gestion & Historique
-              </button>
-            </div>
-
-            <motion.div key={visitesSubTab} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
-              {visitesSubTab === 'planning' ? <PlanningPage /> : <GestionVisitesPage />}
             </motion.div>
-          </div>
-        )}
-
-        
-
-        {/* CONVOCATIONS */}
-        {activeTab === 'convocations' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-            <ConvocationsPage />
           </motion.div>
         )}
-
-        {/* HISTORIQUE DES VISITES */}
-        {activeTab === 'historiqueVisites' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-            <HistoriqueVisites />
-          </motion.div>
-        )}
-
-        {/* NOTIFICATIONS INTELLIGENTES */}
-        {activeTab === 'notifications' && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-            <NotificationsIntelligentesPage />
-          </motion.div>
-        )}
-      </motion.div>
+      </AnimatePresence>
 
       {/* MODALE NOTIFICATION MOT DE PASSE */}
       <AnimatePresence>
         {showPasswordModal && selectedPasswordNotif && (
-          <div className="modal-overlay" onClick={() => setShowPasswordModal(false)}>
-            <motion.div className="modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={e => e.stopPropagation()}>
-              <div className="modal-header">
-                <div className="header-icon" style={{ background: 'linear-gradient(135deg, #3b82f6, #1e40af)' }}><Key size={24} /></div>
+          <div className="sd-modal-overlay" onClick={() => setShowPasswordModal(false)}>
+            <motion.div className="sd-modal-content" initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={e => e.stopPropagation()}>
+              <div className="sd-modal-header">
+                <div className="sd-header-icon" style={{ background: 'linear-gradient(135deg, #3b82f6, #1e40af)' }}><Key size={24} /></div>
                 <h2>Notification mot de passe</h2>
-                <button className="modal-close" onClick={() => setShowPasswordModal(false)}><X size={18} /></button>
+                <button className="sd-modal-close" onClick={() => setShowPasswordModal(false)}><X size={18} /></button>
               </div>
-              <div className="modal-body">
-                <div className="info-box"><p><strong>📋 Raison :</strong></p><p>{selectedPasswordNotif.reason}</p></div>
-                <div className="password-box">
+              <div className="sd-modal-body">
+                <div className="sd-info-box"><p><strong>📋 Raison :</strong></p><p>{selectedPasswordNotif.reason}</p></div>
+                <div className="sd-password-box">
                   <p><strong>🔑 Nouveau mot de passe :</strong></p>
-                  <div className="password-display">
-                    <span className="password-value">{showPassword ? selectedPasswordNotif.new_password : '••••••••'}</span>
-                    <button className="toggle-password-btn" onClick={() => setShowPassword(!showPassword)}>
+                  <div className="sd-password-display">
+                    <span className="sd-password-value">{showPassword ? selectedPasswordNotif.new_password : '••••••••'}</span>
+                    <button className="sd-toggle-password-btn" onClick={() => setShowPassword(!showPassword)}>
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
                 </div>
-                <div className="warning-box"><AlertCircle size={16} /><span>Changez votre mot de passe lors de votre prochaine connexion</span></div>
+                <div className="sd-warning-box"><AlertCircle size={16} /><span>Changez votre mot de passe lors de votre prochaine connexion</span></div>
               </div>
-              <div className="modal-footer">
-                <button className="btn-secondary" onClick={() => setShowPasswordModal(false)}>Fermer</button>
-                <button className="btn-danger" onClick={() => { deletePasswordNotification(selectedPasswordNotif.id); setShowPasswordModal(false); }}>
+              <div className="sd-modal-footer">
+                <button className="sd-btn-secondary" onClick={() => setShowPasswordModal(false)}>Fermer</button>
+                <button className="sd-btn-danger" onClick={() => { deletePasswordNotification(selectedPasswordNotif.id); setShowPasswordModal(false); }}>
                   <Trash2 size={16} /> Supprimer
                 </button>
               </div>
@@ -662,6 +804,7 @@ const SocialDashboard = () => {
           </div>
         )}
       </AnimatePresence>
+      
     </div>
   );
 };

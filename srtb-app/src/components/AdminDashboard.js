@@ -165,6 +165,14 @@ const AdminDashboard = () => {
     year: { totalLogins: 0, uniqueUsers: 0, newUsers: 0, admins: 0, techniciens: 0, sociaux: 0, agents: 0, otpUsage: 0 }
   });
 
+  // ========== STATISTIQUES POUR LES TENDANCES ==========
+  const [trendStats, setTrendStats] = useState({
+    logins: 0,
+    users: 0,
+    newUsers: 0,
+    otp: 0
+  });
+
   // ========== STATISTIQUES POUR GRAPHIQUES ==========
   const [trendData, setTrendData] = useState({
     labels: ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'],
@@ -270,6 +278,135 @@ const AdminDashboard = () => {
     setTimeout(() => setNotification({ show: false, type: '', title: '', message: '' }), 5000);
   };
 
+  // ========== METTRE À JOUR LES STATS SELON LA PÉRIODE SÉLECTIONNÉE ==========
+  const updateStatsForPeriod = (period) => {
+    if (!users.length) return;
+    
+    const now = new Date();
+    let startDate, endDate = new Date(now);
+    let prevStartDate, prevEndDate;
+    
+    switch(period) {
+      case 'today':
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        
+        prevStartDate = new Date(now);
+        prevStartDate.setDate(now.getDate() - 1);
+        prevStartDate.setHours(0, 0, 0, 0);
+        prevEndDate = new Date(now);
+        prevEndDate.setDate(now.getDate() - 1);
+        prevEndDate.setHours(23, 59, 59, 999);
+        break;
+        
+      case 'week':
+        const day = now.getDay();
+        const diff = day === 0 ? 6 : day - 1;
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - diff);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        
+        prevStartDate = new Date(startDate);
+        prevStartDate.setDate(startDate.getDate() - 7);
+        prevStartDate.setHours(0, 0, 0, 0);
+        prevEndDate = new Date(startDate);
+        prevEndDate.setDate(startDate.getDate() - 1);
+        prevEndDate.setHours(23, 59, 59, 999);
+        break;
+        
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        
+        prevStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        prevStartDate.setHours(0, 0, 0, 0);
+        prevEndDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        prevEndDate.setHours(23, 59, 59, 999);
+        break;
+        
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(23, 59, 59, 999);
+        
+        prevStartDate = new Date(now.getFullYear() - 1, 0, 1);
+        prevStartDate.setHours(0, 0, 0, 0);
+        prevEndDate = new Date(now.getFullYear() - 1, 11, 31);
+        prevEndDate.setHours(23, 59, 59, 999);
+        break;
+        
+      default:
+        return;
+    }
+    
+    const usersInPeriod = users.filter(u => 
+      u.lastLogin && new Date(u.lastLogin) >= startDate && new Date(u.lastLogin) <= endDate
+    );
+    
+    const usersInPrevPeriod = users.filter(u => 
+      u.lastLogin && new Date(u.lastLogin) >= prevStartDate && new Date(u.lastLogin) <= prevEndDate
+    );
+    
+    const newUsersInPeriod = users.filter(u => 
+      u.createdAt && new Date(u.createdAt) >= startDate && new Date(u.createdAt) <= endDate
+    ).length;
+    
+    const newUsersInPrevPeriod = users.filter(u => 
+      u.createdAt && new Date(u.createdAt) >= prevStartDate && new Date(u.createdAt) <= prevEndDate
+    ).length;
+    
+    const currentStats = {
+      totalLogins: usersInPeriod.length,
+      uniqueUsers: new Set(usersInPeriod.map(u => u.id)).size,
+      newUsers: newUsersInPeriod,
+      admins: usersInPeriod.filter(u => u.role === 'admin').length,
+      techniciens: usersInPeriod.filter(u => u.role === 'technicien').length,
+      sociaux: usersInPeriod.filter(u => u.role === 'social').length,
+      agents: usersInPeriod.filter(u => u.role === 'agent').length,
+      otpUsage: usersInPeriod.length > 0 ? Math.round((usersInPeriod.filter(u => u.loginCount > 0).length / usersInPeriod.length) * 100) : 0
+    };
+    
+    const prevTotalLogins = usersInPrevPeriod.length;
+    const trendLogins = prevTotalLogins > 0 
+      ? Math.round(((currentStats.totalLogins - prevTotalLogins) / prevTotalLogins) * 100) 
+      : (currentStats.totalLogins > 0 ? 100 : 0);
+    
+    const prevUniqueUsers = new Set(usersInPrevPeriod.map(u => u.id)).size;
+    const trendUsers = prevUniqueUsers > 0 
+      ? Math.round(((currentStats.uniqueUsers - prevUniqueUsers) / prevUniqueUsers) * 100)
+      : (currentStats.uniqueUsers > 0 ? 100 : 0);
+    
+    const trendNewUsers = newUsersInPrevPeriod > 0 
+      ? Math.round(((currentStats.newUsers - newUsersInPrevPeriod) / newUsersInPrevPeriod) * 100)
+      : (currentStats.newUsers > 0 ? 100 : 0);
+    
+    const prevOtpUsage = usersInPrevPeriod.length > 0 ? Math.round((usersInPrevPeriod.filter(u => u.loginCount > 0).length / usersInPrevPeriod.length) * 100) : 0;
+    const trendOtp = prevOtpUsage > 0 
+      ? Math.round(((currentStats.otpUsage - prevOtpUsage) / prevOtpUsage) * 100)
+      : (currentStats.otpUsage > 0 ? 100 : 0);
+    
+    setTrendStats({
+      logins: trendLogins,
+      users: trendUsers,
+      newUsers: trendNewUsers,
+      otp: trendOtp
+    });
+    
+    setCurrentPeriodStats(prev => ({
+      ...prev,
+      [period]: currentStats
+    }));
+  };
+
+  // ========== CHANGEMENT DE PÉRIODE ==========
+  const handlePeriodChange = (period) => {
+    setSelectedPeriod(period);
+    updateStatsForPeriod(period);
+  };
+
   // ========== CHARGEMENT DES UTILISATEURS ==========
   const fetchUsers = async () => {
     setLoading(true);
@@ -310,14 +447,12 @@ const AdminDashboard = () => {
         setAvailableRoles(roles);
         
         calculateSimpleStats(realUsers);
-        calculatePeriodStats(realUsers);
         calculateHourlyData(realUsers);
+        
+        updateStatsForPeriod(selectedPeriod);
       }
 
-      // Charger les stats OTP
       await fetchOtpStats();
-      
-      // Charger les données de tendance
       await fetchTrendData();
       
     } catch (err) {
@@ -331,7 +466,7 @@ const AdminDashboard = () => {
   const fetchOtpStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('`${process.env.REACT_APP_API_URL}/api/otp/stats', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/otp/stats`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
@@ -376,7 +511,7 @@ const AdminDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch('`${process.env.REACT_APP_API_URL}/api/auth/stats/connexions?period=week', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/stats/connexions?period=week`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
@@ -393,18 +528,16 @@ const AdminDashboard = () => {
           dayValues[dayIndex] = parseInt(item.count);
         });
         
-        // Réorganiser pour que Lundi soit en premier
         const reorderedValues = [
-          dayValues[1] || 0, // Lun
-          dayValues[2] || 0, // Mar
-          dayValues[3] || 0, // Mer
-          dayValues[4] || 0, // Jeu
-          dayValues[5] || 0, // Ven
-          dayValues[6] || 0, // Sam
-          dayValues[0] || 0  // Dim
+          dayValues[1] || 0,
+          dayValues[2] || 0,
+          dayValues[3] || 0,
+          dayValues[4] || 0,
+          dayValues[5] || 0,
+          dayValues[6] || 0,
+          dayValues[0] || 0
         ];
         
-        // Calculer les variations
         for (let i = 1; i < reorderedValues.length; i++) {
           if (reorderedValues[i-1] > 0) {
             const change = ((reorderedValues[i] - reorderedValues[i-1]) / reorderedValues[i-1]) * 100;
@@ -437,15 +570,6 @@ const AdminDashboard = () => {
     const sociaux = usersData.filter(u => u.role === 'social').length;
     const agents = usersData.filter(u => u.role === 'agent').length;
     
-    console.log('📊 Stats rôles calculées:', {
-      total,
-      admins,
-      techniciens,
-      sociaux,
-      agents,
-      somme: admins + techniciens + sociaux + agents
-    });
-    
     setStats({
       total,
       active,
@@ -472,91 +596,6 @@ const AdminDashboard = () => {
     setHourlyData({ 
       labels: Array.from({ length: 24 }, (_, i) => `${i}h`), 
       values 
-    });
-  };
-
-  // ========== CALCUL DES STATISTIQUES PAR PÉRIODE ==========
-  const calculatePeriodStats = (usersData) => {
-    const now = new Date();
-    const today = now.toDateString();
-    
-    const startOfWeek = new Date(now);
-    const day = now.getDay();
-    const diff = day === 0 ? 6 : day - 1;
-    startOfWeek.setDate(now.getDate() - diff);
-    startOfWeek.setHours(0, 0, 0, 0);
-    
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    startOfMonth.setHours(0, 0, 0, 0);
-    
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    startOfYear.setHours(0, 0, 0, 0);
-    
-    const todayUsers = usersData.filter(u => 
-      u.lastLogin && new Date(u.lastLogin).toDateString() === today
-    );
-    
-    const todayStats = {
-      totalLogins: todayUsers.length,
-      uniqueUsers: new Set(todayUsers.map(u => u.id)).size,
-      newUsers: usersData.filter(u => u.createdAt && new Date(u.createdAt).toDateString() === today).length,
-      admins: todayUsers.filter(u => u.role === 'admin').length,
-      techniciens: todayUsers.filter(u => u.role === 'technicien').length,
-      sociaux: todayUsers.filter(u => u.role === 'social').length,
-      agents: todayUsers.filter(u => u.role === 'agent').length,
-      otpUsage: Math.floor(Math.random() * 30) + 10
-    };
-    
-    const weekUsers = usersData.filter(u => 
-      u.lastLogin && new Date(u.lastLogin) >= startOfWeek
-    );
-    
-    const weekStats = {
-      totalLogins: weekUsers.length,
-      uniqueUsers: new Set(weekUsers.map(u => u.id)).size,
-      newUsers: usersData.filter(u => u.createdAt && new Date(u.createdAt) >= startOfWeek).length,
-      admins: weekUsers.filter(u => u.role === 'admin').length,
-      techniciens: weekUsers.filter(u => u.role === 'technicien').length,
-      sociaux: weekUsers.filter(u => u.role === 'social').length,
-      agents: weekUsers.filter(u => u.role === 'agent').length,
-      otpUsage: Math.floor(Math.random() * 30) + 20
-    };
-    
-    const monthUsers = usersData.filter(u => 
-      u.lastLogin && new Date(u.lastLogin) >= startOfMonth
-    );
-    
-    const monthStats = {
-      totalLogins: monthUsers.length,
-      uniqueUsers: new Set(monthUsers.map(u => u.id)).size,
-      newUsers: usersData.filter(u => u.createdAt && new Date(u.createdAt) >= startOfMonth).length,
-      admins: monthUsers.filter(u => u.role === 'admin').length,
-      techniciens: monthUsers.filter(u => u.role === 'technicien').length,
-      sociaux: monthUsers.filter(u => u.role === 'social').length,
-      agents: monthUsers.filter(u => u.role === 'agent').length,
-      otpUsage: Math.floor(Math.random() * 30) + 30
-    };
-    
-    const yearUsers = usersData.filter(u => 
-      u.lastLogin && new Date(u.lastLogin) >= startOfYear
-    );
-    
-    const yearStats = {
-      totalLogins: yearUsers.length,
-      uniqueUsers: new Set(yearUsers.map(u => u.id)).size,
-      newUsers: usersData.filter(u => u.createdAt && new Date(u.createdAt) >= startOfYear).length,
-      admins: yearUsers.filter(u => u.role === 'admin').length,
-      techniciens: yearUsers.filter(u => u.role === 'technicien').length,
-      sociaux: yearUsers.filter(u => u.role === 'social').length,
-      agents: yearUsers.filter(u => u.role === 'agent').length,
-      otpUsage: Math.floor(Math.random() * 30) + 40
-    };
-    
-    setCurrentPeriodStats({
-      today: todayStats,
-      week: weekStats,
-      month: monthStats,
-      year: yearStats
     });
   };
 
@@ -629,7 +668,7 @@ const AdminDashboard = () => {
     return { startDate, endDate };
   };
 
-  // ========== CALCULER LES STATISTIQUES POUR UNE PÉRIODE (DONNÉES LOCALES) ==========
+  // ========== CALCULER LES STATISTIQUES POUR UNE PÉRIODE ==========
   const calculateStatsForPeriod = (usersData, periodType, startDate, endDate) => {
     const usersInPeriod = usersData.filter(u => 
       u.lastLogin && new Date(u.lastLogin) >= startDate && new Date(u.lastLogin) <= endDate
@@ -643,7 +682,7 @@ const AdminDashboard = () => {
     const avgConnectionsPerUser = uniqueUsers > 0 ? (usersInPeriod.length / uniqueUsers).toFixed(1) : 0;
     const totalUsers = usersData.length;
     const connectionRate = totalUsers > 0 ? Math.round((uniqueUsers / totalUsers) * 100) : 0;
-    const otpRate = Math.floor(Math.random() * 30) + 40;
+    const otpRate = usersInPeriod.length > 0 ? Math.round((usersInPeriod.filter(u => u.loginCount > 0).length / usersInPeriod.length) * 100) : 0;
 
     return {
       type: periodType,
@@ -660,11 +699,6 @@ const AdminDashboard = () => {
       sociaux: usersInPeriod.filter(u => u.role === 'social').length,
       agents: usersInPeriod.filter(u => u.role === 'agent').length
     };
-  };
-
-  // ========== CHANGEMENT DE PÉRIODE ==========
-  const handlePeriodChange = (period) => {
-    setSelectedPeriod(period);
   };
 
   // ========== OUVERTURE MODALE COMPARAISON ==========
@@ -712,19 +746,17 @@ const AdminDashboard = () => {
     setPeriod2({ ...period2, type, label });
   };
 
-  // ========== EFFECTUER LA COMPARAISON (AVEC VRAIES DONNÉES) ==========
+  // ========== EFFECTUER LA COMPARAISON ==========
   const performComparison = async () => {
     setLoadingStats(true);
     
     try {
       const token = localStorage.getItem('token');
       
-      // Récupérer les stats pour la période 1
       const response1 = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/stats/connexions?period=${period1.type}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      // Récupérer les stats pour la période 2
       const response2 = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/stats/connexions?period=${period2.type}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -733,13 +765,9 @@ const AdminDashboard = () => {
       const data2 = await response2.json();
       
       if (data1.success && data2.success) {
-        console.log('📊 Stats période 1:', data1.stats);
-        console.log('📊 Stats période 2:', data2.stats);
-        
         const stats1 = data1.stats;
         const stats2 = data2.stats;
         
-        // Créer des maps pour les stats par rôle
         const rolesMap1 = {};
         const rolesMap2 = {};
         
@@ -755,53 +783,16 @@ const AdminDashboard = () => {
           });
         }
         
-        // Construire les métriques avec les données réelles
         const metrics = [
-          { 
-            name: 'Connexions totales', 
-            key1: stats1.total || 0, 
-            key2: stats2.total || 0, 
-            unit: '' 
-          },
-          { 
-            name: 'Utilisateurs uniques', 
-            key1: stats1.uniqueUsers || 0, 
-            key2: stats2.uniqueUsers || 0, 
-            unit: '' 
-          },
-          { 
-            name: 'Taux de succès', 
-            key1: stats1.tauxSucces || 0, 
-            key2: stats2.tauxSucces || 0, 
-            unit: '%' 
-          },
-          { 
-            name: 'Administrateurs actifs', 
-            key1: rolesMap1['admin'] || 0, 
-            key2: rolesMap2['admin'] || 0, 
-            unit: '' 
-          },
-          { 
-            name: 'Techniciens actifs', 
-            key1: rolesMap1['technicien'] || 0, 
-            key2: rolesMap2['technicien'] || 0, 
-            unit: '' 
-          },
-          { 
-            name: 'Service Social actif', 
-            key1: rolesMap1['social'] || 0, 
-            key2: rolesMap2['social'] || 0, 
-            unit: '' 
-          },
-          { 
-            name: 'Agents actifs', 
-            key1: rolesMap1['agent'] || 0, 
-            key2: rolesMap2['agent'] || 0, 
-            unit: '' 
-          }
+          { name: 'Connexions totales', key1: stats1.total || 0, key2: stats2.total || 0, unit: '' },
+          { name: 'Utilisateurs uniques', key1: stats1.uniqueUsers || 0, key2: stats2.uniqueUsers || 0, unit: '' },
+          { name: 'Taux de succès', key1: stats1.tauxSucces || 0, key2: stats2.tauxSucces || 0, unit: '%' },
+          { name: 'Administrateurs actifs', key1: rolesMap1['admin'] || 0, key2: rolesMap2['admin'] || 0, unit: '' },
+          { name: 'Techniciens actifs', key1: rolesMap1['technicien'] || 0, key2: rolesMap2['technicien'] || 0, unit: '' },
+          { name: 'Service Social actif', key1: rolesMap1['social'] || 0, key2: rolesMap2['social'] || 0, unit: '' },
+          { name: 'Agents actifs', key1: rolesMap1['agent'] || 0, key2: rolesMap2['agent'] || 0, unit: '' }
         ];
 
-        // Calculer les résultats
         const result = metrics.map(metric => {
           const val1 = metric.key1;
           const val2 = metric.key2;
@@ -860,13 +851,11 @@ const AdminDashboard = () => {
           message: 'Les résultats de la comparaison sont affichés ci-dessous'
         });
       } else {
-        // Fallback avec données locales
         fallbackLocalComparison();
       }
       
     } catch (err) {
       console.error('❌ Erreur comparaison:', err);
-      // Fallback avec données locales
       fallbackLocalComparison();
     } finally {
       setLoadingStats(false);
@@ -887,7 +876,7 @@ const AdminDashboard = () => {
       { name: 'Nouveaux utilisateurs', key1: stats1.newUsers, key2: stats2.newUsers, unit: '' },
       { name: 'Moy. connexions/utilisateur', key1: parseFloat(stats1.avgConnectionsPerUser), key2: parseFloat(stats2.avgConnectionsPerUser), unit: '' },
       { name: 'Taux de connexion', key1: stats1.connectionRate, key2: stats2.connectionRate, unit: '%' },
-      { name: 'Taux d\'utilisation OTP', key1: stats1.otpRate, key2: stats2.otpRate, unit: '%' },
+      { name: "Taux d'utilisation OTP", key1: stats1.otpRate, key2: stats2.otpRate, unit: '%' },
       { name: 'Administrateurs actifs', key1: stats1.admins, key2: stats2.admins, unit: '' },
       { name: 'Techniciens actifs', key1: stats1.techniciens, key2: stats2.techniciens, unit: '' },
       { name: 'Service Social actif', key1: stats1.sociaux, key2: stats2.sociaux, unit: '' },
@@ -1100,7 +1089,7 @@ const AdminDashboard = () => {
         matricule: formData.matricule 
       });
 
-      const response = await fetch('${process.env.REACT_APP_API_URL}/api/auth/register', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1264,7 +1253,7 @@ const AdminDashboard = () => {
         setUsers(updatedUsers);
         setFilteredUsers(updatedUsers);
         calculateSimpleStats(updatedUsers);
-        calculatePeriodStats(updatedUsers);
+        updateStatsForPeriod(selectedPeriod);
         calculateHourlyData(updatedUsers);
         
         showNotification({ 
@@ -1418,7 +1407,7 @@ const AdminDashboard = () => {
       
       const userId = selectedResetUser.id || selectedResetUser.Id_utilisateur;
       
-      const response = await fetch('${process.env.REACT_APP_API_URL}/api/notifications/send-password', {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/send-password`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -2153,14 +2142,6 @@ const AdminDashboard = () => {
                                 <button 
                                   className="action-btn" 
                                   onClick={() => {
-                                    console.log('🟢 ===== DÉBOGAGE UTILISATEUR =====');
-                                    console.log('🟢 user complet:', user);
-                                    console.log('🟢 user.id:', user.id);
-                                    console.log('🟢 user.Id_utilisateur:', user.Id_utilisateur);
-                                    console.log('🟢 type de user.id:', typeof user.id);
-                                    console.log('🟢 Clés disponibles:', Object.keys(user));
-                                    console.log('🟢 ================================');
-                                    
                                     setActiveTab('reset');
                                     setSelectedResetUser(user);
                                   }} 
@@ -2220,7 +2201,6 @@ const AdminDashboard = () => {
                             <Eye size={14} />
                           </button>
                           <button onClick={() => {
-                            console.log('Utilisateur sélectionné pour reset:', user);
                             setActiveTab('reset');
                             setSelectedResetUser(user);
                           }} title="Réinitialiser">
@@ -2308,7 +2288,6 @@ const AdminDashboard = () => {
                         key={user.id}
                         className={`reset-user-item ${selectedResetUser?.id === user.id ? 'selected' : ''}`}
                         onClick={() => {
-                          console.log('Utilisateur sélectionné dans reset:', user);
                           setSelectedResetUser(user);
                         }}
                       >
@@ -2467,17 +2446,15 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* STATISTIQUES - AVEC TABLEAU COMPARATIF BASÉ SUR DONNÉES RÉELLES */}
+        {/* STATISTIQUES */}
         {activeTab === 'stats' && (
           <div className="stats-page">
-            {/* En-tête */}
             <div className="stats-header">
               <div className="stats-title-section">
                 <h2>Analytics Dashboard</h2>
                 <p className="stats-subtitle">Visualisez, analysez et optimisez vos performances</p>
               </div>
               
-              {/* Sélecteur de période */}
               <div className="period-selector-premium">
                 <button 
                   className={`period-btn-premium ${selectedPeriod === 'today' ? 'active' : ''}`}
@@ -2510,7 +2487,6 @@ const AdminDashboard = () => {
               </div>
             </div>
 
-            {/* KPIs */}
             <div className="kpi-premium-grid">
               <div className="kpi-premium-card blue">
                 <div className="kpi-premium-icon">
@@ -2519,12 +2495,11 @@ const AdminDashboard = () => {
                 <div className="kpi-premium-content">
                   <span className="kpi-premium-label">Connexions</span>
                   <span className="kpi-premium-value">
-                    {selectedPeriod === 'today' && currentPeriodStats.today.totalLogins}
-                    {selectedPeriod === 'week' && currentPeriodStats.week.totalLogins}
-                    {selectedPeriod === 'month' && currentPeriodStats.month.totalLogins}
-                    {selectedPeriod === 'year' && currentPeriodStats.year.totalLogins}
+                    {currentPeriodStats[selectedPeriod]?.totalLogins || 0}
                   </span>
-                  <span className="kpi-premium-trend positive">+8%</span>
+                  <span className={`kpi-premium-trend ${trendStats.logins >= 0 ? 'positive' : 'negative'}`}>
+                    {trendStats.logins >= 0 ? '+' : ''}{trendStats.logins}%
+                  </span>
                 </div>
               </div>
 
@@ -2535,12 +2510,11 @@ const AdminDashboard = () => {
                 <div className="kpi-premium-content">
                   <span className="kpi-premium-label">Utilisateurs actifs</span>
                   <span className="kpi-premium-value">
-                    {selectedPeriod === 'today' && currentPeriodStats.today.uniqueUsers}
-                    {selectedPeriod === 'week' && currentPeriodStats.week.uniqueUsers}
-                    {selectedPeriod === 'month' && currentPeriodStats.month.uniqueUsers}
-                    {selectedPeriod === 'year' && currentPeriodStats.year.uniqueUsers}
+                    {currentPeriodStats[selectedPeriod]?.uniqueUsers || 0}
                   </span>
-                  <span className="kpi-premium-trend positive">+12%</span>
+                  <span className={`kpi-premium-trend ${trendStats.users >= 0 ? 'positive' : 'negative'}`}>
+                    {trendStats.users >= 0 ? '+' : ''}{trendStats.users}%
+                  </span>
                 </div>
               </div>
 
@@ -2551,12 +2525,11 @@ const AdminDashboard = () => {
                 <div className="kpi-premium-content">
                   <span className="kpi-premium-label">Nouveaux utilisateurs</span>
                   <span className="kpi-premium-value">
-                    {selectedPeriod === 'today' && currentPeriodStats.today.newUsers}
-                    {selectedPeriod === 'week' && currentPeriodStats.week.newUsers}
-                    {selectedPeriod === 'month' && currentPeriodStats.month.newUsers}
-                    {selectedPeriod === 'year' && currentPeriodStats.year.newUsers}
+                    {currentPeriodStats[selectedPeriod]?.newUsers || 0}
                   </span>
-                  <span className="kpi-premium-trend positive">+5%</span>
+                  <span className={`kpi-premium-trend ${trendStats.newUsers >= 0 ? 'positive' : 'negative'}`}>
+                    {trendStats.newUsers >= 0 ? '+' : ''}{trendStats.newUsers}%
+                  </span>
                 </div>
               </div>
 
@@ -2567,20 +2540,17 @@ const AdminDashboard = () => {
                 <div className="kpi-premium-content">
                   <span className="kpi-premium-label">Taux OTP</span>
                   <span className="kpi-premium-value">
-                    {selectedPeriod === 'today' && currentPeriodStats.today.otpUsage}
-                    {selectedPeriod === 'week' && currentPeriodStats.week.otpUsage}
-                    {selectedPeriod === 'month' && currentPeriodStats.month.otpUsage}
-                    {selectedPeriod === 'year' && currentPeriodStats.year.otpUsage}%
+                    {currentPeriodStats[selectedPeriod]?.otpUsage || 0}%
                   </span>
-                  <span className="kpi-premium-trend neutral">stable</span>
+                  <span className={`kpi-premium-trend ${trendStats.otp >= 0 ? 'positive' : 'negative'}`}>
+                    {trendStats.otp >= 0 ? '+' : ''}{trendStats.otp}%
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Section des 3 graphiques */}
             <div className="charts-premium-grid">
-              
-              {/* GRAPHIQUE 1: RÉPARTITION DES RÔLES */}
+              {/* Graphique 1: Répartition par rôle */}
               <div className="chart-premium-card">
                 <div className="chart-premium-header">
                   <h3>Répartition par rôle</h3>
@@ -2844,7 +2814,7 @@ const AdminDashboard = () => {
               </button>
             </div>
 
-            {/* Résultats de comparaison avec données réelles */}
+            {/* Résultats de comparaison */}
             {comparisonResult && (
               <div className="comparison-results-modern">
                 <div className="comparison-header">
@@ -2900,7 +2870,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* MODALES */}
-
+      
       {/* MODALE DE COMPARAISON */}
       {showComparisonModal && (
         <div className="modal-overlay" onClick={() => setShowComparisonModal(false)}>
@@ -2984,161 +2954,153 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* MODALE DE MODIFICATION - VERSION PREMIUM AVEC SCROLL */}
-{/* MODALE DE MODIFICATION - VERSION SIMPLE */}
-{/* MODALE DE MODIFICATION - VERSION PROFESSIONNELLE */}
-{showEditUserModal && selectedUser && (
-  <div className="modal-overlay" onClick={() => setShowEditUserModal(false)}>
-    <div className="modal-content edit-modal-pro" onClick={e => e.stopPropagation()}>
-      <div className="modal-header-pro">
-        <div className="header-left">
-          <div className="header-icon-pro" style={{ background: `linear-gradient(135deg, ${getRoleColor(selectedUser.role)}, ${getRoleColor(selectedUser.role)}dd)` }}>
-            <Edit size={20} />
-          </div>
-          <div className="header-title-pro">
-            <h2>Modifier l'utilisateur</h2>
-            <span>ID: {selectedUser.id}</span>
-          </div>
-        </div>
-        <button className="modal-close-pro" onClick={() => setShowEditUserModal(false)}>
-          <X size={18} />
-        </button>
-      </div>
-
-      <div className="modal-body-pro">
-        {/* Carte d'identité utilisateur */}
-        <div className="user-identity-card">
-          <div className="user-avatar-pro" style={{ background: `linear-gradient(135deg, ${getRoleColor(selectedUser.role)}, ${getRoleColor(selectedUser.role)}dd)` }}>
-            {selectedUser.email?.charAt(0).toUpperCase()}
-          </div>
-          <div className="user-info-pro">
-            <div className="user-name-pro">{selectedUser.email}</div>
-            <div className="user-badge-pro">
-              <span className={`role-tag ${getRoleClass(selectedUser.role)}`}>
-                {getRoleLabel(selectedUser.role)}
-              </span>
-              <span className={`status-tag ${selectedUser.status}`}>
-                {selectedUser.status === 'active' ? 'Actif' : 'Inactif'}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <form onSubmit={handleEditUser}>
-          <div className="form-grid">
-            {/* Email */}
-            <div className="form-field">
-              <label>Adresse email</label>
-              <div className="input-group">
-                <Mail size={16} className="field-icon" />
-                <input 
-                  type="email" 
-                  value={editFormData.email} 
-                  onChange={e => setEditFormData({...editFormData, email: e.target.value})} 
-                  placeholder="exemple@email.com"
-                  required 
-                />
+      {/* MODALE DE MODIFICATION */}
+      {showEditUserModal && selectedUser && (
+        <div className="modal-overlay" onClick={() => setShowEditUserModal(false)}>
+          <div className="modal-content edit-modal-pro" onClick={e => e.stopPropagation()}>
+            <div className="modal-header-pro">
+              <div className="header-left">
+                <div className="header-icon-pro" style={{ background: `linear-gradient(135deg, ${getRoleColor(selectedUser.role)}, ${getRoleColor(selectedUser.role)}dd)` }}>
+                  <Edit size={20} />
+                </div>
+                <div className="header-title-pro">
+                  <h2>Modifier l'utilisateur</h2>
+                  <span>ID: {selectedUser.id}</span>
+                </div>
               </div>
-            </div>
-
-            {/* Rôle */}
-            <div className="form-field">
-              <label>Rôle</label>
-              <div className="input-group">
-                <UserCog size={16} className="field-icon" />
-                <select 
-                  value={editFormData.role} 
-                  onChange={e => setEditFormData({...editFormData, role: e.target.value})}
-                  required
-                >
-                  <option value="admin">Administrateur</option>
-                  <option value="technicien">Technicien</option>
-                  <option value="social">Service Social</option>
-                  <option value="agent">Agent</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Matricule */}
-            <div className="form-field">
-              <label>Matricule</label>
-              <div className="input-group">
-                <Hash size={16} className="field-icon" />
-                <input 
-                  type="text" 
-                  value={editFormData.matricule} 
-                  onChange={e => setEditFormData({...editFormData, matricule: e.target.value})} 
-                  placeholder="Numéro de matricule"
-                />
-              </div>
-            </div>
-
-            {/* Date de création (lecture seule) */}
-            <div className="form-field">
-              <label>Date de création</label>
-              <div className="input-group readonly">
-                <Calendar size={16} className="field-icon" />
-                <input 
-                  type="text" 
-                  value={formatDate(selectedUser.createdAt)} 
-                  readOnly 
-                  disabled
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Actions supplémentaires */}
-          <div className="actions-section">
-            <h3>Actions sur le compte</h3>
-            <div className="action-buttons">
-              <button 
-                type="button" 
-                className={`action-pro ${selectedUser.status === 'active' ? 'warning' : 'success'}`}
-                onClick={() => handleToggleStatus(selectedUser.id)}
-              >
-                {selectedUser.status === 'active' ? (
-                  <>
-                    <ToggleLeft size={16} />
-                    <span>Désactiver le compte</span>
-                  </>
-                ) : (
-                  <>
-                    <ToggleRight size={16} />
-                    <span>Activer le compte</span>
-                  </>
-                )}
-              </button>
-              
-              <button 
-                type="button" 
-                className="action-pro reset"
-                onClick={() => {
-                  setActiveTab('reset');
-                  setSelectedResetUser(selectedUser);
-                  setShowEditUserModal(false);
-                }}
-              >
-                <Key size={16} />
-                <span>Réinitialiser le mot de passe</span>
+              <button className="modal-close-pro" onClick={() => setShowEditUserModal(false)}>
+                <X size={18} />
               </button>
             </div>
-          </div>
-        </form>
-      </div>
 
-      <div className="modal-footer-pro">
-        <button type="button" className="btn-secondary-pro" onClick={() => setShowEditUserModal(false)}>
-          Annuler
-        </button>
-        <button type="submit" className="btn-primary-pro" onClick={handleEditUser}>
-          <Save size={16} />
-          <span>Enregistrer les modifications</span>
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+            <div className="modal-body-pro">
+              <div className="user-identity-card">
+                <div className="user-avatar-pro" style={{ background: `linear-gradient(135deg, ${getRoleColor(selectedUser.role)}, ${getRoleColor(selectedUser.role)}dd)` }}>
+                  {selectedUser.email?.charAt(0).toUpperCase()}
+                </div>
+                <div className="user-info-pro">
+                  <div className="user-name-pro">{selectedUser.email}</div>
+                  <div className="user-badge-pro">
+                    <span className={`role-tag ${getRoleClass(selectedUser.role)}`}>
+                      {getRoleLabel(selectedUser.role)}
+                    </span>
+                    <span className={`status-tag ${selectedUser.status}`}>
+                      {selectedUser.status === 'active' ? 'Actif' : 'Inactif'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleEditUser}>
+                <div className="form-grid">
+                  <div className="form-field">
+                    <label>Adresse email</label>
+                    <div className="input-group">
+                      <Mail size={16} className="field-icon" />
+                      <input 
+                        type="email" 
+                        value={editFormData.email} 
+                        onChange={e => setEditFormData({...editFormData, email: e.target.value})} 
+                        placeholder="exemple@email.com"
+                        required 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-field">
+                    <label>Rôle</label>
+                    <div className="input-group">
+                      <UserCog size={16} className="field-icon" />
+                      <select 
+                        value={editFormData.role} 
+                        onChange={e => setEditFormData({...editFormData, role: e.target.value})}
+                        required
+                      >
+                        <option value="admin">Administrateur</option>
+                        <option value="technicien">Technicien</option>
+                        <option value="social">Service Social</option>
+                        <option value="agent">Agent</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="form-field">
+                    <label>Matricule</label>
+                    <div className="input-group">
+                      <Hash size={16} className="field-icon" />
+                      <input 
+                        type="text" 
+                        value={editFormData.matricule} 
+                        onChange={e => setEditFormData({...editFormData, matricule: e.target.value})} 
+                        placeholder="Numéro de matricule"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-field">
+                    <label>Date de création</label>
+                    <div className="input-group readonly">
+                      <Calendar size={16} className="field-icon" />
+                      <input 
+                        type="text" 
+                        value={formatDate(selectedUser.createdAt)} 
+                        readOnly 
+                        disabled
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="actions-section">
+                  <h3>Actions sur le compte</h3>
+                  <div className="action-buttons">
+                    <button 
+                      type="button" 
+                      className={`action-pro ${selectedUser.status === 'active' ? 'warning' : 'success'}`}
+                      onClick={() => handleToggleStatus(selectedUser.id)}
+                    >
+                      {selectedUser.status === 'active' ? (
+                        <>
+                          <ToggleLeft size={16} />
+                          <span>Désactiver le compte</span>
+                        </>
+                      ) : (
+                        <>
+                          <ToggleRight size={16} />
+                          <span>Activer le compte</span>
+                        </>
+                      )}
+                    </button>
+                    
+                    <button 
+                      type="button" 
+                      className="action-pro reset"
+                      onClick={() => {
+                        setActiveTab('reset');
+                        setSelectedResetUser(selectedUser);
+                        setShowEditUserModal(false);
+                      }}
+                    >
+                      <Key size={16} />
+                      <span>Réinitialiser le mot de passe</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <div className="modal-footer-pro">
+              <button type="button" className="btn-secondary-pro" onClick={() => setShowEditUserModal(false)}>
+                Annuler
+              </button>
+              <button type="submit" className="btn-primary-pro" onClick={handleEditUser}>
+                <Save size={16} />
+                <span>Enregistrer les modifications</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODALE DE CONFIRMATION SUPPRESSION */}
       {showDeleteConfirmModal && userToDelete && (
@@ -3446,252 +3408,241 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
-      {/* MODALE EXPORT - VERSION PROFESSIONNELLE */}
-{showExportModal && (
-  <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
-    <div className="modal-content export-modal" onClick={e => e.stopPropagation()}>
-      <div className="modal-header-pro">
-        <div className="header-left">
-          <div className="header-icon-pro" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-            <Download size={20} />
-          </div>
-          <div className="header-title-pro">
-            <h2>Exporter les données</h2>
-            <span>{filteredUsers.length} utilisateurs sélectionnés</span>
-          </div>
-        </div>
-        <button className="modal-close-pro" onClick={() => setShowExportModal(false)}>
-          <X size={18} />
-        </button>
-      </div>
-
-      <div className="modal-body-pro">
-        <div className="export-options-grid">
-          {/* Option CSV */}
-          <div className="export-option-card" onClick={handleExport}>
-            <div className="option-icon" style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
-              <FileText size={24} color="#10b981" />
-            </div>
-            <div className="option-content">
-              <h3>Format CSV</h3>
-              <p>Fichier compatible avec Excel, Google Sheets et la plupart des outils</p>
-              <div className="option-meta">
-                <span className="badge">Recommandé</span>
-                <span className="file-size">~{Math.ceil(filteredUsers.length * 0.5)} Ko</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Option PDF (désactivée) */}
-          <div className="export-option-card disabled">
-            <div className="option-icon" style={{ background: 'rgba(239, 68, 68, 0.1)' }}>
-              <FileText size={24} color="#ef4444" />
-            </div>
-            <div className="option-content">
-              <h3>Format PDF</h3>
-              <p>Export PDF avec mise en page professionnelle</p>
-              <div className="option-meta">
-                <span className="badge disabled">Bientôt disponible</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Option Excel (désactivée) */}
-          <div className="export-option-card disabled">
-            <div className="option-icon" style={{ background: 'rgba(37, 99, 235, 0.1)' }}>
-              <FileText size={24} color="#2563eb" />
-            </div>
-            <div className="option-content">
-              <h3>Format Excel</h3>
-              <p>Fichier .xlsx avec formules et mise en forme</p>
-              <div className="option-meta">
-                <span className="badge disabled">Bientôt disponible</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="export-summary">
-          <div className="summary-row">
-            <span>Utilisateurs à exporter :</span>
-            <strong>{filteredUsers.length}</strong>
-          </div>
-          <div className="summary-row">
-            <span>Colonnes incluses :</span>
-            <strong>8</strong>
-          </div>
-          <div className="summary-row">
-            <span>Date d'export :</span>
-            <strong>{new Date().toLocaleDateString('fr-FR')}</strong>
-          </div>
-        </div>
-      </div>
-
-      <div className="modal-footer-pro">
-        <button type="button" className="btn-secondary-pro" onClick={() => setShowExportModal(false)}>
-          Annuler
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-     
-{/* MODALE AJOUT UTILISATEUR */}
       
-{/* MODALE AJOUT UTILISATEUR - VERSION PREMIUM */}
-{/* MODALE AJOUT UTILISATEUR - VERSION CORRIGÉE SANS PRÉ-REMPLISSAGE */}
-{/* MODALE AJOUT UTILISATEUR - VERSION PREMIUM AVEC SCROLL */}
-{showAddUserModal && (
-  <div className="modal-overlay" onClick={() => setShowAddUserModal(false)}>
-    <div className="modal-content modal-add-user scrollable-modal" onClick={e => e.stopPropagation()}>
-      <div className="modal-header premium-header">
-        <div className="header-icon-wrapper">
-          <div className="header-icon-glow"></div>
-          <div className="header-icon" style={{ background: 'linear-gradient(135deg, #2563eb, #1e40af, #1e3a8a)' }}>
-            <UserPlus size={24} />
-          </div>
-        </div>
-        <div className="header-title">
-          <h2 style={{ color: 'white' }}>Nouvel utilisateur</h2>
-          <p>Ajouter un compte</p>
-        </div>
-        <button className="modal-close premium-close" onClick={() => setShowAddUserModal(false)}>
-          <X size={18} />
-        </button>
-      </div>
-      
-      <form onSubmit={handleAddUser} className="modal-form">
-        <div className="modal-body scrollable-content">
-          {/* Étape 1: Informations de connexion */}
-          <div className="form-step compact">
-            <div className="step-header compact">
-              <div className="step-number small">1</div>
-              <div className="step-title">
-                <h4>Connexion</h4>
-              </div>
-            </div>
-            
-            <div className="step-content">
-              <div className="form-group premium-group compact">
-                <label>
-                  <Mail size={14} />
-                  <span>Email <span className="required">*</span></span>
-                </label>
-                <div className="input-wrapper">
-                  <input 
-                    type="email" 
-                    value={formData.email} 
-                    onChange={e => setFormData({...formData, email: e.target.value})} 
-                    placeholder="exemple@email.com"
-                    required 
-                  />
-                  {formData.email && (
-                    <span className="input-valid">
-                      <CheckCircle size={14} />
-                    </span>
-                  )}
+      {/* MODALE EXPORT */}
+      {showExportModal && (
+        <div className="modal-overlay" onClick={() => setShowExportModal(false)}>
+          <div className="modal-content export-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header-pro">
+              <div className="header-left">
+                <div className="header-icon-pro" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                  <Download size={20} />
+                </div>
+                <div className="header-title-pro">
+                  <h2>Exporter les données</h2>
+                  <span>{filteredUsers.length} utilisateurs sélectionnés</span>
                 </div>
               </div>
+              <button className="modal-close-pro" onClick={() => setShowExportModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
 
-              <div className="form-group premium-group compact">
-                <label>
-                  <Key size={14} />
-                  <span>Mot de passe <span className="required">*</span></span>
-                </label>
-                <div className="input-wrapper">
-                  <input 
-                    type="password" 
-                    value={formData.password} 
-                    onChange={e => setFormData({...formData, password: e.target.value})} 
-                    placeholder="••••••••"
-                    required 
-                  />
-                </div>
-                
-                {/* Indicateur de force simplifié */}
-                {formData.password && (
-                  <div className="password-strength-mini">
-                    <div className="strength-bar-mini">
-                      <div 
-                        className="strength-bar-fill-mini" 
-                        style={{ 
-                          width: `${Math.min(100, formData.password.length * 16)}%`,
-                          background: formData.password.length < 4 ? '#ef4444' : 
-                                     formData.password.length < 6 ? '#f59e0b' : '#10b981'
-                        }}
-                      ></div>
+            <div className="modal-body-pro">
+              <div className="export-options-grid">
+                <div className="export-option-card" onClick={handleExport}>
+                  <div className="option-icon" style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
+                    <FileText size={24} color="#10b981" />
+                  </div>
+                  <div className="option-content">
+                    <h3>Format CSV</h3>
+                    <p>Fichier compatible avec Excel, Google Sheets et la plupart des outils</p>
+                    <div className="option-meta">
+                      <span className="badge">Recommandé</span>
+                      <span className="file-size">~{Math.ceil(filteredUsers.length * 0.5)} Ko</span>
                     </div>
                   </div>
-                )}
+                </div>
+
+                <div className="export-option-card disabled">
+                  <div className="option-icon" style={{ background: 'rgba(239, 68, 68, 0.1)' }}>
+                    <FileText size={24} color="#ef4444" />
+                  </div>
+                  <div className="option-content">
+                    <h3>Format PDF</h3>
+                    <p>Export PDF avec mise en page professionnelle</p>
+                    <div className="option-meta">
+                      <span className="badge disabled">Bientôt disponible</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="export-option-card disabled">
+                  <div className="option-icon" style={{ background: 'rgba(37, 99, 235, 0.1)' }}>
+                    <FileText size={24} color="#2563eb" />
+                  </div>
+                  <div className="option-content">
+                    <h3>Format Excel</h3>
+                    <p>Fichier .xlsx avec formules et mise en forme</p>
+                    <div className="option-meta">
+                      <span className="badge disabled">Bientôt disponible</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="export-summary">
+                <div className="summary-row">
+                  <span>Utilisateurs à exporter :</span>
+                  <strong>{filteredUsers.length}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Colonnes incluses :</span>
+                  <strong>8</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Date d'export :</span>
+                  <strong>{new Date().toLocaleDateString('fr-FR')}</strong>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Étape 2: Profil utilisateur */}
-          <div className="form-step compact">
-            <div className="step-header compact">
-              <div className="step-number small">2</div>
-              <div className="step-title">
-                <h4>Profil</h4>
+            <div className="modal-footer-pro">
+              <button type="button" className="btn-secondary-pro" onClick={() => setShowExportModal(false)}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE AJOUT UTILISATEUR */}
+      {showAddUserModal && (
+        <div className="modal-overlay" onClick={() => setShowAddUserModal(false)}>
+          <div className="modal-content modal-add-user scrollable-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header premium-header">
+              <div className="header-icon-wrapper">
+                <div className="header-icon-glow"></div>
+                <div className="header-icon" style={{ background: 'linear-gradient(135deg, #2563eb, #1e40af, #1e3a8a)' }}>
+                  <UserPlus size={24} />
+                </div>
               </div>
+              <div className="header-title">
+                <h2 style={{ color: 'white' }}>Nouvel utilisateur</h2>
+                <p>Ajouter un compte</p>
+              </div>
+              <button className="modal-close premium-close" onClick={() => setShowAddUserModal(false)}>
+                <X size={18} />
+              </button>
             </div>
             
-            <div className="step-content">
-              <div className="form-group premium-group compact">
-                <label>
-                  <UserCog size={14} />
-                  <span>Rôle <span className="required">*</span></span>
-                </label>
-                <div className="select-wrapper compact">
-                  <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} required>
-                    <option value="admin">Administrateur</option>
-                    <option value="technicien">Technicien</option>
-                    <option value="social">Service Social</option>
-                    <option value="agent">Agent</option>
-                  </select>
-                  <ChevronDown size={14} className="select-arrow" />
+            <form onSubmit={handleAddUser} className="modal-form">
+              <div className="modal-body scrollable-content">
+                <div className="form-step compact">
+                  <div className="step-header compact">
+                    <div className="step-number small">1</div>
+                    <div className="step-title">
+                      <h4>Connexion</h4>
+                    </div>
+                  </div>
+                  
+                  <div className="step-content">
+                    <div className="form-group premium-group compact">
+                      <label>
+                        <Mail size={14} />
+                        <span>Email <span className="required">*</span></span>
+                      </label>
+                      <div className="input-wrapper">
+                        <input 
+                          type="email" 
+                          value={formData.email} 
+                          onChange={e => setFormData({...formData, email: e.target.value})} 
+                          placeholder="exemple@email.com"
+                          required 
+                        />
+                        {formData.email && (
+                          <span className="input-valid">
+                            <CheckCircle size={14} />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="form-group premium-group compact">
+                      <label>
+                        <Key size={14} />
+                        <span>Mot de passe <span className="required">*</span></span>
+                      </label>
+                      <div className="input-wrapper">
+                        <input 
+                          type="password" 
+                          value={formData.password} 
+                          onChange={e => setFormData({...formData, password: e.target.value})} 
+                          placeholder="••••••••"
+                          required 
+                        />
+                      </div>
+                      
+                      {formData.password && (
+                        <div className="password-strength-mini">
+                          <div className="strength-bar-mini">
+                            <div 
+                              className="strength-bar-fill-mini" 
+                              style={{ 
+                                width: `${Math.min(100, formData.password.length * 16)}%`,
+                                background: formData.password.length < 4 ? '#ef4444' : 
+                                           formData.password.length < 6 ? '#f59e0b' : '#10b981'
+                              }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-step compact">
+                  <div className="step-header compact">
+                    <div className="step-number small">2</div>
+                    <div className="step-title">
+                      <h4>Profil</h4>
+                    </div>
+                  </div>
+                  
+                  <div className="step-content">
+                    <div className="form-group premium-group compact">
+                      <label>
+                        <UserCog size={14} />
+                        <span>Rôle <span className="required">*</span></span>
+                      </label>
+                      <div className="select-wrapper compact">
+                        <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} required>
+                          <option value="admin">Administrateur</option>
+                          <option value="technicien">Technicien</option>
+                          <option value="social">Service Social</option>
+                          <option value="agent">Agent</option>
+                        </select>
+                        <ChevronDown size={14} className="select-arrow" />
+                      </div>
+                    </div>
+
+                    <div className="form-group premium-group compact">
+                      <label>
+                        <Hash size={14} />
+                        <span>Matricule</span>
+                      </label>
+                      <div className="input-wrapper">
+                        <input 
+                          type="text" 
+                          value={formData.matricule} 
+                          onChange={e => setFormData({...formData, matricule: e.target.value})} 
+                          placeholder="Optionnel"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-note">
+                  <Info size={14} />
+                  <span>Email de confirmation envoyé après création</span>
                 </div>
               </div>
 
-              <div className="form-group premium-group compact">
-                <label>
-                  <Hash size={14} />
-                  <span>Matricule</span>
-                </label>
-                <div className="input-wrapper">
-                  <input 
-                    type="text" 
-                    value={formData.matricule} 
-                    onChange={e => setFormData({...formData, matricule: e.target.value})} 
-                    placeholder="Optionnel"
-                  />
-                </div>
+              <div className="modal-footer premium-footer compact">
+                <button type="button" className="btn-outline small" onClick={() => setShowAddUserModal(false)}>
+                  Annuler
+                </button>
+                <button type="submit" className="btn-premium small">
+                  <UserPlus size={14} /> Créer
+                </button>
               </div>
-            </div>
-          </div>
-
-          {/* Note simplifiée */}
-          <div className="form-note">
-            <Info size={14} />
-            <span>Email de confirmation envoyé après création</span>
+            </form>
           </div>
         </div>
-
-        <div className="modal-footer premium-footer compact">
-          <button type="button" className="btn-outline small" onClick={() => setShowAddUserModal(false)}>
-            Annuler
-          </button>
-          <button type="submit" className="btn-premium small">
-            <UserPlus size={14} /> Créer
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 };
 
-export default AdminDashboard;                  
+export default AdminDashboard;               

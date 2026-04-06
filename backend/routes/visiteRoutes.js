@@ -48,7 +48,6 @@ router.get('/historique/planning', protect, async (req, res) => {
       raw: true
     });
     
-    // Récupérer les agents pour les visites
     const matricules = [...new Set(historique.map(v => v.matricule_agent))];
     const agents = await Agent.findAll({
       where: { matricule_agent: { [Op.in]: matricules } },
@@ -87,7 +86,6 @@ router.get('/historique/formulaire', protect, async (req, res) => {
       raw: true
     });
     
-    // Récupérer les agents pour les visites
     const matricules = [...new Set(historique.map(v => v.matricule_agent))];
     const agents = await Agent.findAll({
       where: { matricule_agent: { [Op.in]: matricules } },
@@ -133,17 +131,31 @@ router.get('/historique/stats-sources', protect, async (req, res) => {
   }
 });
 
-// ========== AGENTS ==========
+// ========== AGENTS - CORRIGÉ AVEC TOUS LES CHAMPS ==========
 router.get('/agents', protect, async (req, res) => {
   try {
-    const agents = await Agent.findAll({
-      attributes: [
-        'matricule_agent', 'nom', 'prenom', 'code_agence', 'code_affectation',
-        'statut', 'date_derniere_visite', 'date_fin_inaptitude', 'date_prochaine_inaptitude'
-      ],
-      order: [['nom', 'ASC']],
-      raw: true
-    });
+    const { sequelizeGlobal } = require('../config/database');
+    
+    const [agents] = await sequelizeGlobal.query(`
+      SELECT 
+        matricule_agent, 
+        nom, 
+        prenom, 
+        code_agence, 
+        code_affectation,
+        statut, 
+        date_derniere_visite, 
+        date_fin_inaptitude, 
+        date_prochaine_inaptitude,
+        date_naissance,
+        direction,
+        periodicite_jours,
+        date_debut_inaptitude,
+        created_at
+      FROM agent
+      ORDER BY nom ASC
+    `);
+    
     res.json({ success: true, agents });
   } catch (error) {
     console.error('❌ Erreur agents:', error);
@@ -165,7 +177,6 @@ router.post('/visites', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Date de visite requise' });
     }
     
-    // Vérifier si l'agent existe
     const agent = await Agent.findOne({
       where: { matricule_agent: visiteData.matricule_agent }
     });
@@ -174,7 +185,6 @@ router.post('/visites', protect, async (req, res) => {
       return res.status(404).json({ success: false, message: 'Agent non trouvé' });
     }
     
-    // Vérifier si le créneau est déjà occupé
     const existeDeja = await Planning.findOne({
       where: {
         date_visite: visiteData.date_visite,
@@ -190,7 +200,6 @@ router.post('/visites', protect, async (req, res) => {
       });
     }
     
-    // Créer un planning
     const planning = await Planning.create({
       matricule_agent: visiteData.matricule_agent,
       date_visite: visiteData.date_visite,
@@ -205,7 +214,6 @@ router.post('/visites', protect, async (req, res) => {
       source_planification: 'manuel'
     });
     
-    // Enregistrer dans l'historique
     const visite = await Visite.create({
       matricule_agent: visiteData.matricule_agent,
       date_visite: visiteData.date_visite,
@@ -223,7 +231,6 @@ router.post('/visites', protect, async (req, res) => {
       created_by: req.user.id
     });
     
-    // Mettre à jour l'agent
     await Agent.update(
       { date_derniere_visite: visiteData.date_visite },
       { where: { matricule_agent: visiteData.matricule_agent } }
@@ -268,7 +275,6 @@ router.get('/visites', protect, async (req, res) => {
       raw: true
     });
     
-    // Récupérer les agents pour les visites
     const matricules = [...new Set(rows.map(v => v.matricule_agent))];
     const agents = await Agent.findAll({
       where: { matricule_agent: { [Op.in]: matricules } },
@@ -321,7 +327,6 @@ router.get('/planning/:semaine/:annee', protect, async (req, res) => {
       });
     }
     
-    // Récupérer les agents
     const matricules = [...new Set(planning.map(p => p.matricule_agent))];
     const agents = await Agent.findAll({
       where: { matricule_agent: { [Op.in]: matricules } },
@@ -340,7 +345,6 @@ router.get('/planning/:semaine/:annee', protect, async (req, res) => {
       actions_autorisees: getActionsAutorisees(p.type_visite, p.statut)
     }));
     
-    // Vérifier spécifiquement l'agent 5015
     const visiteAgent5015 = planningEnrichi.find(p => p.matricule_agent === 5015);
     if (visiteAgent5015) {
       console.log(`\n✅ Agent 5015 trouvé dans le planning S${semaine}/${annee}:`);
@@ -349,9 +353,7 @@ router.get('/planning/:semaine/:annee', protect, async (req, res) => {
       console.log(`   Type: ${visiteAgent5015.type_visite}`);
     } else {
       console.log(`\n⚠️ Agent 5015 NON trouvé dans le planning S${semaine}/${annee}`);
-      console.log(`   Vérifiez la semaine de la visite créée:`);
       
-      // Chercher toutes les visites de l'agent 5015
       const visites5015 = await Planning.findAll({
         where: { matricule_agent: 5015 },
         order: [['date_visite', 'DESC']],
@@ -737,7 +739,6 @@ router.post('/planifier-reclassement', protect, async (req, res) => {
     const agent = await Agent.findByPk(matricule_agent);
     if (!agent) return res.status(404).json({ success: false, message: 'Agent non trouvé' });
 
-    // Vérifier si le créneau est déjà occupé
     const existeDeja = await Planning.findOne({
       where: {
         date_visite: date_visite,
@@ -768,7 +769,6 @@ router.post('/planifier-reclassement', protect, async (req, res) => {
       source_planification: 'manuel'
     });
     
-    // Enregistrer dans l'historique
     await Visite.create({
       matricule_agent: matricule_agent,
       date_visite: date_visite,
@@ -846,7 +846,6 @@ router.get('/planning/reclassements', protect, async (req, res) => {
       raw: true
     });
     
-    // Récupérer les agents
     const matricules = [...new Set(plannings.map(p => p.matricule_agent))];
     const agents = await Agent.findAll({
       where: { matricule_agent: { [Op.in]: matricules } },
@@ -1039,6 +1038,7 @@ router.get('/planning/debug/stats', protect, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
+
 // ========== DEBUG STATISTIQUES CONVOCATIONS ==========
 router.get('/planning/convocations-stats/debug', protect, async (req, res) => {
   try {
@@ -1047,7 +1047,6 @@ router.get('/planning/convocations-stats/debug', protect, async (req, res) => {
     
     const { sequelizeLocal } = require('../config/database');
     
-    // Récupérer toutes les stats manuellement avec SQL direct
     const [results] = await sequelizeLocal.query(`
       SELECT 
         COUNT(*) as total_visites,
@@ -1120,6 +1119,7 @@ router.get('/planning/test-date', protect, async (req, res) => {
     total: planningsJ7.length
   });
 });
+
 // ========== STATISTIQUES VISITES ==========
 router.get('/visites/stats', protect, async (req, res) => {
   try {

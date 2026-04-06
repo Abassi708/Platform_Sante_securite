@@ -1175,7 +1175,7 @@ const HistoriqueConnexions = () => {
                     <th>Rôle</th>
                     <th>Date & Heure</th>
                     <th>IP</th>
-                    <th>Appareil</th>
+                    <th>navigateur</th>
                     <th>Statut</th>
                     <th>Actions</th>
                   </tr>

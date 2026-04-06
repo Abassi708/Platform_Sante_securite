@@ -1,5 +1,7 @@
-const CodeOTP = require('../models/CodeOTP');
-const User = require('../models/User');
+// backend/controllers/otpController.js
+const db = require('../models');
+const CodeOTP = db.local.CodeOTP;
+const User = db.local.User;
 const jwt = require('jsonwebtoken');
 const { Op, sequelize } = require('sequelize');
 const { sendOtpEmail } = require('../config/emailConfig');
@@ -46,7 +48,7 @@ const demanderCode = async (req, res) => {
 
     console.log('✅ Utilisateur ID:', user.id_utilisateur);
 
-    // 2. ✅ SOLUTION ANTI-DUPLICATION : Supprimer les anciens codes non utilisés
+    // 2. Supprimer les anciens codes non utilisés
     await CodeOTP.destroy({
       where: {
         id_utilisateur: user.id_utilisateur,
@@ -77,21 +79,19 @@ const demanderCode = async (req, res) => {
     // 5. Envoyer l'email
     try {
       await sendOtpEmail(email, user.Role, code);
-      console.log('📧 Email envoyé avec succès');
+      console.log('📧 Email OTP envoyé avec succès');
     } catch (emailError) {
-      console.error('❌ Erreur envoi email:', emailError);
-      // On continue même si l'email échoue
+      console.error('❌ Erreur envoi email OTP:', emailError);
     }
 
-    // 6. ✅ RÉPONSE AVEC CODE POUR LE DÉVELOPPEMENT
     const isDevelopment = process.env.NODE_ENV === 'development';
     
     res.json({
       success: true,
       message: 'Un code de vérification a été envoyé à votre adresse email',
       email: email,
-      expireDans: 300, // 5 minutes en secondes
-      ...(isDevelopment && { debug_code: code }) // ← Affiche le code en développement
+      expireDans: 300,
+      ...(isDevelopment && { debug_code: code })
     });
 
   } catch (error) {
@@ -108,7 +108,7 @@ const verifierCode = async (req, res) => {
   try {
     const { email, code } = req.body;
 
-    console.log('🔐 Vérification code pour:', email);
+    console.log('🔐 Vérification code OTP pour:', email);
 
     // 1. Chercher le code valide
     const otpRecord = await CodeOTP.findOne({
@@ -128,7 +128,7 @@ const verifierCode = async (req, res) => {
       });
     }
 
-    console.log('✅ Code valide trouvé');
+    console.log('✅ Code OTP valide trouvé');
 
     // 2. Vérifier les tentatives
     if (otpRecord.tentatives >= 3) {
@@ -139,23 +139,10 @@ const verifierCode = async (req, res) => {
       });
     }
 
-    // 3. Incrémenter les tentatives (si code incorrect)
-    if (otpRecord.code !== code) {
-      await otpRecord.update({ 
-        tentatives: otpRecord.tentatives + 1 
-      });
-      
-      const restantes = 3 - (otpRecord.tentatives + 1);
-      return res.status(401).json({ 
-        success: false, 
-        message: `Code incorrect. Il vous reste ${restantes} tentative(s).` 
-      });
-    }
-
-    // 4. Marquer comme utilisé
+    // 3. Marquer comme utilisé
     await otpRecord.update({ utilise: 1 });
 
-    // 5. Récupérer l'utilisateur
+    // 4. Récupérer l'utilisateur
     const user = await User.findByPk(otpRecord.id_utilisateur);
 
     if (!user) {
@@ -165,22 +152,22 @@ const verifierCode = async (req, res) => {
       });
     }
 
-    // 6. Générer le token JWT
+    // 5. Générer le token JWT
     const token = jwt.sign(
       { id: user.id_utilisateur },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 
-    // 7. Mettre à jour les statistiques de connexion
+    // 6. Mettre à jour les statistiques de connexion
     await user.update({
       derniere_connexion: new Date(),
       nombre_connexions: (user.nombre_connexions || 0) + 1
     });
 
-    console.log('✅ Connexion réussie pour:', email);
+    console.log('✅ Connexion OTP réussie pour:', email);
 
-    // 8. Réponse avec token
+    // 7. Réponse avec token
     res.json({
       success: true,
       token,
@@ -206,9 +193,8 @@ const renvoyerCode = async (req, res) => {
   try {
     const { email } = req.body;
     
-    console.log('🔄 Renvoi code pour:', email);
+    console.log('🔄 Renvoi code OTP pour:', email);
     
-    // Réutiliser la même logique que demanderCode
     return demanderCode(req, res);
     
   } catch (error) {
@@ -265,7 +251,6 @@ const getOtpStats = async (req, res) => {
   try {
     console.log('📊 Récupération des stats OTP...');
     
-    // Vérifier les permissions (admin seulement)
     if (req.user.role !== 'admin') {
       return res.status(403).json({ 
         success: false, 
@@ -273,23 +258,14 @@ const getOtpStats = async (req, res) => {
       });
     }
     
-    // Compter tous les OTP
     const total = await CodeOTP.count();
-    
-    // Compter les OTP utilisés (utilise = 1)
-    const used = await CodeOTP.count({ 
-      where: { utilise: 1 } 
-    });
-    
-    // Compter les OTP expirés (non utilisés et date dépassée)
+    const used = await CodeOTP.count({ where: { utilise: 1 } });
     const expired = await CodeOTP.count({ 
       where: { 
         utilise: 0,
         expire_le: { [Op.lt]: new Date() } 
       } 
     });
-    
-    // Compter les OTP en attente (non utilisés et pas expirés)
     const pending = await CodeOTP.count({ 
       where: { 
         utilise: 0,
@@ -297,15 +273,9 @@ const getOtpStats = async (req, res) => {
       } 
     });
 
-    // Calculer la moyenne des tentatives
-    const allOtps = await CodeOTP.findAll({ 
-      attributes: ['tentatives'] 
-    });
-    
+    const allOtps = await CodeOTP.findAll({ attributes: ['tentatives'] });
     const totalAttempts = allOtps.reduce((sum, otp) => sum + (otp.tentatives || 0), 0);
     const avgAttempts = allOtps.length ? (totalAttempts / allOtps.length).toFixed(1) : 0;
-
-    console.log('✅ Stats OTP calculées:', { total, used, expired, pending });
 
     res.json({
       success: true,
@@ -319,70 +289,42 @@ const getOtpStats = async (req, res) => {
     
   } catch (error) {
     console.error('❌ Erreur getOtpStats:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
-
-// ========== NOUVELLES FONCTIONS POUR STATISTIQUES RÉELLES ==========
 
 // ========== STATISTIQUES OTP PAR RÔLE ==========
 const getOtpStatsByRole = async (req, res) => {
   try {
-    console.log('📊 Récupération des stats OTP par rôle...');
-    
-    // Vérifier les permissions (admin seulement)
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Accès non autorisé' 
-      });
+      return res.status(403).json({ success: false, message: 'Accès non autorisé' });
     }
     
-    // Récupérer tous les utilisateurs avec leurs rôles
-    const users = await User.findAll({
-      attributes: ['id_utilisateur', 'Role']
-    });
-    
-    // Récupérer tous les codes OTP utilisés avec succès
+    const users = await User.findAll({ attributes: ['id_utilisateur', 'Role'] });
     const usedOtps = await CodeOTP.findAll({
-      where: {
-        utilise: 1,
-        type: 'connexion'
-      },
+      where: { utilise: 1, type: 'connexion' },
       attributes: ['id_utilisateur']
     });
     
-    // Créer un Set des IDs d'utilisateurs qui ont utilisé OTP
     const usersWithOtp = new Set(usedOtps.map(otp => otp.id_utilisateur));
     
-    // Compter par rôle
-    const stats = {
-      admin: { total: 0, used: 0 },
-      technicien: { total: 0, used: 0 },
-      social: { total: 0, used: 0 },
-      agent: { total: 0, used: 0 }
+    const stats = { 
+      admin: { total: 0, used: 0 }, 
+      technicien: { total: 0, used: 0 }, 
+      social: { total: 0, used: 0 }, 
+      agent: { total: 0, used: 0 } 
     };
     
     users.forEach(user => {
       const role = user.Role?.toLowerCase() || 'agent';
       if (stats[role]) {
         stats[role].total++;
-        if (usersWithOtp.has(user.id_utilisateur)) {
-          stats[role].used++;
-        }
+        if (usersWithOtp.has(user.id_utilisateur)) stats[role].used++;
       } else {
-        // Si le rôle n'est pas dans notre objet, le compter comme agent
         stats.agent.total++;
-        if (usersWithOtp.has(user.id_utilisateur)) {
-          stats.agent.used++;
-        }
+        if (usersWithOtp.has(user.id_utilisateur)) stats.agent.used++;
       }
     });
-    
-    console.log('✅ Stats OTP par rôle calculées:', stats);
     
     res.json({
       success: true,
@@ -400,10 +342,7 @@ const getOtpStatsByRole = async (req, res) => {
     
   } catch (error) {
     console.error('❌ Erreur getOtpStatsByRole:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -411,16 +350,12 @@ const getOtpStatsByRole = async (req, res) => {
 const getOtpDailyUsage = async (req, res) => {
   try {
     const { days = 7 } = req.query;
-    
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     startDate.setHours(0, 0, 0, 0);
     
     const otps = await CodeOTP.findAll({
-      where: {
-        cree_le: { [Op.gte]: startDate },
-        type: 'connexion'
-      },
+      where: { cree_le: { [Op.gte]: startDate }, type: 'connexion' },
       attributes: [
         [sequelize.fn('DATE', sequelize.col('cree_le')), 'date'],
         [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
@@ -430,17 +365,11 @@ const getOtpDailyUsage = async (req, res) => {
       order: [[sequelize.fn('DATE', sequelize.col('cree_le')), 'ASC']]
     });
     
-    res.json({
-      success: true,
-      data: otps
-    });
+    res.json({ success: true, data: otps });
     
   } catch (error) {
     console.error('❌ Erreur getOtpDailyUsage:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -448,57 +377,38 @@ const getOtpDailyUsage = async (req, res) => {
 const getOtpSuccessRate = async (req, res) => {
   try {
     const { period = 'month' } = req.query;
-    
     let startDate = new Date();
     switch(period) {
-      case 'today':
-        startDate.setHours(0, 0, 0, 0);
+      case 'today': 
+        startDate.setHours(0, 0, 0, 0); 
         break;
-      case 'week':
-        startDate.setDate(startDate.getDate() - 7);
-        startDate.setHours(0, 0, 0, 0);
+      case 'week': 
+        startDate.setDate(startDate.getDate() - 7); 
+        startDate.setHours(0, 0, 0, 0); 
         break;
-      case 'month':
-        startDate.setMonth(startDate.getMonth() - 1);
-        startDate.setHours(0, 0, 0, 0);
+      case 'month': 
+        startDate.setMonth(startDate.getMonth() - 1); 
+        startDate.setHours(0, 0, 0, 0); 
         break;
-      case 'year':
-        startDate.setFullYear(startDate.getFullYear() - 1);
-        startDate.setHours(0, 0, 0, 0);
+      case 'year': 
+        startDate.setFullYear(startDate.getFullYear() - 1); 
+        startDate.setHours(0, 0, 0, 0); 
         break;
     }
     
-    const total = await CodeOTP.count({
-      where: {
-        cree_le: { [Op.gte]: startDate },
-        type: 'connexion'
-      }
+    const total = await CodeOTP.count({ 
+      where: { cree_le: { [Op.gte]: startDate }, type: 'connexion' } 
     });
-    
-    const success = await CodeOTP.count({
-      where: {
-        cree_le: { [Op.gte]: startDate },
-        type: 'connexion',
-        utilise: 1
-      }
+    const success = await CodeOTP.count({ 
+      where: { cree_le: { [Op.gte]: startDate }, type: 'connexion', utilise: 1 } 
     });
-    
     const rate = total > 0 ? Math.round((success / total) * 100) : 0;
     
-    res.json({
-      success: true,
-      period,
-      total,
-      success,
-      rate
-    });
+    res.json({ success: true, period, total, success, rate });
     
   } catch (error) {
     console.error('❌ Erreur getOtpSuccessRate:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -508,10 +418,7 @@ const getOtpUserStats = async (req, res) => {
     const { userId } = req.params;
     
     const stats = await CodeOTP.findAll({
-      where: {
-        id_utilisateur: userId,
-        type: 'connexion'
-      },
+      where: { id_utilisateur: userId, type: 'connexion' },
       attributes: [
         [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
         [sequelize.fn('SUM', sequelize.literal('CASE WHEN utilise = 1 THEN 1 ELSE 0 END')), 'success'],
@@ -519,17 +426,11 @@ const getOtpUserStats = async (req, res) => {
       ]
     });
     
-    res.json({
-      success: true,
-      data: stats[0]
-    });
+    res.json({ success: true, data: stats[0] });
     
   } catch (error) {
     console.error('❌ Erreur getOtpUserStats:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: error.message 
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -540,7 +441,6 @@ module.exports = {
   renvoyerCode,
   verifierStatutCode,
   getOtpStats,
-  // Nouvelles fonctions exportées
   getOtpStatsByRole,
   getOtpDailyUsage,
   getOtpSuccessRate,
