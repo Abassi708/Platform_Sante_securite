@@ -309,14 +309,15 @@ const SocialAccidents = () => {
         };
         
         const parMois = Array(12).fill(0);
-        accidentsAvecAgent.forEach(acc => {
-          if (acc.date_accident) {
-            const mois = new Date(acc.date_accident).getMonth();
-            if (!isNaN(mois) && mois >= 0 && mois < 12) {
-              parMois[mois]++;
-            }
-          }
-        });
+accidentsAvecAgent.forEach(acc => {
+  if (acc.date_accident) {
+    const [year, month, day] = acc.date_accident.split('-');
+    const mois = parseInt(month) - 1;
+    if (!isNaN(mois) && mois >= 0 && mois < 12) {
+      parMois[mois]++;
+    }
+  }
+});
         
         setStats({ total, declares, brouillons, parGravite, parMois });
       }
@@ -599,25 +600,22 @@ const SocialAccidents = () => {
     }
   };
 
-  const formatDate = (date) => {
-    if (!date) return 'Non spécifiée';
-    return new Date(date).toLocaleDateString('fr-FR', {
-      day: '2-digit', month: '2-digit', year: 'numeric'
-    });
-  };
+  const formatDate = (dateStr) => {
+  if (!dateStr) return 'Non spécifiée';
+  const [year, month, day] = dateStr.split('-');
+  return `${day}/${month}/${year}`;
+};
 
-  const formatDateTime = (date, time) => {
-    if (!date) return 'Non spécifiée';
-    const d = new Date(date);
-    if (time) {
-      const [hours, minutes] = time.split(':');
-      d.setHours(hours, minutes);
-    }
-    return d.toLocaleString('fr-FR', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
-  };
+  const formatDateTime = (dateStr, timeStr) => {
+  if (!dateStr) return 'Non spécifiée';
+  const [year, month, day] = dateStr.split('-');
+  const dateFormatted = `${day}/${month}/${year}`;
+  if (timeStr) {
+    const heure = timeStr.substring(0, 5);
+    return `${dateFormatted} ${heure}`;
+  }
+  return dateFormatted;
+};
 
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;

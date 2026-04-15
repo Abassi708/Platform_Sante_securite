@@ -14,6 +14,11 @@ const Agent = db.global.Agent;
 
 // ========== FONCTIONS UTILITAIRES ==========
 
+// Fonction utilitaire pour extraire l'email (accepte email ou Login)
+const extractEmail = (body) => {
+  return body.email || body.Login;
+};
+
 const generateToken = (user) => {
   return jwt.sign(
     { 
@@ -37,7 +42,8 @@ const generateCode = () => {
 
 const loginAgent = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = extractEmail(req.body);
+    const { password } = req.body;
     
     console.log('🔐 Tentative login agent:', email);
     
@@ -224,7 +230,8 @@ const loginAgent = async (req, res) => {
 
 const loginAdmin = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = extractEmail(req.body);
+    const { password } = req.body;
     
     console.log('🔐 Tentative login admin:', email);
     
@@ -294,7 +301,8 @@ const loginAdmin = async (req, res) => {
 
 const loginTechnicien = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = extractEmail(req.body);
+    const { password } = req.body;
     
     console.log('🔐 Tentative login technicien:', email);
     
@@ -364,7 +372,8 @@ const loginTechnicien = async (req, res) => {
 
 const loginSocial = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = extractEmail(req.body);
+    const { password } = req.body;
     
     console.log('🔐 Tentative login social:', email);
     

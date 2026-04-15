@@ -1,59 +1,57 @@
-// backend/scripts/testNouvellesNotifications.js
-require('dotenv').config();
-const sequelize = require('../config/database');
-
-async function testNouvellesNotifications() {
-  console.log('\n🚀 TEST DES NOUVELLES NOTIFICATIONS INTELLIGENTES (TABLE DÉDIÉE)\n');
-  
+// ========== DIAGNOSTIC COMPLET DES NOTIFICATIONS ==========
+router.get('/diagnostic', protect, async (req, res) => {
   try {
-    await sequelize.authenticate();
-    console.log('✅ Connecté à la base de données\n');
+    if (req.user.role !== 'admin' && req.user.Role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Accès réservé aux administrateurs' });
+    }
     
-    // Charger les modèles
-    require('../models');
-    console.log('✅ Modèles chargés\n');
+    const db = require('../models');
+    const NotificationIntelligente = db.local.NotificationIntelligente;
     
-    const notificationIntelligente = require('../services/notificationIntelligenteService');
+    // 1. Vérifier la table
+    const tableExists = await NotificationIntelligente.sequelize.getQueryInterface().showAllTables();
+    const tableFound = tableExists.includes('notifications_intelligentes');
     
-    console.log('🔍 ÉTAPE 1: Détection et envoi...\n');
-    
-    // ✅ Utilise la bonne fonction
-    const situations = await notificationIntelligente.detecterToutesSituations();
-    console.log(`📊 ${situations.length} situations détectées`);
-    
-    const nbEnvoyees = await notificationIntelligente.envoyerNotifications();
-    
-    console.log(`\n✅ ${nbEnvoyees} notifications envoyées dans la table notifications_intelligentes`);
-    
-    // Vérifier en base
-    const NotificationIntelligente = require('../models/NotificationIntelligente');
+    // 2. Compter les notifications
     const total = await NotificationIntelligente.count();
     const nonLues = await NotificationIntelligente.count({ where: { statut: 'non_lu' } });
     
-    console.log(`\n📊 STATISTIQUES DE LA TABLE :`);
-    console.log(`   • Total notifications : ${total}`);
-    console.log(`   • Non lues : ${nonLues}`);
-    console.log(`   • Lues : ${total - nonLues}`);
+    // 3. Détecter les situations
+    const situations = await notificationService.detecterToutesSituations();
     
-    // Afficher les 5 dernières
-    const dernieres = await NotificationIntelligente.findAll({
-      order: [['created_at', 'DESC']],
-      limit: 5
+    // 4. Créer une notification de test
+    const testNotif = await notificationService.creerNotification({
+      type: 'INFO',
+      titre: '🧪 Diagnostic - Test notification',
+      message: `Cette notification a été créée le ${new Date().toLocaleString('fr-FR')}`,
+      priorite: 3,
+      id_utilisateur: req.user.id,
+      email_utilisateur: req.user.email,
+      role_utilisateur: req.user.role,
+      source: 'diagnostic'
     });
     
-    if (dernieres.length > 0) {
-      console.log(`\n📋 DERNIÈRES NOTIFICATIONS :`);
-      dernieres.forEach((n, i) => {
-        console.log(`   ${i+1}. [${n.type}] ${n.titre} → ${n.role_utilisateur} ${n.email_utilisateur}`);
-      });
-    }
-    
-    process.exit(0);
-    
+    res.json({
+      success: true,
+      diagnostic: {
+        table_notifications: {
+          existe: tableFound,
+          total_notifications: total,
+          non_lues: nonLues
+        },
+        situations_detectees: {
+          nombre: situations.length,
+          liste: situations.slice(0, 10)
+        },
+        notification_test: testNotif ? {
+          id: testNotif.id,
+          titre: testNotif.titre,
+          message: testNotif.message
+        } : null
+      }
+    });
   } catch (error) {
-    console.error('❌ Erreur fatale:', error);
-    process.exit(1);
+    console.error('❌ Erreur diagnostic:', error);
+    res.status(500).json({ success: false, message: error.message, stack: error.stack });
   }
-}
-
-testNouvellesNotifications();
+});

@@ -1,31 +1,21 @@
 // frontend/components/NotificationsIntelligentesPage.js
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { 
-  Bell, X, CheckCircle, AlertTriangle, Info, Clock, 
-  Filter, RefreshCw, Trash2, Eye, EyeOff, ChevronLeft,
-  Zap, Calendar, User, Award, TrendingUp
-} from 'lucide-react';
+import { Bell, X, CheckCircle, Info, Clock, Filter, RefreshCw, Eye, ChevronLeft, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/NotificationsIntelligentesPage.css';
 
 const NotificationsIntelligentesPage = () => {
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
-  const [stats, setStats] = useState({ total: 0, nonLues: 0, parType: {} });
+  const [stats, setStats] = useState({ total: 0, nonLues: 0 });
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    type: 'all',
-    statut: 'all'
-  });
+  const [filters, setFilters] = useState({ type: 'all', statut: 'all' });
   const [showFilters, setShowFilters] = useState(false);
 
   const typeColors = {
     URGENT: { bg: '#ef444420', color: '#ef4444', icon: '🔴', label: 'Urgent' },
     IMPORTANT: { bg: '#f59e0b20', color: '#f59e0b', icon: '🟠', label: 'Important' },
-    INFO: { bg: '#3b82f620', color: '#3b82f6', icon: '🔵', label: 'Information' },
-    RAPPEL: { bg: '#10b98120', color: '#10b981', icon: '🟢', label: 'Rappel' },
-    SUGGESTION: { bg: '#8b5cf620', color: '#8b5cf6', icon: '🟣', label: 'Suggestion' }
+    INFO: { bg: '#3b82f620', color: '#3b82f6', icon: '🔵', label: 'Information' }
   };
 
   useEffect(() => {
@@ -65,15 +55,24 @@ const NotificationsIntelligentesPage = () => {
     }
   };
 
+  // ✅ CORRECTION : Utiliser 'id' comme clé (pas 'id_notification')
   const marquerCommeLue = async (id) => {
     try {
       const token = localStorage.getItem('token');
-      await fetch(`${process.env.REACT_APP_API_URL}/api/notifications-intelligentes/${id}/lire`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications-intelligentes/${id}/lire`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      chargerNotifications();
+      const data = await response.json();
+      
+      if (data.success) {
+        // Mettre à jour localement
+        setNotifications(prev => prev.map(n => 
+          n.id === id ? { ...n, statut: 'lu' } : n
+        ));
+        setStats(prev => ({ ...prev, nonLues: prev.nonLues - 1 }));
+      }
     } catch (error) {
       console.error('Erreur:', error);
     }
@@ -87,7 +86,8 @@ const NotificationsIntelligentesPage = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      chargerNotifications();
+      setNotifications(prev => prev.map(n => ({ ...n, statut: 'lu' })));
+      setStats(prev => ({ ...prev, nonLues: 0 }));
     } catch (error) {
       console.error('Erreur:', error);
     }
@@ -161,11 +161,7 @@ const NotificationsIntelligentesPage = () => {
 
       {/* FILTRES */}
       {showFilters && (
-        <motion.div 
-          className="filters-panel"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <div className="filters-panel">
           <div className="filters-row">
             <select 
               value={filters.type} 
@@ -175,8 +171,6 @@ const NotificationsIntelligentesPage = () => {
               <option value="URGENT">🔴 Urgent</option>
               <option value="IMPORTANT">🟠 Important</option>
               <option value="INFO">🔵 Information</option>
-              <option value="RAPPEL">🟢 Rappel</option>
-              <option value="SUGGESTION">🟣 Suggestion</option>
             </select>
             
             <select 
@@ -188,7 +182,7 @@ const NotificationsIntelligentesPage = () => {
               <option value="lu">Lu</option>
             </select>
           </div>
-        </motion.div>
+        </div>
       )}
 
       {/* LISTE DES NOTIFICATIONS */}
@@ -209,11 +203,9 @@ const NotificationsIntelligentesPage = () => {
             const typeStyle = typeColors[notif.type] || typeColors.INFO;
             
             return (
-              <motion.div 
+              <div 
                 key={notif.id}
                 className={`notification-card ${notif.statut === 'non_lu' ? 'unread' : ''}`}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
               >
                 <div className="notification-indicator" style={{ background: typeStyle.color }} />
                 
@@ -242,13 +234,6 @@ const NotificationsIntelligentesPage = () => {
                       <span>Action : {notif.action_suggested}</span>
                     </div>
                   )}
-                  
-                  {notif.details && (
-                    <details className="notification-details">
-                      <summary>Détails techniques</summary>
-                      <pre>{JSON.stringify(notif.details, null, 2)}</pre>
-                    </details>
-                  )}
                 </div>
                 
                 <div className="notification-actions">
@@ -264,7 +249,7 @@ const NotificationsIntelligentesPage = () => {
                     <span className="read-badge">Lu</span>
                   )}
                 </div>
-              </motion.div>
+              </div>
             );
           })
         )}

@@ -22,7 +22,7 @@ const technicienRoutes = require('./routes/technicienRoutes');
 const documentRoutes = require('./routes/documentRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const chartRoutes = require('./routes/chartRoutes');
-
+const creneauxRoutes = require('./routes/creneauxRoutes');
 
 // ========== IMPORT DES CRONS ==========
 require('./cron/planningCron');
@@ -87,6 +87,7 @@ try {
   app.use('/api/previsions', previsionsRoutes);
   app.use('/api', planningRoutes);
   app.use('/api/technicien', technicienRoutes);
+  app.use('/api/creneaux', creneauxRoutes);
   console.log('✅ Routes montées avec succès');
 } catch (error) {
   console.error('❌ Erreur lors du montage des routes:', error.message);

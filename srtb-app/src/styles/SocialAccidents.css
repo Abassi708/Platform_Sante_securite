@@ -2218,4 +2218,271 @@
 .social-accidents ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, var(--accident-primary), var(--accident-primary-dark));
 }
+/* Boutons d'action dans le tableau */
+.social-accidents .row-actions {
+display: flex;
+gap: 0.5rem;
+}
+
+.social-accidents .action-btn {
+width: 34px;
+height: 34px;
+border: none;
+border-radius: 8px;
+cursor: pointer;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Bouton Détails (Eye) - Bleu professionnel */
+.social-accidents .action-btn:first-child {
+background: #1e40af;
+color: white;
+}
+
+.social-accidents .action-btn:first-child:hover {
+background: #1e3a8a;
+transform: translateY(-2px);
+box-shadow: 0 4px 8px rgba(30, 64, 175, 0.3);
+}
+
+/* Bouton Modifier (Edit) - Gris anthracite professionnel */
+.social-accidents .action-btn:nth-child(2) {
+background: #475569;
+color: white;
+}
+
+.social-accidents .action-btn:nth-child(2):hover {
+background: #334155;
+transform: translateY(-2px);
+box-shadow: 0 4px 8px rgba(71, 85, 105, 0.3);
+}
+
+/* Bouton Déclarer (Send) - Vert institutionnel */
+.social-accidents .action-btn:nth-child(3) {
+background: #047857;
+color: white;
+}
+
+.social-accidents .action-btn:nth-child(3):hover {
+background: #065f46;
+transform: translateY(-2px);
+box-shadow: 0 4px 8px rgba(4, 120, 87, 0.3);
+}
+
+/* Bouton Supprimer (Trash2) - Rouge élégant */
+.social-accidents .action-btn.delete {
+background: #b91c1c;
+color: white;
+}
+
+.social-accidents .action-btn.delete:hover {
+background: #991b1b;
+transform: translateY(-2px);
+box-shadow: 0 4px 8px rgba(185, 28, 28, 0.3);
+}
+
+/* ============================================ */
+/* VARIANTE 2 - COULEURS CORPORATES PLUS DOUCES
+/* ============================================ */
+
+/* Version corporate élégante (décommentez pour utiliser) */
+.social-accidents .action-btn.corporate:first-child {
+background: #2c5f8a;
+}
+
+.social-accidents .action-btn.corporate:first-child:hover {
+background: #1e4a6e;
+}
+
+.social-accidents .action-btn.corporate:nth-child(2) {
+background: #6c757d;
+}
+
+.social-accidents .action-btn.corporate:nth-child(2):hover {
+background: #5a6268;
+}
+
+.social-accidents .action-btn.corporate:nth-child(3) {
+background: #2e7d64;
+}
+
+.social-accidents .action-btn.corporate:nth-child(3):hover {
+background: #236b55;
+}
+
+.social-accidents .action-btn.corporate.delete {
+background: #c0392b;
+}
+
+.social-accidents .action-btn.corporate.delete:hover {
+background: #a93226;
+}
+
+/* ============================================ */
+/* VARIANTE 3 - MINIMALISTE AVEC BORDURES
+/* ============================================ */
+
+.social-accidents .action-btn.minimal {
+background: transparent;
+border: 1.5px solid;
+box-shadow: none;
+}
+
+.social-accidents .action-btn.minimal:first-child {
+border-color: #1e40af;
+color: #1e40af;
+}
+
+.social-accidents .action-btn.minimal:first-child:hover {
+background: #1e40af;
+color: white;
+}
+
+.social-accidents .action-btn.minimal:nth-child(2) {
+border-color: #475569;
+color: #475569;
+}
+
+.social-accidents .action-btn.minimal:nth-child(2):hover {
+background: #475569;
+color: white;
+}
+
+.social-accidents .action-btn.minimal:nth-child(3) {
+border-color: #047857;
+color: #047857;
+}
+
+.social-accidents .action-btn.minimal:nth-child(3):hover {
+background: #047857;
+color: white;
+}
+
+.social-accidents .action-btn.minimal.delete {
+border-color: #b91c1c;
+color: #b91c1c;
+}
+
+.social-accidents .action-btn.minimal.delete:hover {
+background: #b91c1c;
+color: white;
+}
+
+/* ============================================ */
+/* BOUTONS DANS LES CARTES (CARDS)
+/* ============================================ */
+
+.social-accidents .card-actions {
+display: flex;
+gap: 0.5rem;
+}
+
+.social-accidents .card-btn {
+width: 36px;
+height: 36px;
+border: none;
+border-radius: 8px;
+cursor: pointer;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Premier bouton de la carte (Détails) */
+.social-accidents .card-btn:first-child {
+background: #1e40af;
+color: white;
+}
+
+.social-accidents .card-btn:first-child:hover {
+background: #1e3a8a;
+transform: translateY(-2px);
+box-shadow: 0 4px 8px rgba(30, 64, 175, 0.3);
+}
+
+/* Deuxième bouton de la carte (Modifier) */
+.social-accidents .card-btn:last-child {
+background: #475569;
+color: white;
+}
+
+.social-accidents .card-btn:last-child:hover {
+background: #334155;
+transform: translateY(-2px);
+box-shadow: 0 4px 8px rgba(71, 85, 105, 0.3);
+}
+
+/* ============================================ */
+/* BOUTON DÉCLARER SPÉCIAL DANS LE TABLEAU
+/* ============================================ */
+
+.social-accidents .declare-badge {
+display: inline-flex;
+align-items: center;
+gap: 0.5rem;
+padding: 0.375rem 1rem;
+background: #047857;
+border-radius: 30px;
+font-size: 0.7rem;
+font-weight: 600;
+color: white;
+border: none;
+box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.social-accidents .declare-badge svg {
+width: 14px;
+height: 14px;
+}
+
+/* ============================================ */
+/* PALETTE DE COULEURS PROFESSIONNELLE
+/* ============================================ */
+/*
+* Bleu professionnel: #1e40af (Détails)
+* Gris anthracite: #475569 (Modifier)
+* Vert institutionnel: #047857 (Déclarer)
+* Rouge élégant: #b91c1c (Supprimer)
+*
+* Ces couleurs sont:
+* - Sobres et élégantes
+* - Accessibles (bon contraste)
+* - Adaptées aux environnements professionnels
+* - Cohérentes avec les standards d'entreprise
+*/
+
+/* ============================================ */
+/* EFFET DE FOCUS POUR ACCESSIBILITÉ
+/* ============================================ */
+
+.social-accidents .action-btn:focus-visible,
+.social-accidents .card-btn:focus-visible {
+outline: 2px solid #1e40af;
+outline-offset: 2px;
+transform: scale(0.98);
+}
+
+/* ============================================ */
+/* RESPONSIVE
+/* ============================================ */
+
+@media (max-width: 768px) {
+.social-accidents .action-btn,
+.social-accidents .card-btn {
+width: 32px;
+height: 32px;
+}
+
+.social-accidents .action-btn svg,
+.social-accidents .card-btn svg {
+width: 14px;
+height: 14px;
+}
+}
 

@@ -1,7 +1,7 @@
 // frontend/components/NotificationBadge.js
 import React, { useState, useEffect, useRef } from 'react';
-import ReactDOM from 'react-dom'; // ← AJOUTER CET IMPORT
-import { Bell, X, CheckCircle, AlertTriangle, Info, Clock } from 'lucide-react';
+import ReactDOM from 'react-dom';
+import { Bell, X, CheckCircle, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import '../styles/NotificationBadge.css';
@@ -11,7 +11,6 @@ const NotificationBadge = () => {
   const [notifications, setNotifications] = useState([]);
   const [stats, setStats] = useState({ total: 0, nonLues: 0 });
   const [showDropdown, setShowDropdown] = useState(false);
-  const [loading, setLoading] = useState(false);
   const buttonRef = useRef(null);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
 
@@ -29,7 +28,6 @@ const NotificationBadge = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Écouter la fermeture des autres dropdowns
   useEffect(() => {
     const handleCloseOther = (e) => {
       if (e.detail !== 'planning') {
@@ -41,7 +39,6 @@ const NotificationBadge = () => {
     return () => window.removeEventListener('closeOtherDropdown', handleCloseOther);
   }, []);
 
-  // Mettre à jour la position
   useEffect(() => {
     if (showDropdown && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
@@ -53,11 +50,8 @@ const NotificationBadge = () => {
   }, [showDropdown]);
 
   const handleToggle = () => {
-    // Fermer l'autre dropdown
     const event = new CustomEvent('closeOtherDropdown', { detail: 'planning' });
     window.dispatchEvent(event);
-    
-    // Ouvrir celui-ci
     setShowDropdown(!showDropdown);
   };
 
@@ -99,7 +93,8 @@ const NotificationBadge = () => {
     }
   };
 
-  const marquerToutLu = async () => {
+  const marquerToutLu = async (e) => {
+    e.stopPropagation();
     try {
       const token = localStorage.getItem('token');
       await fetch(`${process.env.REACT_APP_API_URL}/api/notifications-intelligentes/tout-lire`, {
@@ -114,6 +109,18 @@ const NotificationBadge = () => {
     }
   };
 
+  // ✅ CORRECTION : Navigation vers /social/notifications
+  const handleVoirTout = () => {
+    setShowDropdown(false);
+    navigate('/social/notifications');
+  };
+
+  // ✅ CORRECTION : Navigation vers /social/notifications
+  const handleNotificationClick = () => {
+    setShowDropdown(false);
+    navigate('/social/notifications');
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -125,7 +132,6 @@ const NotificationBadge = () => {
     return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
   };
 
-  // Composant Portal
   const Portal = ({ children }) => {
     const [container] = useState(() => document.createElement('div'));
     
@@ -182,10 +188,7 @@ const NotificationBadge = () => {
                         <CheckCircle size={14} />
                       </button>
                     )}
-                    <button onClick={() => {
-                      setShowDropdown(false);
-                      navigate('/notifications-intelligentes');
-                    }} title="Voir tout">
+                    <button onClick={handleVoirTout} title="Voir tout">
                       <span>Voir tout</span>
                     </button>
                   </div>
@@ -205,10 +208,7 @@ const NotificationBadge = () => {
                         <div 
                           key={notif.id} 
                           className="dropdown-item"
-                          onClick={() => {
-                            setShowDropdown(false);
-                            navigate('/notifications-intelligentes');
-                          }}
+                          onClick={() => handleNotificationClick(notif)}
                         >
                           <div className="item-icon" style={{ background: typeStyle.bg }}>
                             <span>{typeStyle.icon}</span>
@@ -240,10 +240,7 @@ const NotificationBadge = () => {
 
                 {notifications.length > 0 && (
                   <div className="dropdown-footer">
-                    <button onClick={() => {
-                      setShowDropdown(false);
-                      navigate('/notifications-intelligentes');
-                    }}>
+                    <button onClick={handleVoirTout}>
                       Voir toutes les notifications
                     </button>
                   </div>

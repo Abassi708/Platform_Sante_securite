@@ -1,4 +1,6 @@
 // backend/services/reprogrammationAutoService.js
+// Version CORRIGÉE avec vérifications complètes
+
 const { Op } = require('sequelize');
 const Planning = require('../models/Planning');
 const Agent = require('../models/Agent');
@@ -7,198 +9,249 @@ const tracabiliteService = require('./tracabiliteVisiteService');
 
 class ReprogrammationAutoService {
   
-  // ========== REPROGRAMMATION AUTO POUR PÉRIODIQUES ==========
-  async reprogrammerAutoPeriodique(idPlanning, nouvelleDate, nouvelleHeure, motif, userId) {
-    return this.reprogrammerAuto(idPlanning, nouvelleDate, nouvelleHeure, motif, userId, 'Périodique');
-  }
-  
-  // ========== REPROGRAMMATION AUTO POUR REPRISES ==========
-  async reprogrammerAutoReprise(idPlanning, nouvelleDate, nouvelleHeure, motif, userId) {
-    return this.reprogrammerAuto(idPlanning, nouvelleDate, nouvelleHeure, motif, userId, 'Reprise');
-  }
-  
-  // ========== REPROGRAMMATION AUTO (CORE LOGIC) ==========
-  async reprogrammerAuto(idPlanning, nouvelleDate, nouvelleHeure, motif, userId, typeVisite) {
-    try {
-      console.log('\n🔄 REPROGRAMMATION AUTOMATIQUE');
-      console.log(`   ID Planning: ${idPlanning}`);
-      console.log(`   Type: ${typeVisite}`);
-      console.log(`   Nouveau créneau: ${nouvelleDate} ${nouvelleHeure}`);
-      console.log(`   Motif: ${motif}`);
-
-      // 1. Récupérer l'ancien planning
-      const ancienPlanning = await Planning.findByPk(idPlanning, {
-        include: [{
-          model: Agent,
-          as: 'planningAgent',
-          attributes: ['nom', 'prenom', 'code_affectation']
-        }]
-      });
-
-      if (!ancienPlanning) throw new Error('Planning non trouvé');
-
-      // 2. Vérifier le type
-      if (ancienPlanning.type_visite !== typeVisite) {
-        throw new Error(`Ce planning n'est pas une visite de type ${typeVisite}`);
-      }
-
-      // 3. Vérifier si le planning n'est pas déjà effectué
-      if (ancienPlanning.visite_effectuee) {
-        throw new Error('Impossible de reprogrammer une visite déjà effectuée');
-      }
-
-      // 4. Vérifier si le nouveau créneau est disponible
-      const creneauOccupe = await Planning.findOne({
-        where: {
-          date_visite: nouvelleDate,
-          heure_visite: nouvelleHeure,
-          statut: 'Programmé',
-          id_planning: { [Op.ne]: idPlanning }
-        }
-      });
-
-      if (creneauOccupe) {
-        throw new Error(`Le créneau ${nouvelleDate} à ${nouvelleHeure} est déjà occupé`);
-      }
-
-      // 5. Vérifier que le nouveau créneau est valide
-      const dateObj = new Date(nouvelleDate);
-      const jour = dateObj.getDay();
-      const joursVisite = [2, 3, 4, 5];
-      if (!joursVisite.includes(jour)) {
-        throw new Error('Les visites ne peuvent être programmées que du mardi au vendredi');
-      }
-
-      // 6. MARQUER L'ANCIEN CRÉNEAU COMME BLOQUÉ
-      ancienPlanning.statut = 'Reporté';
-      ancienPlanning.reprogrammee = true;
-      ancienPlanning.source_reprogrammation = 'auto';
-      ancienPlanning.motif_reprogrammation = motif;
-      ancienPlanning.date_reprogrammation = new Date();
-      ancienPlanning.creneau_bloque = true;
-      ancienPlanning.nouvelle_date_visite = nouvelleDate;
-      ancienPlanning.nouvelle_heure_visite = nouvelleHeure;
-      await ancienPlanning.save();
-
-      console.log(`   🔒 Ancien créneau BLOQUÉ: ${ancienPlanning.date_visite} ${ancienPlanning.heure_visite}`);
-      console.log(`   🤖 Source: Automatique`);
-
-      // 7. CRÉER LE NOUVEAU PLANNING
-      const semaine = planningService.getNumeroSemaine(dateObj);
-      const annee = dateObj.getFullYear();
-
-      const nouveauPlanning = await Planning.create({
-        matricule_agent: ancienPlanning.matricule_agent,
-        date_visite: nouvelleDate,
-        heure_visite: nouvelleHeure,
-        type_visite: ancienPlanning.type_visite,
-        statut: 'Programmé',
-        priorite: ancienPlanning.priorite + 20,
-        visite_originale_id: ancienPlanning.id_planning,
-        semaine: semaine,
-        annee: annee,
-        created_by: userId,
-        convocation_envoyee: false
-      });
-
-      console.log(`   ✅ Nouveau planning créé: ${nouvelleDate} ${nouvelleHeure}`);
-
-      // 8. TRAÇABILITÉ
-      await tracabiliteService.enregistrerReprogrammation(
-        ancienPlanning,
-        nouveauPlanning,
-        `${motif} (auto)`,
-        { id: userId, role: 'system' }
-      );
-
-      // 9. Résultat
-      const agent = ancienPlanning.planningAgent;
-      return {
-        success: true,
-        ancien_planning: {
-          id: ancienPlanning.id_planning,
-          date: ancienPlanning.date_visite,
-          heure: ancienPlanning.heure_visite,
-          creneau_bloque: ancienPlanning.creneau_bloque,
-          source_reprogrammation: ancienPlanning.source_reprogrammation
-        },
-        nouveau_planning: {
-          id: nouveauPlanning.id_planning,
-          date: nouveauPlanning.date_visite,
-          heure: nouveauPlanning.heure_visite
-        },
-        agent: {
-          matricule: agent?.matricule_agent,
-          nom: agent?.nom,
-          prenom: agent?.prenom
-        },
-        motif: motif,
-        source: 'auto',
-        type_visite: typeVisite,
-        date_reprogrammation: new Date()
-      };
-
-    } catch (error) {
-      console.error('❌ Erreur reprogrammation auto:', error);
-      throw error;
+  // ========== VÉRIFIER SI L'AGENT EST DISPONIBLE CE JOUR ==========
+  async estAgentDisponibleCeJour(matriculeAgent, dateVisite, idExclu = null) {
+    const whereClause = {
+      matricule_agent: matriculeAgent,
+      date_visite: dateVisite,
+      statut: 'Programmé',
+      visite_effectuee: false
+    };
+    if (idExclu) {
+      whereClause.id_planning = { [Op.ne]: idExclu };
     }
+    const visiteExistante = await Planning.findOne({ where: whereClause });
+    return !visiteExistante;
   }
-  
-  // ========== REPROGRAMMATION AUTO SUR RETARD (PÉRIODIQUES) ==========
+
+  // ========== VÉRIFIER SI LE CRÉNEAU EST DISPONIBLE ==========
+  async estCreneauDisponible(dateVisite, heureVisite, idExclu = null) {
+    const whereClause = {
+      date_visite: dateVisite,
+      heure_visite: heureVisite,
+      [Op.or]: [
+        { statut: 'Programmé', visite_effectuee: false },
+        { creneau_bloque: true },
+        { statut: 'Annulé' },
+        { visite_effectuee: true }
+      ]
+    };
+    if (idExclu) {
+      whereClause.id_planning = { [Op.ne]: idExclu };
+    }
+    const visiteExistante = await Planning.findOne({ where: whereClause });
+    return !visiteExistante;
+  }
+
+
+async reprogrammerAuto(idPlanning, nouvelleDate, nouvelleHeure, motif, userId, typeVisite) {
+  try {
+    console.log('\n🔄 REPROGRAMMATION AUTOMATIQUE');
+    console.log(`   ID Planning: ${idPlanning}`);
+    console.log(`   Type: ${typeVisite}`);
+
+    // 1. Récupérer l'ancien planning
+    const ancienPlanning = await Planning.findByPk(idPlanning, {
+      include: [{
+        model: Agent,
+        as: 'planningAgent',
+        attributes: ['nom', 'prenom', 'matricule_agent']
+      }]
+    });
+
+    if (!ancienPlanning) throw new Error('Planning non trouvé');
+    if (ancienPlanning.visite_effectuee) throw new Error('Visite déjà effectuée');
+
+    const agent = ancienPlanning.planningAgent;
+    const matriculeAgent = agent.matricule_agent;
+
+    // 2. Chercher le prochain créneau disponible (jour + heure)
+    const dateObj = new Date(nouvelleDate);
+    let dateValide = new Date(dateObj);
+    let heureFinale = nouvelleHeure;
+    let trouve = false;
+    let joursRecherche = 0;
+    const maxJours = 30;
+
+    while (!trouve && joursRecherche < maxJours) {
+      const dateStr = dateValide.toISOString().split('T')[0];
+      
+      // Vérifier si le jour est ouvré
+      const estOuvre = await planningService.estJourOuvre(dateValide);
+      
+      if (estOuvre) {
+        // Vérifier si l'agent est disponible ce jour
+        const agentDispo = await this.estAgentDisponibleCeJour(matriculeAgent, dateStr, idPlanning);
+        
+        if (agentDispo) {
+          // Chercher un créneau disponible
+          for (const heure of planningService.creneaux) {
+            const creneauDispo = await this.estCreneauDisponible(dateStr, heure, idPlanning);
+            if (creneauDispo) {
+              heureFinale = heure;
+              trouve = true;
+              console.log(`   ✅ Créneau trouvé: ${dateStr} à ${heureFinale}`);
+              break;
+            }
+          }
+        }
+      }
+      
+      if (!trouve) {
+        dateValide.setDate(dateValide.getDate() + 1);
+        joursRecherche++;
+      }
+    }
+
+    if (!trouve) {
+      throw new Error(`Aucun créneau disponible dans les ${maxJours} prochains jours`);
+    }
+
+    const nouvelleDateValide = dateValide.toISOString().split('T')[0];
+
+    // 3. Marquer l'ancien créneau comme bloqué
+    ancienPlanning.statut = 'Reporté';
+    ancienPlanning.reprogrammee = true;
+    ancienPlanning.source_reprogrammation = 'auto';
+    ancienPlanning.motif_reprogrammation = `${motif} - Reporté au ${nouvelleDateValide} ${heureFinale}`;
+    ancienPlanning.date_reprogrammation = new Date();
+    ancienPlanning.creneau_bloque = true;
+    ancienPlanning.nouvelle_date_visite = nouvelleDateValide;
+    ancienPlanning.nouvelle_heure_visite = heureFinale;
+    await ancienPlanning.save();
+
+    // 4. Créer le nouveau planning
+    const nouvelleDateObj = new Date(nouvelleDateValide);
+    const semaine = planningService.getNumeroSemaine(nouvelleDateObj);
+    const annee = nouvelleDateObj.getFullYear();
+
+    const nouveauPlanning = await Planning.create({
+      matricule_agent: ancienPlanning.matricule_agent,
+      date_visite: nouvelleDateValide,
+      heure_visite: heureFinale,
+      type_visite: ancienPlanning.type_visite,
+      statut: 'Programmé',
+      priorite: (ancienPlanning.priorite || 0) + 20,
+      visite_originale_id: ancienPlanning.id_planning,
+      semaine: semaine,
+      annee: annee,
+      created_by: userId,
+      convocation_envoyee: false,
+      source_planification: 'auto'
+    });
+
+    // 5. Traçabilité
+    await tracabiliteService.enregistrerReprogrammation(
+      ancienPlanning,
+      nouveauPlanning,
+      `${motif} (auto)`,
+      { id: userId, role: 'system' }
+    );
+
+    return {
+      success: true,
+      ancien_planning: {
+        id: ancienPlanning.id_planning,
+        date: ancienPlanning.date_visite,
+        heure: ancienPlanning.heure_visite
+      },
+      nouveau_planning: {
+        id: nouveauPlanning.id_planning,
+        date: nouveauPlanning.date_visite,
+        heure: nouveauPlanning.heure_visite
+      },
+      agent: {
+        matricule: agent?.matricule_agent,
+        nom: agent?.nom,
+        prenom: agent?.prenom
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Erreur reprogrammation auto:', error);
+    throw error;
+  }
+}
+
+  // ========== REPROGRAMMATION RETARD PÉRIODIQUE ==========
   async reprogrammerRetardPeriodique(planning, userId) {
     const aujourdhui = new Date();
     const joursRetard = Math.floor((aujourdhui - new Date(planning.date_visite)) / (1000 * 60 * 60 * 24));
     
-    const nouvelleDate = new Date(aujourdhui);
-    nouvelleDate.setDate(aujourdhui.getDate() + 7);
+    const prochainJourValide = await planningService.getProchainJourOuvre(aujourdhui);
     
-    let joursEssais = 0;
-    while (!(await planningService.estJourOuvre(nouvelleDate)) && joursEssais < 21) {
-      nouvelleDate.setDate(nouvelleDate.getDate() + 1);
-      joursEssais++;
-    }
-    
-    if (joursEssais >= 21) {
-      console.log(`⚠️ Impossible de reprogrammer auto la visite #${planning.id_planning}`);
+    if (!prochainJourValide) {
+      console.log(`⚠️ Impossible de trouver un jour valide pour la visite #${planning.id_planning}`);
       return null;
     }
     
-    return await this.reprogrammerAutoPeriodique(
+    return await this.reprogrammerAuto(
       planning.id_planning,
-      nouvelleDate.toISOString().split('T')[0],
+      prochainJourValide.toISOString().split('T')[0],
       planning.heure_visite,
       `Auto-report: retard de ${joursRetard} jours`,
-      userId
+      userId,
+      'Périodique'
     );
   }
-  
-  // ========== REPROGRAMMATION AUTO SUR RETARD (REPRISES) ==========
+
+  // ========== REPROGRAMMATION RETARD REPRISE ==========
   async reprogrammerRetardReprise(planning, userId) {
     const aujourdhui = new Date();
     const joursRetard = Math.floor((aujourdhui - new Date(planning.date_visite)) / (1000 * 60 * 60 * 24));
     
-    const nouvelleDate = new Date(aujourdhui);
-    nouvelleDate.setDate(aujourdhui.getDate() + 7);
+    const prochainJourValide = await planningService.getProchainJourOuvre(aujourdhui);
     
-    let joursEssais = 0;
-    while (!(await planningService.estJourOuvre(nouvelleDate)) && joursEssais < 21) {
-      nouvelleDate.setDate(nouvelleDate.getDate() + 1);
-      joursEssais++;
-    }
-    
-    if (joursEssais >= 21) {
-      console.log(`⚠️ Impossible de reprogrammer auto la visite de reprise #${planning.id_planning}`);
+    if (!prochainJourValide) {
+      console.log(`⚠️ Impossible de trouver un jour valide pour la reprise #${planning.id_planning}`);
       return null;
     }
     
-    return await this.reprogrammerAutoReprise(
+    return await this.reprogrammerAuto(
       planning.id_planning,
-      nouvelleDate.toISOString().split('T')[0],
+      prochainJourValide.toISOString().split('T')[0],
       planning.heure_visite,
       `Auto-report: retard de ${joursRetard} jours`,
-      userId
+      userId,
+      'Reprise'
     );
   }
+  
+  async reprogrammerAutoPeriodique(idPlanning, nouvelleDate, nouvelleHeure, motif, userId) {
+  return this.reprogrammerAuto(idPlanning, nouvelleDate, nouvelleHeure, motif, userId, 'Périodique');
+}
+
+async reprogrammerAutoReprise(idPlanning, nouvelleDate, nouvelleHeure, motif, userId) {
+  return this.reprogrammerAuto(idPlanning, nouvelleDate, nouvelleHeure, motif, userId, 'Reprise');
+}
+
+async reprogrammerRetardPeriodique(planning, userId) {
+  const aujourdhui = new Date();
+  const prochainJourValide = await planningService.getProchainJourOuvre(aujourdhui);
+  if (!prochainJourValide) return null;
+  
+  return await this.reprogrammerAutoPeriodique(
+    planning.id_planning,
+    prochainJourValide.toISOString().split('T')[0],
+    planning.heure_visite,
+    `Auto-report: retard`,
+    userId
+  );
+}
+
+async reprogrammerRetardReprise(planning, userId) {
+  const aujourdhui = new Date();
+  const prochainJourValide = await planningService.getProchainJourOuvre(aujourdhui);
+  if (!prochainJourValide) return null;
+  
+  return await this.reprogrammerAutoReprise(
+    planning.id_planning,
+    prochainJourValide.toISOString().split('T')[0],
+    planning.heure_visite,
+    `Auto-report: retard`,
+    userId
+  );
+}
 }
 
 module.exports = new ReprogrammationAutoService();

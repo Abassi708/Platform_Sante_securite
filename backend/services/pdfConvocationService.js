@@ -1,9 +1,21 @@
-// backend/services/pdfConvocationService.js
 const PDFDocument = require('pdfkit');
+
+// ✅ FONCTION DE FORMATAGE DE DATE CORRIGÉE
+function formatDateFR(dateStr) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-');
+  const date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+  return date.toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC'
+  });
+}
 
 class PdfConvocationService {
   
-  // ========== GÉNÉRER LE PDF DE CONVOCATION ==========
   async genererConvocationPDF(plannings, dateReference) {
     return new Promise((resolve, reject) => {
       try {
@@ -13,7 +25,6 @@ class PdfConvocationService {
         doc.on('data', chunk => chunks.push(chunk));
         doc.on('end', () => resolve(Buffer.concat(chunks)));
         
-        // En-tête
         doc.fontSize(20)
           .font('Helvetica-Bold')
           .fillColor('#1e3a8a')
@@ -32,7 +43,6 @@ class PdfConvocationService {
         
         doc.moveDown(1);
         
-        // Ligne de séparation
         doc.strokeColor('#e2e8f0')
           .lineWidth(1)
           .moveTo(50, doc.y)
@@ -41,7 +51,6 @@ class PdfConvocationService {
         
         doc.moveDown(0.5);
         
-        // Regrouper par date
         const visitesParJour = {};
         for (const v of plannings) {
           const dateKey = v.date_visite;
@@ -51,23 +60,22 @@ class PdfConvocationService {
         
         const datesTriees = Object.keys(visitesParJour).sort();
         
-        datesTriees.forEach((dateKey, index) => {
+        for (let index = 0; index < datesTriees.length; index++) {
+          const dateKey = datesTriees[index];
+          
           if (index > 0) {
             doc.addPage();
           }
           
           const visites = visitesParJour[dateKey];
-          const dateVisite = new Date(dateKey);
+          
+          // ✅ UTILISER LA FONCTION CORRIGÉE
+          const dateFormatee = formatDateFR(dateKey);
           
           doc.fontSize(16)
             .font('Helvetica-Bold')
             .fillColor('#1e293b')
-            .text(`CONVOCATION - ${dateVisite.toLocaleDateString('fr-FR', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric'
-            }).toUpperCase()}`, { align: 'center' });
+            .text(`CONVOCATION - ${dateFormatee.toUpperCase()}`, { align: 'center' });
           
           doc.moveDown(0.5);
           doc.fontSize(10)
@@ -101,7 +109,7 @@ class PdfConvocationService {
           for (const visite of visites) {
             const agent = visite.planningAgent || {};
             const nomComplet = `${agent.nom || '—'} ${agent.prenom || '—'}`;
-            const poste = agent.code_affectation === 3 ? 'Chauffeur' : 'Autre';
+            const poste = agent.code_affectation === 3 ? 'Chauffeur' : 'Contrôleur';
             const typeVisite = this.getTypeLabel(visite.type_visite);
             const heure = (visite.heure_visite || '').substring(0, 5);
             
@@ -112,7 +120,7 @@ class PdfConvocationService {
             }
             
             doc.fillColor('#334155');
-            doc.text(visite.matricule_agent.toString(), currentX, currentY, { width: colWidths[0] });
+            doc.text(String(visite.matricule_agent), currentX, currentY, { width: colWidths[0] });
             currentX += colWidths[0];
             doc.text(nomComplet, currentX, currentY, { width: colWidths[1] });
             currentX += colWidths[1];
@@ -149,7 +157,7 @@ class PdfConvocationService {
           doc.text('Cachet et signature du médecin du travail :', 50);
           doc.text('_________________________________________', 50);
           doc.text('Dr. Mahmoud Khelifi', 50);
-        });
+        }
         
         doc.end();
         
@@ -164,7 +172,8 @@ class PdfConvocationService {
     const labels = {
       'Périodique': '📋 Périodique',
       'Reprise': '🔄 Reprise',
-      'Reclassement': '📝 Reclassement'
+      'Reclassement': '📝 Reclassement',
+      'Embauche': '👔 Embauche'
     };
     return labels[type] || type;
   }

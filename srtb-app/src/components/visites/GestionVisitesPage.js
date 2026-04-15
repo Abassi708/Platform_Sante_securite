@@ -1,11 +1,12 @@
 // frontend/components/visites/GestionVisitesPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Heart, Users, Calendar, Clock, User, FileText, CheckCircle, XCircle,
   AlertCircle, Info, Plus, RefreshCw, ChevronLeft, ChevronRight,
   ChevronsLeft, ChevronsRight, Search, Filter, Eye, Edit,
-  Trash2, Save, X, Award, AlertTriangle, MapPin, Briefcase
+  Trash2, Save, X, Award, AlertTriangle, MapPin, Briefcase,
+  Stethoscope, Activity
 } from 'lucide-react';
 import '../../styles/GestionVisitesPage.css';
 
@@ -13,9 +14,11 @@ const GestionVisitesPage = () => {
   const [loading, setLoading] = useState(true);
   const [visites, setVisites] = useState([]);
   const [agents, setAgents] = useState([]);
-  const [planning, setPlanning] = useState([]); // Pour vérifier les conflits
   const [stats, setStats] = useState({
     total: 0,
+    aptes: 0,
+    reserves: 0,
+    inaptes: 0,
     parType: [],
     parResultat: [],
     planningSemaine: 0,
@@ -31,16 +34,23 @@ const GestionVisitesPage = () => {
     matricule_agent: '',
     date_visite: '',
     heure_visite: '09:00:00',
-    type_visite: 'Périodique',
-    medecin: 'Dr. Mahmoud Khelifi',
-    observation: '',
-    resultat: 'Apte',
-    id_planning: null,
-    motif: ''
+    type_visite: 'Reclassement',
+    motif: '',
+    medecin: 'Dr. Mahmoud Khelifi'
   });
+  
+  // ========== ÉTATS POUR LE CALENDRIER INTELLIGENT ==========
+  const [joursDisponibles, setJoursDisponibles] = useState([]);
+  const [creneauxDisponibles, setCreneauxDisponibles] = useState([]);
+  const [loadingCreneaux, setLoadingCreneaux] = useState(false);
+  const [isLoadingJours, setIsLoadingJours] = useState(false);
+  const [moisActuel, setMoisActuel] = useState(new Date().getMonth());
+  const [anneeActuelle, setAnneeActuelle] = useState(new Date().getFullYear());
+  
   const [formErrors, setFormErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [checkingSlot, setCheckingSlot] = useState(false);
+  const [visiteHasActions, setVisiteHasActions] = useState({});
 
   // ========== ÉTATS POUR LES FILTRES ==========
   const [filters, setFilters] = useState({
@@ -62,21 +72,34 @@ const GestionVisitesPage = () => {
     chargerDonnees();
   }, []);
 
-  // Appliquer les filtres
   useEffect(() => {
-    if (visites.length > 0) {
-      fetchVisites();
-    }
+    fetchVisites();
   }, [filters]);
 
+  // Effet pour charger les jours disponibles quand l'agent change ou le mois change
+  useEffect(() => {
+    if (showForm && formData.matricule_agent) {
+      chargerJoursDisponibles(moisActuel, anneeActuelle);
+    }
+  }, [showForm, formData.matricule_agent, moisActuel, anneeActuelle]);
+
+  // Effet pour charger les créneaux disponibles quand la date change
+  useEffect(() => {
+    if (formData.date_visite) {
+      chargerCreneauxDisponibles(formData.date_visite);
+    } else {
+      setCreneauxDisponibles([]);
+    }
+  }, [formData.date_visite, formData.matricule_agent, editMode]);
+
+  // ========== FONCTIONS DE CHARGEMENT ==========
   const chargerDonnees = async () => {
     setLoading(true);
     try {
       await Promise.all([
         fetchAgents(),
         fetchVisites(),
-        fetchStats(),
-        fetchPlanning()
+        fetchStats()
       ]);
     } catch (error) {
       showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur de chargement' });
@@ -98,176 +121,325 @@ const GestionVisitesPage = () => {
     }
   };
 
-  const fetchPlanning = async () => {
+  const checkHasActions = async (matricule_visite) => {
+    if (!matricule_visite) return false;
     try {
       const token = localStorage.getItem('token');
-      // Récupérer le planning pour les 30 prochains jours
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/convocations-a-envoyer`, {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/visites/${matricule_visite}/has-actions`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
-      if (data.success) {
-        setPlanning(data.convocations || []);
-      }
+      return data.hasActions === true;
     } catch (err) {
-      console.error('Erreur chargement planning:', err);
+      return false;
     }
   };
 
   const fetchVisites = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    let url = `${process.env.REACT_APP_API_URL}/api/visites?limit=1000`;
+    try {
+      const token = localStorage.getItem('token');
+      let url = `${process.env.REACT_APP_API_URL}/api/visites?limit=1000`;
 
-    if (filters.search) url += `&search=${encodeURIComponent(filters.search)}`;
-    if (filters.type !== 'all') url += `&type=${encodeURIComponent(filters.type)}`;
-    if (filters.resultat !== 'all') url += `&resultat=${encodeURIComponent(filters.resultat)}`;
-    if (filters.dateDebut && filters.dateFin) {
-      url += `&dateDebut=${filters.dateDebut}&dateFin=${filters.dateFin}`;
-    }
-    if (filters.agent !== 'all') url += `&agentId=${filters.agent}`;
+      if (filters.search) url += `&search=${encodeURIComponent(filters.search)}`;
+      if (filters.type !== 'all') url += `&type=${encodeURIComponent(filters.type)}`;
+      if (filters.resultat !== 'all') url += `&resultat=${encodeURIComponent(filters.resultat)}`;
+      if (filters.dateDebut && filters.dateFin) {
+        url += `&dateDebut=${filters.dateDebut}&dateFin=${filters.dateFin}`;
+      }
+      if (filters.agent !== 'all') url += `&agentId=${filters.agent}`;
 
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const data = await response.json();
-    if (data.success) {
-      setVisites(data.visites || []);
-      setCurrentPage(1);
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) {
+        const visitesAvecActions = await Promise.all(
+          (data.visites || []).map(async (visite) => {
+            const hasActions = await checkHasActions(visite.matricule_visite);
+            return { ...visite, hasActions };
+          })
+        );
+        setVisites(visitesAvecActions);
+        setCurrentPage(1);
+      }
+    } catch (err) {
+      console.error('Erreur chargement visites:', err);
     }
-  } catch (err) {
-    console.error('Erreur chargement visites:', err);
-  }
-};
+  };
 
   const fetchStats = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    // Appeler la route qui filtre sur source = 'FORMULAIRE'
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/visites/stats?source=FORMULAIRE`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const data = await response.json();
-    
-    if (data.success && data.stats) {
-      setStats({
-        total: data.stats.total || 0,
-        aptes: data.stats.aptes || 0,
-        reserves: data.stats.reserves || 0,
-        inaptes: data.stats.inaptes || 0,
-        parType: data.stats.parType || [],
-        parResultat: data.stats.parResultat || [],
-        planningSemaine: data.stats.planningSemaine || 0,
-        parMois: data.stats.parMois || Array(12).fill(0)
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/visites/stats?source=FORMULAIRE`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
+      const data = await response.json();
+      
+      if (data.success && data.stats) {
+        setStats({
+          total: data.stats.total || 0,
+          aptes: data.stats.aptes || 0,
+          reserves: data.stats.reserves || 0,
+          inaptes: data.stats.inaptes || 0,
+          parType: data.stats.parType || [],
+          parResultat: data.stats.parResultat || [],
+          planningSemaine: data.stats.planningSemaine || 0,
+          parMois: data.stats.parMois || Array(12).fill(0)
+        });
+      }
+    } catch (err) {
+      console.error('Erreur chargement stats:', err);
     }
-  } catch (err) {
-    console.error('Erreur chargement stats:', err);
-  }
-};
+  };
 
-  // ========== VÉRIFICATION DES CONFLITS DE CRÉNEAU ==========
+  // ========== CALENDRIER INTELLIGENT ==========
+  const chargerJoursDisponibles = async (mois, annee) => {
+    if (!formData.matricule_agent) {
+      console.log('⚠️ Aucun agent sélectionné');
+      return;
+    }
+    
+    if (isLoadingJours) {
+      console.log('⏳ Déjà en chargement...');
+      return;
+    }
+    
+    setIsLoadingJours(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      // mois + 1 car l'API attend 1-12
+      const url = `${process.env.REACT_APP_API_URL}/api/creneaux/jours-disponibles?mois=${mois + 1}&annee=${annee}&matricule_agent=${formData.matricule_agent}`;
+      console.log('📡 URL appelée:', url);
+      
+      const response = await fetch(url, { 
+        headers: { 'Authorization': `Bearer ${token}` } 
+      });
+      const data = await response.json();
+      console.log('📥 Réponse reçue:', data);
+      
+      if (data.success) {
+        console.log('✅ Jours disponibles:', data.jours.length);
+        setJoursDisponibles(data.jours);
+      } else {
+        console.error('❌ Erreur API:', data.message);
+      }
+    } catch (err) {
+      console.error('❌ Erreur chargement jours:', err);
+    } finally {
+      setIsLoadingJours(false);
+    }
+  };
+
+  const chargerCreneauxDisponibles = async (date) => {
+    if (!date) {
+      setCreneauxDisponibles([]);
+      return;
+    }
+    
+    setLoadingCreneaux(true);
+    try {
+      const token = localStorage.getItem('token');
+      let url = `${process.env.REACT_APP_API_URL}/api/creneaux/creneaux-disponibles?date=${date}&matricule_agent=${formData.matricule_agent}`;
+      if (editMode && selectedVisite) {
+        url += `&id_planning_exclu=${selectedVisite.id_planning}`;
+      }
+      console.log('📡 URL créneaux:', url);
+      
+      const response = await fetch(url, { 
+        headers: { 'Authorization': `Bearer ${token}` } 
+      });
+      const data = await response.json();
+      console.log('📥 Créneaux reçus:', data);
+      
+      if (data.success) {
+        setCreneauxDisponibles(data.creneaux);
+        
+        const premierDispo = data.creneaux.find(c => c.disponible);
+        if (premierDispo && !formData.heure_visite) {
+          setFormData(prev => ({ ...prev, heure_visite: premierDispo.heure }));
+        }
+      }
+    } catch (err) {
+      console.error('❌ Erreur chargement créneaux:', err);
+    } finally {
+      setLoadingCreneaux(false);
+    }
+  };
+
+  const handleMoisPrecedent = () => {
+    let newMois = moisActuel - 1;
+    let newAnnee = anneeActuelle;
+    if (newMois < 0) {
+      newMois = 11;
+      newAnnee--;
+    }
+    setMoisActuel(newMois);
+    setAnneeActuelle(newAnnee);
+  };
+
+  const handleMoisSuivant = () => {
+    let newMois = moisActuel + 1;
+    let newAnnee = anneeActuelle;
+    if (newMois > 11) {
+      newMois = 0;
+      newAnnee++;
+    }
+    setMoisActuel(newMois);
+    setAnneeActuelle(newAnnee);
+  };
+
+  const getJourTitle = (jour) => {
+    if (jour.creneauxDisponibles === 1) return `${jour.creneauxDisponibles} créneau disponible`;
+    return `${jour.creneauxDisponibles} créneaux disponibles`;
+  };
+
+  // ========== FONCTIONS DE VALIDATION ==========
   const verifierConflitCreneau = async (date, heure) => {
-  try {
-    const token = localStorage.getItem('token');
-    // S'assurer que l'heure est au format HH:MM:SS complet
-    const heureComplete = heure.includes(':') && heure.length === 8 ? heure : `${heure}:00`;
-    const url = `${process.env.REACT_APP_API_URL}/api/planning/verifier-creneau?date=${date}&heure=${heureComplete}`;
-    
-    console.log(`🔍 Vérification créneau: ${date} ${heureComplete}`);
-    
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    const data = await response.json();
-    console.log('🔍 Réponse vérification:', data);
-    
-    return data.occupe === true;
-  } catch (err) {
-    console.error('Erreur vérification créneau:', err);
-    return false;
-  }
-};
-  // ========== VALIDATION DU FORMULAIRE ==========
+    try {
+      const token = localStorage.getItem('token');
+      const heureComplete = heure.includes(':') && heure.length === 8 ? heure : `${heure}:00`;
+      const url = `${process.env.REACT_APP_API_URL}/api/planning/verifier-creneau?date=${date}&heure=${heureComplete}`;
+      
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const data = await response.json();
+      return data.occupe === true;
+    } catch (err) {
+      return false;
+    }
+  };
+
+  const verifierVisiteExistante = async (matricule_agent, date_visite, idPlanningExclu = null) => {
+    try {
+      const token = localStorage.getItem('token');
+      let url = `${process.env.REACT_APP_API_URL}/api/planning/verifier-visite-existante?matricule=${matricule_agent}&date=${date_visite}`;
+      if (idPlanningExclu) {
+        url += `&exclure=${idPlanningExclu}`;
+      }
+      
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const data = await response.json();
+      return data.existe === true;
+    } catch (err) {
+      return false;
+    }
+  };
+
+  const verifierConflitCreneauExclu = async (date, heure, idPlanningExclu) => {
+    try {
+      const token = localStorage.getItem('token');
+      const heureComplete = heure.includes(':') && heure.length === 8 ? heure : `${heure}:00`;
+      const url = `${process.env.REACT_APP_API_URL}/api/planning/verifier-disponibilite-creneau?date=${date}&heure=${heureComplete}&id_planning_exclu=${idPlanningExclu}`;
+      
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      const data = await response.json();
+      return data.disponible === false;
+    } catch (err) {
+      return false;
+    }
+  };
+
   const validateForm = () => {
     const errors = {};
     if (!formData.matricule_agent) errors.matricule_agent = 'Agent requis';
     if (!formData.date_visite) errors.date_visite = 'Date requise';
-    if (!formData.medecin) errors.medecin = 'Médecin requis';
+    if (!formData.heure_visite) errors.heure_visite = 'Heure requise';
     return errors;
   };
 
-  // ========== ENREGISTRER / MODIFIER UNE VISITE ==========
+  // ========== SOUMISSION ==========
   const handleSubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  const errors = validateForm();
-  if (Object.keys(errors).length > 0) {
-    setFormErrors(errors);
-    showNotification({ type: 'error', title: '❌ Erreur', message: 'Champs obligatoires manquants' });
-    return;
-  }
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      showNotification({ type: 'error', title: '❌ Erreur', message: 'Champs obligatoires manquants' });
+      return;
+    }
 
-  // Vérifier les conflits de créneau pour les nouvelles visites
-  if (!editMode) {
     setCheckingSlot(true);
-    const conflit = await verifierConflitCreneau(formData.date_visite, formData.heure_visite);
+    
+    let visiteExistante = false;
+    if (editMode && selectedVisite) {
+      visiteExistante = await verifierVisiteExistante(formData.matricule_agent, formData.date_visite, selectedVisite.id_planning);
+    } else {
+      visiteExistante = await verifierVisiteExistante(formData.matricule_agent, formData.date_visite);
+    }
+    
+    if (visiteExistante) {
+      setCheckingSlot(false);
+      showNotification({ 
+        type: 'warning', 
+        title: '⚠️ Agent déjà programmé', 
+        message: `Cet agent a déjà une visite programmée le ${new Date(formData.date_visite).toLocaleDateString('fr-FR')}.` 
+      });
+      return;
+    }
+
+    let conflit = false;
+    if (editMode && selectedVisite) {
+      conflit = await verifierConflitCreneauExclu(formData.date_visite, formData.heure_visite, selectedVisite.id_planning);
+    } else {
+      conflit = await verifierConflitCreneau(formData.date_visite, formData.heure_visite);
+    }
+    
     setCheckingSlot(false);
     
     if (conflit) {
       showNotification({ 
         type: 'warning', 
         title: '⚠️ Créneau indisponible', 
-        message: `Le créneau du ${new Date(formData.date_visite).toLocaleDateString('fr-FR')} à ${formData.heure_visite.substring(0,5)} est déjà occupé. Veuillez choisir une autre date ou heure.` 
+        message: `Le créneau du ${new Date(formData.date_visite).toLocaleDateString('fr-FR')} à ${formData.heure_visite.substring(0,5)} est déjà occupé.` 
       });
-      return; // ← IMPORTANT: arrêter l'exécution ici
+      return;
     }
-  }
 
     setSaving(true);
     try {
       const token = localStorage.getItem('token');
-      
-      // Pour Reclassement et Embauche, utiliser la route dédiée
       let url, method, bodyData;
       
-      if (formData.type_visite === 'Reclassement') {
-        url = `${process.env.REACT_APP_API_URL}/api/planifier-reclassement`;
-        method = 'POST';
+      if (editMode && selectedVisite) {
+        url = `${process.env.REACT_APP_API_URL}/api/visites/${selectedVisite.matricule_visite}`;
+        method = 'PUT';
         bodyData = {
-          matricule_agent: formData.matricule_agent,
-          date_visite: formData.date_visite,
-          heure_visite: formData.heure_visite,
-          motif: formData.motif
-        };
-      } 
-      else if (formData.type_visite === 'Embauche') {
-        url = `${process.env.REACT_APP_API_URL}/api/planifier-embauche`;
-        method = 'POST';
-        bodyData = {
-          matricule_agent: formData.matricule_agent,
-          date_visite: formData.date_visite,
-          heure_visite: formData.heure_visite,
-          motif: formData.motif
-        };
-      }
-      else {
-        // Pour Périodique et Reprise, utiliser la route standard
-        url = editMode && selectedVisite
-          ? `${process.env.REACT_APP_API_URL}/api/visites/${selectedVisite.matricule_visite}`
-          : `${process.env.REACT_APP_API_URL}/api/visites`;
-        method = editMode ? 'PUT' : 'POST';
-        bodyData = {
-          matricule_agent: formData.matricule_agent,
           date_visite: formData.date_visite,
           heure_visite: formData.heure_visite,
           type_visite: formData.type_visite,
-          medecin: formData.medecin,
-          observation: formData.observation,
-          resultat: formData.resultat,
-          id_planning: formData.id_planning
+           medecin: formData.medecin
         };
+      } else {
+        if (formData.type_visite === 'Reclassement') {
+          url = `${process.env.REACT_APP_API_URL}/api/planifier-reclassement`;
+          method = 'POST';
+          bodyData = {
+            matricule_agent: formData.matricule_agent,
+            date_visite: formData.date_visite,
+            heure_visite: formData.heure_visite,
+            motif: formData.motif,
+             medecin: formData.medecin
+          };
+        } else {
+          url = `${process.env.REACT_APP_API_URL}/api/planifier-embauche`;
+          method = 'POST';
+          bodyData = {
+            matricule_agent: formData.matricule_agent,
+            date_visite: formData.date_visite,
+            heure_visite: formData.heure_visite,
+            motif: formData.motif,
+             medecin: formData.medecin
+          };
+        }
       }
 
       const response = await fetch(url, {
@@ -280,17 +452,16 @@ const GestionVisitesPage = () => {
       });
 
       const data = await response.json();
+      
       if (data.success) {
         showNotification({
           type: 'success',
-          title: editMode ? '✅ Modifiée' : '✅ Ajoutée',
-          message: editMode ? 'Visite modifiée avec succès' : 'Visite ajoutée avec succès'
+          title: editMode ? '✅ Modifiée' : '✅ Programmée',
+          message: editMode ? 'Visite modifiée avec succès' : 'Visite programmée avec succès'
         });
         setShowForm(false);
         resetForm();
-        fetchVisites();
-        fetchStats();
-        fetchPlanning();
+        await chargerDonnees();
       } else {
         showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
       }
@@ -301,34 +472,6 @@ const GestionVisitesPage = () => {
     }
   };
 
-  // ========== SUPPRIMER UNE VISITE ==========
-  const handleDelete = async (id) => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette visite ?')) return;
-
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/visites/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        showNotification({
-          type: 'success',
-          title: '✅ Supprimée',
-          message: 'Visite supprimée avec succès'
-        });
-        fetchVisites();
-        fetchStats();
-      }
-    } catch (err) {
-      showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur lors de la suppression' });
-    }
-  };
-
-  // ========== ÉDITER UNE VISITE ==========
   const handleEdit = (visite) => {
     setSelectedVisite(visite);
     setEditMode(true);
@@ -336,11 +479,7 @@ const GestionVisitesPage = () => {
       matricule_agent: visite.matricule_agent,
       date_visite: visite.date_visite,
       heure_visite: visite.heure_visite || '09:00:00',
-      type_visite: visite.type_visite || 'Périodique',
-      medecin: visite.medecin || 'Dr. Mahmoud Khelifi',
-      observation: visite.observation || '',
-      resultat: visite.resultat || 'Apte',
-      id_planning: visite.id_planning || null,
+      type_visite: visite.type_visite || 'Reclassement',
       motif: visite.motif_reprogrammation || ''
     });
     setShowForm(true);
@@ -351,19 +490,18 @@ const GestionVisitesPage = () => {
       matricule_agent: '',
       date_visite: '',
       heure_visite: '09:00:00',
-      type_visite: 'Périodique',
-      medecin: 'Dr. Mahmoud Khelifi',
-      observation: '',
-      resultat: 'Apte',
-      id_planning: null,
+      type_visite: 'Reclassement',
       motif: ''
     });
     setFormErrors({});
     setSelectedVisite(null);
     setEditMode(false);
+    setMoisActuel(new Date().getMonth());
+    setAnneeActuelle(new Date().getFullYear());
+    setJoursDisponibles([]);
+    setCreneauxDisponibles([]);
   };
 
-  // ========== UTILITAIRES ==========
   const showNotification = ({ type, title, message }) => {
     setNotification({ show: true, type, title, message });
     setTimeout(() => setNotification({ show: false, type: '', title: '', message: '' }), 5000);
@@ -395,6 +533,7 @@ const GestionVisitesPage = () => {
   };
 
   const formatDate = (date) => {
+    if (!date) return '';
     return new Date(date).toLocaleDateString('fr-FR', {
       day: '2-digit', month: '2-digit', year: 'numeric'
     });
@@ -402,18 +541,11 @@ const GestionVisitesPage = () => {
 
   const formatDateTime = (date, time) => {
     if (!date) return '';
-    const d = new Date(date);
-    if (time) {
-      const [hours, minutes] = time.split(':');
-      d.setHours(hours, minutes);
-    }
-    return d.toLocaleString('fr-FR', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
+    const [year, month, day] = date.split('-');
+    const heure = time ? time.substring(0,5) : '';
+    return `${day}/${month}/${year} ${heure}`;
   };
 
-  // ========== PAGINATION ==========
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentVisites = visites.slice(indexOfFirstItem, indexOfLastItem);
@@ -447,11 +579,11 @@ const GestionVisitesPage = () => {
       <div className="gestion-header">
         <div className="header-left">
           <div className="header-icon">
-            <Heart size={28} />
+            <Stethoscope size={28} />
           </div>
           <div className="header-title">
-            <h1>Gestion des visites médicales</h1>
-            <p>Enregistrement, historique et statistiques</p>
+            <h1>Gestion des visites médicales - Reclassement & Embauche</h1>
+            <p>Programmation des visites de reclassement et d'embauche</p>
           </div>
         </div>
 
@@ -471,12 +603,12 @@ const GestionVisitesPage = () => {
             resetForm();
             setShowForm(true);
           }}>
-            <Plus size={16} /> Nouvelle visite
+            <Plus size={16} /> Programmer une visite
           </button>
         </div>
       </div>
 
-      {/* FILTRES - inchangé */}
+      {/* FILTRES */}
       <div className="filters-section">
         <div className="filters-header">
           <button
@@ -490,7 +622,7 @@ const GestionVisitesPage = () => {
             <Search size={16} />
             <input
               type="text"
-              placeholder="Rechercher un agent, médecin..."
+              placeholder="Rechercher un agent..."
               value={filters.search}
               onChange={(e) => setFilters({...filters, search: e.target.value})}
             />
@@ -504,8 +636,6 @@ const GestionVisitesPage = () => {
                 <label>Type de visite</label>
                 <select value={filters.type} onChange={(e) => setFilters({...filters, type: e.target.value})}>
                   <option value="all">Tous</option>
-                  <option value="Périodique">Périodique</option>
-                  <option value="Reprise">Reprise</option>
                   <option value="Reclassement">Reclassement</option>
                   <option value="Embauche">Embauche</option>
                 </select>
@@ -565,7 +695,7 @@ const GestionVisitesPage = () => {
             <FileText size={20} />
           </div>
           <div className="stat-mini-content">
-            <span className="stat-mini-label">Total</span>
+            <span className="stat-mini-label">Total visites</span>
             <span className="stat-mini-value">{stats.total}</span>
           </div>
         </div>
@@ -609,14 +739,14 @@ const GestionVisitesPage = () => {
         </div>
       ) : visites.length === 0 ? (
         <div className="empty-state">
-          <Heart size={48} />
+          <Stethoscope size={48} />
           <h3>Aucune visite trouvée</h3>
-          <p>Commencez par enregistrer une visite médicale</p>
+          <p>Commencez par programmer une visite de reclassement ou d'embauche</p>
           <button className="btn-primary" onClick={() => {
             resetForm();
             setShowForm(true);
           }}>
-            <Plus size={16} /> Nouvelle visite
+            <Plus size={16} /> Programmer une visite
           </button>
         </div>
       ) : (
@@ -655,7 +785,9 @@ const GestionVisitesPage = () => {
                       </div>
                     </td>
                     <td>
-                      <span className="type-badge">{visite.type_visite || 'Périodique'}</span>
+                      <span className={`type-badge ${visite.type_visite === 'Reclassement' ? 'reclassement' : 'embauche'}`}>
+                        {visite.type_visite === 'Reclassement' ? ' Reclassement' : 'Embauche'}
+                      </span>
                     </td>
                     <td>
                       <div className="medecin-cell">
@@ -671,25 +803,19 @@ const GestionVisitesPage = () => {
                     </td>
                     <td>
                       <div className="observation-cell" title={visite.observation}>
-                        {visite.observation?.substring(0, 30) || '-'}
-                        {visite.observation?.length > 30 && '...'}
+                        {visite.observation?.substring(0, 50) || '-'}
+                        {visite.observation?.length > 50 && '...'}
                       </div>
                     </td>
                     <td>
                       <div className="row-actions">
                         <button
-                          className="action-btn edit"
-                          onClick={() => handleEdit(visite)}
-                          title="Modifier"
+                          className={`action-btn edit ${visite.hasActions ? 'disabled' : ''}`}
+                          onClick={() => !visite.hasActions && handleEdit(visite)}
+                          title={visite.hasActions ? 'Modification impossible - Une action a déjà été effectuée' : 'Modifier la programmation'}
+                          disabled={visite.hasActions}
                         >
                           <Edit size={14} />
-                        </button>
-                        <button
-                          className="action-btn delete"
-                          onClick={() => handleDelete(visite.matricule_visite)}
-                          title="Supprimer"
-                        >
-                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>
@@ -740,7 +866,7 @@ const GestionVisitesPage = () => {
         </>
       )}
 
-      {/* MODALE FORMULAIRE AVEC CONTRÔLE DE CRÉNEAU */}
+      {/* ========== MODAL FORMULAIRE AVEC CALENDRIER INTELLIGENT ========== */}
       <AnimatePresence>
         {showForm && (
           <motion.div
@@ -751,171 +877,202 @@ const GestionVisitesPage = () => {
             onClick={() => setShowForm(false)}
           >
             <motion.div
-              className="modal-content"
+              className="modal-content large"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={e => e.stopPropagation()}
             >
               <div className="modal-header">
-                <div className="header-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-                  <Heart size={24} />
+                <div className="header-icon" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+                  <Calendar size={24} />
                 </div>
-                <h2>{editMode ? 'Modifier la visite' : 'Nouvelle visite médicale'}</h2>
+                <h2>{editMode ? 'Modifier la programmation' : 'Programmer une visite'}</h2>
                 <button className="modal-close" onClick={() => setShowForm(false)}>
                   <X size={18} />
                 </button>
               </div>
 
               <form onSubmit={handleSubmit}>
-                <div className="modal-body">
-                  <div className="form-grid">
-                    {/* Agent */}
-                    <div className="form-group full-width">
-                      <label>
-                        <User size={14} />
-                        Agent <span className="required">*</span>
-                      </label>
-                      <select
-                        value={formData.matricule_agent}
-                        onChange={(e) => setFormData({...formData, matricule_agent: e.target.value})}
-                        className={formErrors.matricule_agent ? 'error' : ''}
-                        required
-                      >
-                        <option value="">Sélectionner un agent</option>
-                        {agents.map(agent => (
-                          <option key={agent.matricule_agent} value={agent.matricule_agent}>
-                            {agent.nom} {agent.prenom} - #{agent.matricule_agent} ({agent.code_affectation === 3 ? 'Chauffeur' : 'Autre'})
-                          </option>
-                        ))}
-                      </select>
-                      {formErrors.matricule_agent && (
-                        <div className="error-message">{formErrors.matricule_agent}</div>
-                      )}
-                    </div>
+  <div className="modal-body">
+    <div className="form-info-banner">
+      <Info size={16} />
+      <span>Programmation d'une visite de <strong>{formData.type_visite === 'Reclassement' ? 'Reclassement' : 'Embauche'}</strong></span>
+    </div>
 
-                    {/* Date et Heure */}
-                    <div className="form-group">
-                      <label>
-                        <Calendar size={14} />
-                        Date <span className="required">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.date_visite}
-                        onChange={(e) => setFormData({...formData, date_visite: e.target.value})}
-                        min={new Date().toISOString().split('T')[0]}
-                        className={formErrors.date_visite ? 'error' : ''}
-                        required
-                      />
-                    </div>
+    <div className="form-grid two-columns">
+      {/* Sélection de l'agent */}
+      <div className="form-group full-width">
+        <label>
+          <User size={14} />
+          Agent <span className="required">*</span>
+        </label>
+        <select
+          value={formData.matricule_agent}
+          onChange={(e) => {
+            setFormData({...formData, matricule_agent: e.target.value, date_visite: '', heure_visite: ''});
+            setJoursDisponibles([]);
+            setCreneauxDisponibles([]);
+          }}
+          required
+        >
+          <option value="">Sélectionner un agent</option>
+          {agents.map(agent => (
+            <option key={agent.matricule_agent} value={agent.matricule_agent}>
+              {agent.nom} {agent.prenom} - #{agent.matricule_agent}
+            </option>
+          ))}
+        </select>
+      </div>
 
+      {/* Type de visite */}
+      <div className="form-group">
+        <label>
+          <FileText size={14} />
+          Type de visite <span className="required">*</span>
+        </label>
+        <select
+          value={formData.type_visite}
+          onChange={(e) => setFormData({...formData, type_visite: e.target.value})}
+          required
+        >
+          <option value="Reclassement"> Reclassement</option>
+          <option value="Embauche"> Embauche</option>
+        </select>
+      </div>
+
+<div className="form-group">
+  <label>
+    <User size={14} />
+    Médecin
+  </label>
+  <div className="medecin-default-box">
+    <User size={16} className="medecin-icon" />
+    <span className="medecin-name">Dr. Mahmoud Khelifi</span>
+    <span className="medecin-badge">Médecin du travail</span>
+  </div>
+  <input type="hidden" name="medecin" value="Dr. Mahmoud Khelifi" />
+  <small className="form-hint">Médecin par défaut - Non modifiable</small>
+</div>
+                    {/* ========== CALENDRIER INTELLIGENT - JOURS ========== */}
+<div className="form-group full-width">
+  <label>
+    <Calendar size={14} />
+    Date <span className="required">*</span>
+  </label>
+  
+  {/* Navigation mois */}
+  <div className="mois-navigation">
+    <button type="button" onClick={handleMoisPrecedent}>◀</button>
+    <span>{new Date(anneeActuelle, moisActuel).toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+    <button type="button" onClick={handleMoisSuivant}>▶</button>
+  </div>
+  
+  {/* ✅ Grille des jours - UNIQUEMENT les jours ouvrés avec créneaux > 0 */}
+  {!formData.matricule_agent ? (
+    <div className="no-jours-disponibles">
+      <AlertCircle size={16} />
+      <span>Sélectionnez d'abord un agent</span>
+    </div>
+  ) : joursDisponibles.filter(jour => jour.creneauxDisponibles > 0).length === 0 ? (
+    <div className="no-jours-disponibles">
+      <AlertCircle size={16} />
+      <span>Aucun jour ouvré disponible avec créneaux libres pour ce mois</span>
+    </div>
+  ) : (
+    <div className="calendrier-jours">
+      {joursDisponibles
+        .filter(jour => jour.creneauxDisponibles > 0) // ✅ Filtrer les jours sans créneaux
+        .map(jour => {
+          // Parser la date sans décalage horaire
+          const [year, month, day] = jour.date.split('-');
+          const jourNum = parseInt(day);
+          const dateObj = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+          const jourSemaine = dateObj.getUTCDay();
+          
+          const estSelectionne = formData.date_visite === jour.date;
+          const joursSemaine = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+          
+          // ✅ Ne pas afficher Dimanche(0), Lundi(1), Samedi(6)
+          if (jourSemaine === 0 || jourSemaine === 1 || jourSemaine === 6) {
+            return null;
+          }
+          
+          return (
+            <button
+              key={jour.date}
+              type="button"
+              className={`jour-cell ${estSelectionne ? 'selected' : ''}`}
+              onClick={() => {
+                setFormData({...formData, date_visite: jour.date, heure_visite: ''});
+              }}
+              title={`${jour.creneauxDisponibles} créneau(x) disponible(s)`}
+            >
+              <span className="jour-num">{jourNum}</span>
+              <span className="jour-semaine">{joursSemaine[jourSemaine]}</span>
+              <span className="creneaux-count">{jour.creneauxDisponibles} créneau(x)</span>
+            </button>
+          );
+        })}
+    </div>
+  )}
+</div>
+
+                    {/* ========== CALENDRIER INTELLIGENT - CRÉNEAUX ========== */}
                     <div className="form-group">
                       <label>
                         <Clock size={14} />
                         Heure <span className="required">*</span>
                       </label>
-                      <select
-                        value={formData.heure_visite}
-                        onChange={(e) => setFormData({...formData, heure_visite: e.target.value})}
-                        required
-                      >
-                        <option value="08:00:00">08:00</option>
-                        <option value="08:30:00">08:30</option>
-                        <option value="09:00:00">09:00</option>
-                        <option value="09:30:00">09:30</option>
-                      </select>
+                      {!formData.date_visite ? (
+                        <div className="info-message">
+                          <Info size={14} />
+                          <span>Sélectionnez une date d'abord</span>
+                        </div>
+                      ) : loadingCreneaux ? (
+                        <div className="loading-creneaux">Chargement des créneaux...</div>
+                      ) : (
+                        <div className="creneaux-grid">
+                          {creneauxDisponibles.map(creneau => (
+                            <button
+                              key={creneau.heure}
+                              type="button"
+                              className={`creneau-cell ${creneau.disponible ? 'disponible' : 'indisponible'} ${formData.heure_visite === creneau.heure ? 'selected' : ''}`}
+                              onClick={() => {
+                                if (creneau.disponible) {
+                                  setFormData({...formData, heure_visite: creneau.heure});
+                                }
+                              }}
+                              disabled={!creneau.disponible}
+                              title={creneau.message}
+                            >
+                              {creneau.heure_affichage}
+                              {creneau.disponible && formData.heure_visite === creneau.heure && <span className="check-icon">✓</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {!loadingCreneaux && formData.date_visite && creneauxDisponibles.filter(c => c.disponible).length === 0 && (
+                        <div className="no-creneaux-disponibles">
+                          <AlertCircle size={14} />
+                          <span>Aucun créneau disponible pour cette date</span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Type de visite */}
-                    <div className="form-group">
-                      <label>
-                        <FileText size={14} />
-                        Type de visite <span className="required">*</span>
-                      </label>
-                      <select
-                        value={formData.type_visite}
-                        onChange={(e) => setFormData({...formData, type_visite: e.target.value})}
-                        required
-                      >
-                        <option value="Périodique">📋 Périodique (auto)</option>
-                        <option value="Reprise">🔄 Reprise (auto)</option>
-                        <option value="Reclassement">📝 Reclassement (manuel)</option>
-                        <option value="Embauche">👔 Embauche (manuel)</option>
-                      </select>
-                      <small className="form-hint">
-                        {formData.type_visite === 'Périodique' && 'Visite périodique - planifiée automatiquement selon la périodicité'}
-                        {formData.type_visite === 'Reprise' && 'Visite de reprise - après arrêt maladie ou accident'}
-                        {formData.type_visite === 'Reclassement' && 'Visite de reclassement - inaptitude temporaire ou définitive'}
-                        {formData.type_visite === 'Embauche' && "Visite d'embauche - pour les nouveaux agents"}
-                      </small>
-                    </div>
-
-                    {/* Médecin */}
-                    <div className="form-group">
-                      <label>
-                        <User size={14} />
-                        Médecin <span className="required">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.medecin}
-                        onChange={(e) => setFormData({...formData, medecin: e.target.value})}
-                        placeholder="Dr. Mahmoud Khelifi"
-                        className={formErrors.medecin ? 'error' : ''}
-                        required
-                      />
-                      {formErrors.medecin && <div className="error-message">{formErrors.medecin}</div>}
-                    </div>
-
-                    {/* Résultat */}
-                    <div className="form-group">
-                      <label>
-                        <Award size={14} />
-                        Résultat
-                      </label>
-                      <select
-                        value={formData.resultat}
-                        onChange={(e) => setFormData({...formData, resultat: e.target.value})}
-                      >
-                        <option value="Apte">Apte</option>
-                        <option value="Apte avec réserves">Apte avec réserves</option>
-                        <option value="Inapte temporaire">Inapte temporaire</option>
-                        <option value="Inapte définitif">Inapte définitif</option>
-                      </select>
-                    </div>
-
-                    {/* Observations */}
+                    {/* Motif (optionnel) */}
                     <div className="form-group full-width">
                       <label>
-                        <FileText size={14} />
-                        Observations
+                        <Info size={14} />
+                        Motif (optionnel)
                       </label>
                       <textarea
-                        rows="3"
-                        value={formData.observation}
-                        onChange={(e) => setFormData({...formData, observation: e.target.value})}
-                        placeholder="Observations médicales..."
+                        rows="2"
+                        value={formData.motif}
+                        onChange={(e) => setFormData({...formData, motif: e.target.value})}
+                        placeholder="Motif de la programmation..."
                       />
                     </div>
-
-                    {/* Motif - visible pour Reclassement et Embauche */}
-                    {(formData.type_visite === 'Reclassement' || formData.type_visite === 'Embauche') && (
-                      <div className="form-group full-width">
-                        <label>
-                          <AlertCircle size={14} />
-                          Motif de la visite
-                        </label>
-                        <textarea
-                          rows="2"
-                          value={formData.motif}
-                          onChange={(e) => setFormData({...formData, motif: e.target.value})}
-                          placeholder={formData.type_visite === 'Reclassement' 
-                            ? "Raison du reclassement (inaptitude temporaire/définitive, etc.)"
-                            : "Motif de l'embauche (nouveau recrutement, etc.)"}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -923,13 +1080,13 @@ const GestionVisitesPage = () => {
                   <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>
                     Annuler
                   </button>
-                  <button type="submit" className="btn-primary" disabled={saving || checkingSlot}>
+                  <button type="submit" className="btn-primary" disabled={saving || checkingSlot || !formData.heure_visite}>
                     {checkingSlot ? (
                       <><span className="spinner-small"></span> Vérification créneau...</>
                     ) : saving ? (
                       <><span className="spinner-small"></span> Enregistrement...</>
                     ) : (
-                      <><Save size={16} /> {editMode ? 'Modifier' : 'Enregistrer'}</>
+                      <><Save size={16} /> {editMode ? 'Modifier' : 'Programmer'}</>
                     )}
                   </button>
                 </div>

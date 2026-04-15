@@ -39,15 +39,16 @@ async function getJourOuvreAvant(date) {
   return dateTemp;
 }
 
-// ========== FONCTION POUR TROUVER UN CRÉNEAU DISPONIBLE ==========
-async function trouverCreneauDisponible(dateVisite) {
+// ========== FONCTION POUR TROUVER UN CRÉNEAU DISPONIBLE POUR L'AGENT ==========
+async function trouverCreneauDisponible(dateVisite, matriculeAgent) {
   const creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
   const dateStr = dateVisite.toISOString().split('T')[0];
   
   console.log(`   🔍 Recherche créneau pour le ${dateStr}`);
   
   for (const heure of creneaux) {
-    const existe = await Planning.findOne({
+    // Vérifier si le créneau est occupé par une autre visite
+    const creneauOccupe = await Planning.findOne({
       where: {
         date_visite: dateStr,
         heure_visite: heure,
@@ -55,61 +56,222 @@ async function trouverCreneauDisponible(dateVisite) {
       }
     });
     
-    if (!existe) {
+    // Vérifier si l'agent a déjà une visite ce jour-là
+    const agentDejaOccupe = await Planning.findOne({
+      where: {
+        matricule_agent: matriculeAgent,
+        date_visite: dateStr,
+        statut: 'Programmé'
+      }
+    });
+    
+    if (!creneauOccupe && !agentDejaOccupe) {
       console.log(`   ✅ Créneau disponible: ${dateStr} à ${heure}`);
-      return { date: dateVisite, heure, trouve: true };
+      return { date: dateVisite, heure, trouve: true, message: null };
+    } else if (agentDejaOccupe) {
+      const typeVisiteExistante = agentDejaOccupe.type_visite;
+      console.log(`   ⚠️ Agent a déjà une visite (${typeVisiteExistante}) le ${dateStr}`);
+      return { 
+        trouve: false, 
+        raison: 'agent_deja_occupe',
+        message: `⚠️ L'agent a déjà une visite de type "${typeVisiteExistante}" prévue le ${dateStr}. Passage au jour suivant...`
+      };
     } else {
-      console.log(`   ⚠️ ${dateStr} à ${heure} est déjà occupé`);
+      console.log(`   ⚠️ ${dateStr} à ${heure} est déjà occupé par un autre agent`);
     }
   }
   
   console.log(`   ❌ Aucun créneau disponible le ${dateStr}`);
-  return { trouve: false };
+  return { 
+    trouve: false, 
+    raison: 'pas_de_creneau',
+    message: `❌ Aucun créneau disponible le ${dateStr}. Recherche d'un autre jour...`
+  };
 }
 
 // ========== FONCTION POUR TROUVER UNE DATE DE REPRISE VALIDE ==========
-async function trouverDateRepriseValide(dateFinArret) {
-  // Règle: Reprise = Fin d'arrêt - 3 jours
+async function trouverDateRepriseValide(dateFinArret, matriculeAgent, agentNom) {
   const dateRepriseIdeale = new Date(dateFinArret);
   dateRepriseIdeale.setDate(dateFinArret.getDate() - 3);
   
-  console.log(`\n📅 Date reprise idéale: ${dateRepriseIdeale.toISOString().split('T')[0]}`);
-  console.log(`   Jour: ${dateRepriseIdeale.toLocaleDateString('fr-FR', { weekday: 'long' })}`);
+  const dateIdealeStr = dateRepriseIdeale.toISOString().split('T')[0];
+  const jourIdeale = dateRepriseIdeale.toLocaleDateString('fr-FR', { weekday: 'long' });
   
-  // 1. Chercher un jour ouvré AVANT la date idéale (priorité absolue)
+  console.log(`\n📅 Date reprise idéale: ${dateIdealeStr} (${jourIdeale})`);
+  
+  // 1. Chercher un jour ouvré AVANT la date idéale
   let dateReprise = await getJourOuvreAvant(dateRepriseIdeale);
   let dateRepriseStr = dateReprise.toISOString().split('T')[0];
+  let dernierMessage = "";
   
   console.log(`   📍 Premier jour ouvré avant: ${dateRepriseStr}`);
   
-  // 2. Vérifier si on peut avoir un créneau à cette date
-  let creneau = await trouverCreneauDisponible(dateReprise);
+  // 2. Vérifier si disponible
+  let resultat = await trouverCreneauDisponible(dateReprise, matriculeAgent);
   
-  // 3. Si pas de créneau disponible, chercher un jour après
-  if (!creneau.trouve) {
-    console.log(`\n   ⚠️ Aucun créneau disponible le ${dateRepriseStr}, recherche après...`);
+  if (resultat.message) {
+    dernierMessage = resultat.message;
+    console.log(`   ${resultat.message}`);
+  }
+  
+  // 3. Si pas disponible, chercher un jour après
+  if (!resultat.trouve) {
+    console.log(`\n   🔍 Recherche d'un autre jour disponible...`);
     
     let joursRecherche = 1;
     let dateTemp = new Date(dateReprise);
+    let tentatives = [];
     
     while (joursRecherche <= 14) {
       dateTemp.setDate(dateReprise.getDate() + joursRecherche);
       
       if (await planningService.estJourOuvre(dateTemp)) {
-        dateRepriseStr = dateTemp.toISOString().split('T')[0];
-        console.log(`   🔍 Test date J+${joursRecherche}: ${dateRepriseStr}`);
+        const dateTestStr = dateTemp.toISOString().split('T')[0];
+        const jourTest = dateTemp.toLocaleDateString('fr-FR', { weekday: 'long' });
         
-        creneau = await trouverCreneauDisponible(dateTemp);
-        if (creneau.trouve) {
+        console.log(`   🔍 Test J+${joursRecherche}: ${dateTestStr} (${jourTest})`);
+        
+        resultat = await trouverCreneauDisponible(dateTemp, matriculeAgent);
+        
+        if (resultat.message) {
+          tentatives.push(`${dateTestStr} (${jourTest}): ${resultat.message}`);
+        }
+        
+        if (resultat.trouve) {
           dateReprise = dateTemp;
+          dateRepriseStr = dateTestStr;
+          dernierMessage = `✅ Date de reprise trouvée le ${dateTestStr} (${jourTest}) après ${joursRecherche} jour(s) de recherche.`;
           break;
         }
       }
       joursRecherche++;
     }
+    
+    if (!resultat.trouve && tentatives.length > 0) {
+      dernierMessage = `❌ Impossible de planifier la visite de reprise pour ${agentNom}. Raisons: ${tentatives.join('; ')}`;
+    }
+  } else {
+    dernierMessage = `✅ Date de reprise idéale disponible le ${dateRepriseStr} (${dateReprise.toLocaleDateString('fr-FR', { weekday: 'long' })}).`;
   }
   
-  return { date: dateReprise, creneau, trouve: creneau.trouve };
+  return { date: dateReprise, creneau: resultat, trouve: resultat.trouve, message: dernierMessage };
+}
+
+// ========== FONCTION POUR GÉRER LES VISITES PÉRIODIQUES APRÈS ACCIDENT ==========
+async function gererVisitesPeriodiquesApresAccident(agent, dateAccident, dateRepriseStr, userId) {
+  console.log(`\n📋 Vérification des visites périodiques après accident...`);
+  
+  // Vérifier si l'agent a une visite périodique planifiée APRÈS la date de l'accident
+  const visitePeriodiqueApresAccident = await Planning.findOne({
+    where: {
+      matricule_agent: agent.matricule_agent,
+      type_visite: 'Périodique',
+      statut: 'Programmé',
+      date_visite: { [Op.gt]: dateAccident }
+    }
+  });
+  
+  if (!visitePeriodiqueApresAccident) {
+    console.log(`   ✅ Aucune visite périodique à reprogrammer`);
+    return null;
+  }
+  
+  const ancienneDate = visitePeriodiqueApresAccident.date_visite;
+  const ancienneHeure = visitePeriodiqueApresAccident.heure_visite;
+  const motifAnnulation = `Annulé automatiquement suite à accident du ${dateAccident} - Visite de reprise programmée le ${dateRepriseStr}`;
+  
+  console.log(`   ⚠️ Visite périodique trouvée le ${ancienneDate} (APRÈS accident du ${dateAccident})`);
+  
+  // 1. Annuler l'ancienne visite périodique avec motif
+  await visitePeriodiqueApresAccident.update({
+    statut: 'Annulé',
+    motif_annulation: motifAnnulation
+  });
+  
+  console.log(`   ✅ Ancienne visite périodique annulée - Motif: ${motifAnnulation}`);
+  
+  // 2. Calculer la nouvelle date (après la visite de reprise + 14 jours)
+  const dateRepriseObj = new Date(dateRepriseStr);
+  const nouvelleDatePeriodique = new Date(dateRepriseObj);
+  nouvelleDatePeriodique.setDate(dateRepriseObj.getDate() + 14);
+  
+  // Ajuster au jour ouvré
+  let datePeriodiqueValide = nouvelleDatePeriodique;
+  let joursRecherche = 0;
+  while (!(await planningService.estJourOuvre(datePeriodiqueValide)) && joursRecherche < 14) {
+    datePeriodiqueValide.setDate(nouvelleDatePeriodique.getDate() + joursRecherche + 1);
+    joursRecherche++;
+  }
+  
+  const nouvelleDateStr = datePeriodiqueValide.toISOString().split('T')[0];
+  
+  // 3. Chercher un créneau disponible
+  const creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
+  let nouveauCreneau = null;
+  
+  for (const heure of creneaux) {
+    const existe = await Planning.findOne({
+      where: {
+        date_visite: nouvelleDateStr,
+        heure_visite: heure,
+        statut: 'Programmé'
+      }
+    });
+    if (!existe) {
+      nouveauCreneau = heure;
+      break;
+    }
+  }
+  
+  if (nouveauCreneau) {
+    // 4. Créer la nouvelle visite périodique avec mention de reprogrammation
+    const nouveauPlanning = await Planning.create({
+      matricule_agent: agent.matricule_agent,
+      date_visite: nouvelleDateStr,
+      heure_visite: nouveauCreneau,
+      type_visite: 'Périodique',
+      statut: 'Programmé',
+      priorite: visitePeriodiqueApresAccident.priorite,
+      semaine: planningService.getNumeroSemaine(datePeriodiqueValide),
+      annee: datePeriodiqueValide.getFullYear(),
+      created_by: userId,
+      convocation_envoyee: false,
+      motif_reprogrammation: `Reprogrammée automatiquement suite à accident du ${dateAccident} (ancienne date: ${ancienneDate}) - Nouvelle date après reprise du ${dateRepriseStr}`,
+      source_planification: 'auto',
+      reprogrammee: true
+    });
+    
+    console.log(`   ✅ Nouvelle visite périodique reprogrammée le ${nouvelleDateStr} à ${nouveauCreneau.substring(0,5)}`);
+    
+    // Créer l'historique
+    await Visite.create({
+      matricule_agent: agent.matricule_agent,
+      date_visite: nouvelleDateStr,
+      heure_visite: nouveauCreneau,
+      type_visite: 'Périodique',
+      medecin: 'Système',
+      observation: `Reprogrammation automatique suite à accident du ${dateAccident}`,
+      id_planning: nouveauPlanning.id_planning,
+      type_action: 'REPROGRAMMEE',
+      ancien_statut: 'Programmé',
+      nouveau_statut: 'Programmé',
+      motif_action: `Reprogrammation automatique - Accident le ${dateAccident}`,
+      details_action: JSON.stringify({
+        ancienne_date: ancienneDate,
+        ancienne_heure: ancienneHeure,
+        nouvelle_date: nouvelleDateStr,
+        nouvelle_heure: nouveauCreneau,
+        raison: 'accident'
+      }),
+      source: 'PLANNING',
+      created_by: userId
+    });
+    
+    return nouveauPlanning;
+  } else {
+    console.log(`   ⚠️ Aucun créneau disponible pour reprogrammer la visite périodique`);
+    return null;
+  }
 }
 
 // ========== RÉCUPÉRER TOUS LES AGENTS ==========
@@ -160,14 +322,11 @@ router.post('/accidents', protect, async (req, res) => {
       console.log('🔄 PLANIFICATION VISITE DE REPRISE');
       console.log('='.repeat(70));
       
-      const transaction = await sequelizeLocal.transaction();
-      
       try {
         const agent = await Agent.findByPk(accident.matricule_agent);
         
         if (!agent) {
           console.log(`❌ Agent #${accident.matricule_agent} non trouvé`);
-          await transaction.rollback();
           return res.status(404).json({ 
             success: false, 
             message: 'Agent non trouvé' 
@@ -195,15 +354,16 @@ router.post('/accidents', protect, async (req, res) => {
         
         console.log(`   ✅ Agent mis à jour (inaptitude du ${accident.date_accident} au ${dateFinStr})`);
         
-        // ÉTAPE 3: Trouver une date de reprise valide
-        const { date: dateReprise, creneau, trouve: repriseTrouvee } = await trouverDateRepriseValide(dateFinArret);
+        // Appel de la fonction pour la reprise
+        const { date: dateReprise, creneau, trouve: repriseTrouvee, message: repriseMessage } = await trouverDateRepriseValide(dateFinArret, accident.matricule_agent, `${agent.nom} ${agent.prenom}`);
+        
+        console.log(`\n📋 ${repriseMessage}`);
         
         if (!repriseTrouvee) {
-          console.log(`\n❌ Aucune date de reprise disponible dans les 14 jours suivants`);
-          await transaction.rollback();
+          console.log(`\n❌ ${repriseMessage}`);
           return res.status(400).json({ 
             success: false, 
-            message: 'Aucune date de reprise disponible. Veuillez contacter l\'administrateur.' 
+            message: repriseMessage 
           });
         }
         
@@ -216,7 +376,10 @@ router.post('/accidents', protect, async (req, res) => {
         console.log(`   Heure: ${creneau.heure}`);
         console.log(`   Type: ${typeVisite}`);
         
-        // ÉTAPE 4: Créer la visite dans le planning
+        // Appeler la fonction APRÈS avoir dateRepriseStr
+        await gererVisitesPeriodiquesApresAccident(agent, accident.date_accident, dateRepriseStr, req.user.id);
+        
+        // Créer la visite dans le planning
         const planning = await Planning.create({
           matricule_agent: agent.matricule_agent,
           date_visite: dateRepriseStr,
@@ -230,14 +393,19 @@ router.post('/accidents', protect, async (req, res) => {
           convocation_envoyee: false,
           motif_reprogrammation: `Visite ${typeVisite} post-accident (${accident.numero_accident})`,
           source_planification: 'auto'
-        }, { transaction });
+        });
+        
+        // Mettre à jour date_prochaine_inaptitude
+        await agent.update({
+          date_prochaine_inaptitude: dateRepriseStr
+        });
         
         console.log(`\n✅ VISITE DE ${typeVisite.toUpperCase()} CRÉÉE:`);
         console.log(`   ID Planning: ${planning.id_planning}`);
         console.log(`   Date: ${dateRepriseStr}`);
         console.log(`   Heure: ${creneau.heure}`);
         
-        // ÉTAPE 5: Créer l'historique
+        // Créer l'historique
         await Visite.create({
           matricule_agent: agent.matricule_agent,
           date_visite: dateRepriseStr,
@@ -262,9 +430,7 @@ router.post('/accidents', protect, async (req, res) => {
           }),
           source: 'PLANNING',
           created_by: req.user.id
-        }, { transaction });
-        
-        await transaction.commit();
+        });
         
         console.log('\n' + '='.repeat(70));
         console.log('✅ VISITE DE REPRISE PROGRAMMÉE AVEC SUCCÈS !');
@@ -283,8 +449,7 @@ router.post('/accidents', protect, async (req, res) => {
         });
         
       } catch (error) {
-        await transaction.rollback();
-        console.error('❌ Erreur transaction:', error);
+        console.error('❌ Erreur traitement:', error);
         throw error;
       }
     } else {

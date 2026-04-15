@@ -83,7 +83,23 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
       field: 'updated_at'
-    }
+    },
+    // Dans la définition du modèle Agent, ajouter :
+date_debut_reclassement: {
+  type: DataTypes.DATEONLY,
+  allowNull: true,
+  field: 'date_debut_reclassement'
+},
+date_fin_reclassement: {
+  type: DataTypes.DATEONLY,
+  allowNull: true,
+  field: 'date_fin_reclassement'
+},
+date_prochaine_reclassement: {
+  type: DataTypes.DATEONLY,
+  allowNull: true,
+  field: 'date_prochaine_reclassement'
+},
   }, {
     tableName: 'agent',
     timestamps: false

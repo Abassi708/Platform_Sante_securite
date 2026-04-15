@@ -499,6 +499,8 @@ const SocialDashboard = () => {
             <Calendar size={14} />
             <span>{currentTime.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
           </div>
+
+          <NotificationBadge />
           
           {/* NOTIFICATIONS GÉNÉRALES */}
           <div className="sd-notifications-wrapper">
@@ -726,7 +728,7 @@ const SocialDashboard = () => {
                     <CalendarIcon size={16} /> Planning
                   </button>
                   <button className={`sd-submenu-btn ${visitesSubTab === 'gestion' ? 'active' : ''}`} onClick={() => setVisitesSubTab('gestion')}>
-                    <FileText size={16} /> Gestion & Historique
+                    <FileText size={16} /> Gestion Visites Manuellement
                   </button>
                 </div>
                 {visitesSubTab === 'planning' ? <PlanningPage /> : <GestionVisitesPage />}
