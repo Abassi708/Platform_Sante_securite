@@ -5,6 +5,7 @@ const db = require('../models');
 const { Op, Sequelize } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const { sendOtpEmail } = require('../config/emailConfig');
+const AuditService = require('../services/auditService'); // ← AJOUTÉ
 
 // Récupérer les modèles depuis db
 const User = db.local.User;
@@ -882,7 +883,9 @@ const deleteUser = async (req, res) => {
   }
 };
 
+// ========== RESET PASSWORD AVEC AUDIT ==========
 const resetPassword = async (req, res) => {
+  const startTime = Date.now();
   try {
     const { id } = req.params;
     const { newPassword } = req.body;
@@ -912,6 +915,20 @@ const resetPassword = async (req, res) => {
     
     console.log('✅ Mot de passe réinitialisé avec succès pour user:', id);
     
+    // ✅ AJOUT DE L'AUDIT POUR LA RÉINITIALISATION
+    await AuditService.enregistrer({
+      utilisateur: req.user,
+      requete: req,
+      typeAction: 'REINITIALISATION_MDP',
+      module: 'UTILISATEUR',
+      idCible: id,
+      identifiantCible: user.Login,
+      description: `${req.user.email} a réinitialisé le mot de passe de l'utilisateur ${user.Login}`,
+      nouvellesValeurs: { mot_de_passe: '[MODIFIÉ]' },
+      statut: 'SUCCES',
+      dureeMs: Date.now() - startTime
+    });
+    
     res.json({ 
       success: true, 
       message: 'Mot de passe réinitialisé avec succès' 
@@ -919,6 +936,24 @@ const resetPassword = async (req, res) => {
     
   } catch (error) {
     console.error('❌ Erreur réinitialisation mot de passe:', error);
+    
+    // Enregistrement de l'échec dans l'audit
+    try {
+      await AuditService.enregistrer({
+        utilisateur: req.user,
+        requete: req,
+        typeAction: 'REINITIALISATION_MDP',
+        module: 'UTILISATEUR',
+        idCible: req.params.id,
+        description: `Échec de réinitialisation du mot de passe par ${req.user?.email}`,
+        statut: 'ECHEC',
+        erreur: error.message,
+        dureeMs: Date.now() - startTime
+      });
+    } catch (auditError) {
+      console.error('Erreur enregistrement audit:', auditError);
+    }
+    
     res.status(500).json({ 
       success: false,
       message: 'Erreur serveur lors de la réinitialisation' 

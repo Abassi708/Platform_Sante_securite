@@ -1,49 +1,26 @@
-import React, { useState, useEffect } from 'react';
+// ============================================
+// PARTIE 1: IMPORTS - VERSION SIMPLIFIÉE
+// ============================================
+
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   Users, Shield, UserPlus, Search, Edit, Trash2, ToggleLeft, ToggleRight,
-  Key, Mail, Phone, Calendar, Clock, CheckCircle, XCircle, LogOut,
+  Key, Mail, Calendar, Clock, CheckCircle, XCircle, LogOut,
   Bell, BarChart3, Settings, Grid, List, ChevronLeft, ChevronRight,
-  X, Save, Map, Briefcase, Zap, Award, ChevronUp, ChevronDown,
+  X, Save, Briefcase, Zap, Award, ChevronUp, ChevronDown,
   Download, Upload, AlertCircle, Info, Wrench, User, Eye, EyeOff,
   Filter, RefreshCw, PieChart, TrendingUp, UsersRound, UserCheck,
-  UserX, Activity, Globe, Lock, History, Copy, Star, Heart,
-  Sun, Moon, HelpCircle, Headphones, MessageCircle, Database,
-  Server, Cpu, HardDrive, Wifi, Shield as ShieldIcon, Globe2,
-  Languages, BellRing, Fingerprint, KeyRound, Printer, FileText,
-  BarChart, LineChart, PieChart as PieChartIcon, Settings as SettingsIcon,
-  LogIn, LogOut as LogOutIcon, UserCog, UserMinus, UserPlus as UserPlusIcon,
-  Users as UsersIcon, ShieldAlert, ShieldCheck, ShieldOff, Eye as EyeIcon,
-  EyeOff as EyeOffIcon, ChevronsLeft, ChevronsRight, Maximize2, Minimize2,
-  TrendingDown, FilterX, Check, AlertTriangle, Crown, Briefcase as BriefcaseIcon,
-  RefreshCcw, MailCheck, MailWarning, MailX, Send, Clock as ClockIcon,
-  Calendar as CalendarIcon, Activity as ActivityIcon, Target, TrendingUp as TrendingUpIcon,
-  Users2, UserCircle, UserCog2, UserRound, UserRoundCog, UserRoundSearch,
-  UserRoundX, UserRoundCheck, UserRoundPlus, UserRoundMinus,
-  Hash, Gauge, Network, HardDrive as HardDriveIcon, Cpu as CpuIcon,
-  Thermometer, Battery, Wifi as WifiIcon, Server as ServerIcon,
-  Cloud, CloudOff, AlertOctagon, Award as AwardIcon, Target as TargetIcon,
-  TrendingUp as TrendingUpIcon2, Users as UsersIcon2, Activity as ActivityIcon2,
-  CalendarCheck, CalendarClock, CalendarDays, CalendarRange,
-  UserCircle as UserCircleIcon, UserCog as UserCogIcon, UserPlus as UserPlusIcon2,
-  UserMinus as UserMinusIcon, UserCheck as UserCheckIcon, UserX as UserXIcon,
-  Users as UsersIcon3, Shield as ShieldIcon2, Key as KeyIcon,
-  Mail as MailIcon, Phone as PhoneIcon, MapPin as MapPinIcon,
-  Briefcase as BriefcaseIcon2, Clock as ClockIcon2, Calendar as CalendarIcon2,
-  Zap as ZapIcon, Award as AwardIcon2, Star as StarIcon,
-  Heart as HeartIcon, Wrench as WrenchIcon, Crown as CrownIcon,
-  TrendingUp as TrendingUpIcon3, TrendingDown as TrendingDownIcon,
-  ArrowUp, ArrowDown, Minus, Equal,
-  Calendar as CalendarIcon3, CalendarDays as CalendarDaysIcon,
-  CalendarRange as CalendarRangeIcon, BarChart as BarChartIcon,
-  LineChart as LineChartIcon, PieChart as PieChartIcon2,
-  Activity as ActivityIcon3, Target as TargetIcon2,
-  Award as AwardIcon3, Zap as ZapIcon2,
-  Fingerprint as FingerprintIcon,
-  ArrowUp as ArrowUpIcon,
-  ArrowDown as ArrowDownIcon
+  UserX, Activity, Lock, History, Copy, Star, Heart,
+  Fingerprint, FileText, ChevronsLeft, ChevronsRight, Check,
+  AlertTriangle, Crown, RefreshCcw, Send, CalendarDays, CalendarRange,
+  ArrowUp, ArrowDown, SlidersHorizontal, ArrowRight, CheckCircle2,
+  FilterX, Calendar as CalendarIcon, FileText as FileTextIcon,
+  ArrowUp as ArrowUpIcon, ArrowDown as ArrowDownIcon, BarChart, MessageCircle,
+  UserCog, Hash, Briefcase as BriefcaseIcon, Phone, MapPin, Globe, Server, Cpu, HardDrive, Wifi
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/AdminDashboard.css';
+import AuditLog from './AuditLog';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -54,6 +31,12 @@ const AdminDashboard = () => {
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // ========== OPTIMISATION CACHE ==========
+  const [cachedUsers, setCachedUsers] = useState(null);
+  const [lastFetchTime, setLastFetchTime] = useState(null);
+  const [searchDebounceTimer, setSearchDebounceTimer] = useState(null);
+  const statsCache = useRef(new Map());
   
   // ========== FILTRES AVANCÉS ==========
   const [filters, setFilters] = useState({
@@ -159,10 +142,11 @@ const AdminDashboard = () => {
 
   // ========== STATISTIQUES PÉRIODE ACTUELLE ==========
   const [currentPeriodStats, setCurrentPeriodStats] = useState({
-    today: { totalLogins: 0, uniqueUsers: 0, newUsers: 0, admins: 0, techniciens: 0, sociaux: 0, agents: 0, otpUsage: 0 },
-    week: { totalLogins: 0, uniqueUsers: 0, newUsers: 0, admins: 0, techniciens: 0, sociaux: 0, agents: 0, otpUsage: 0 },
-    month: { totalLogins: 0, uniqueUsers: 0, newUsers: 0, admins: 0, techniciens: 0, sociaux: 0, agents: 0, otpUsage: 0 },
-    year: { totalLogins: 0, uniqueUsers: 0, newUsers: 0, admins: 0, techniciens: 0, sociaux: 0, agents: 0, otpUsage: 0 }
+    today: { totalLogins: 0, uniqueUsers: 0, newUsers: 0, admins: 0, techniciens: 0, sociaux: 0, agents: 0, otpUsage: 0, totalConnexions: 0 },
+    week: { totalLogins: 0, uniqueUsers: 0, newUsers: 0, admins: 0, techniciens: 0, sociaux: 0, agents: 0, otpUsage: 0, totalConnexions: 0 },
+    month: { totalLogins: 0, uniqueUsers: 0, newUsers: 0, admins: 0, techniciens: 0, sociaux: 0, agents: 0, otpUsage: 0, totalConnexions: 0 },
+    year: { totalLogins: 0, uniqueUsers: 0, newUsers: 0, admins: 0, techniciens: 0, sociaux: 0, agents: 0, otpUsage: 0, totalConnexions: 0 },
+    custom: { totalLogins: 0, uniqueUsers: 0, newUsers: 0, admins: 0, techniciens: 0, sociaux: 0, agents: 0, otpUsage: 0, totalConnexions: 0 }
   });
 
   // ========== STATISTIQUES POUR LES TENDANCES ==========
@@ -185,8 +169,13 @@ const AdminDashboard = () => {
     values: Array(24).fill(0)
   });
 
+  // ========== ÉTATS POUR LE SÉLECTEUR DE PÉRIODE ==========
+  const [periodType, setPeriodType] = useState('today');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [isRefreshingStats, setIsRefreshingStats] = useState(false);
+
   // ========== ÉTATS POUR LA COMPARAISON ==========
-  const [selectedPeriod, setSelectedPeriod] = useState('today');
   const [comparisonResult, setComparisonResult] = useState(null);
   const [period1, setPeriod1] = useState({
     type: 'today',
@@ -201,6 +190,17 @@ const AdminDashboard = () => {
     label: 'Hier'
   });
   const [loadingStats, setLoadingStats] = useState(false);
+  const [showCustomComparison, setShowCustomComparison] = useState(false);
+  const [customPeriod1, setCustomPeriod1] = useState({
+    startDate: '',
+    endDate: '',
+    label: ''
+  });
+  const [customPeriod2, setCustomPeriod2] = useState({
+    startDate: '',
+    endDate: '',
+    label: ''
+  });
   
   // ========== PARAMÈTRES ==========
   const [settings, setSettings] = useState(() => {
@@ -219,12 +219,13 @@ const AdminDashboard = () => {
   // ========== TRADUCTIONS ==========
   const t = {
     fr: {
-      dashboard: 'Tableau de bord',
+      dashboard: 'Accueil',
       users: 'Utilisateurs',
-      stats: 'Statistiques',
+      stats: 'Tableau de bord',
       reset: 'Réinitialisation',
       settings: 'Paramètres',
       historique: 'Historique',
+      audit: 'Journal d\'audit',
       search: 'Rechercher...',
       addUser: 'Nouvel utilisateur',
       edit: 'Modifier',
@@ -278,137 +279,234 @@ const AdminDashboard = () => {
     setTimeout(() => setNotification({ show: false, type: '', title: '', message: '' }), 5000);
   };
 
-  // ========== METTRE À JOUR LES STATS SELON LA PÉRIODE SÉLECTIONNÉE ==========
-  const updateStatsForPeriod = (period) => {
+  // ========== STATS SIMPLES OPTIMISÉES AVEC USEMEMO ==========
+  const memoizedStats = useMemo(() => {
+    if (!users.length) return stats;
+    
+    const total = users.length;
+    const active = users.filter(u => u.status === 'active').length;
+    const inactive = users.filter(u => u.status === 'inactive').length;
+    const totalConnexions = users.reduce((sum, u) => sum + (u.loginCount || 0), 0);
+    
+    const admins = users.filter(u => u.role === 'admin').length;
+    const techniciens = users.filter(u => u.role === 'technicien').length;
+    const sociaux = users.filter(u => u.role === 'social').length;
+    const agents = users.filter(u => u.role === 'agent').length;
+    
+    return { total, active, inactive, admins, techniciens, sociaux, agents, totalConnexions };
+  }, [users]);
+
+  // Mettre à jour stats quand memoizedStats change
+  useEffect(() => {
+    setStats(memoizedStats);
+  }, [memoizedStats]);
+
+  // ========== METTRE À JOUR LES STATS - VERSION OPTIMISÉE ==========
+  const updateStatsForPeriod = useCallback(async (period, startDateParam = null, endDateParam = null) => {
     if (!users.length) return;
     
-    const now = new Date();
-    let startDate, endDate = new Date(now);
-    let prevStartDate, prevEndDate;
+    const startTime = Date.now();
+    setIsRefreshingStats(true);
     
-    switch(period) {
-      case 'today':
-        startDate = new Date(now);
+    try {
+      const token = localStorage.getItem('token');
+      let startDate, endDate;
+      
+      // Déterminer les dates
+      if (period === 'custom' && startDateParam) {
+        startDate = new Date(startDateParam);
         startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDateParam);
+        endDate.setHours(23, 59, 59, 999);
+      } else {
+        const now = new Date();
+        endDate = new Date(now);
         endDate.setHours(23, 59, 59, 999);
         
-        prevStartDate = new Date(now);
-        prevStartDate.setDate(now.getDate() - 1);
-        prevStartDate.setHours(0, 0, 0, 0);
-        prevEndDate = new Date(now);
-        prevEndDate.setDate(now.getDate() - 1);
-        prevEndDate.setHours(23, 59, 59, 999);
-        break;
+        switch(period) {
+          case 'today':
+            startDate = new Date(now);
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case 'week':
+            startDate = new Date(now);
+            const day = now.getDay();
+            const diff = day === 0 ? 6 : day - 1;
+            startDate.setDate(now.getDate() - diff);
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          case 'year':
+            startDate = new Date(now.getFullYear(), 0, 1);
+            startDate.setHours(0, 0, 0, 0);
+            break;
+          default:
+            startDate = new Date(now);
+            startDate.setHours(0, 0, 0, 0);
+        }
+      }
+      
+      // Calcul RAPIDE des statistiques locales
+      const usersInPeriod = users.filter(u => 
+        u.lastLogin && new Date(u.lastLogin) >= startDate && new Date(u.lastLogin) <= endDate
+      );
+      
+      const newUsersInPeriod = users.filter(u => 
+        u.createdAt && new Date(u.createdAt) >= startDate && new Date(u.createdAt) <= endDate
+      ).length;
+      
+      const adminsCount = usersInPeriod.filter(u => u.role === 'admin').length;
+      const techniciensCount = usersInPeriod.filter(u => u.role === 'technicien').length;
+      const sociauxCount = usersInPeriod.filter(u => u.role === 'social').length;
+      const agentsCount = usersInPeriod.filter(u => u.role === 'agent').length;
+      const currentUniqueUsers = new Set(usersInPeriod.map(u => u.id)).size;
+      
+      // Calcul des tendances
+      const duration = endDate - startDate;
+      const prevEndDate = new Date(startDate);
+      prevEndDate.setMilliseconds(prevEndDate.getMilliseconds() - 1);
+      const prevStartDate = new Date(prevEndDate);
+      prevStartDate.setTime(prevStartDate.getTime() - duration);
+      
+      const usersInPrevPeriod = users.filter(u => 
+        u.lastLogin && new Date(u.lastLogin) >= prevStartDate && new Date(u.lastLogin) <= prevEndDate
+      );
+      
+      const prevTotalLogins = usersInPrevPeriod.length;
+      const trendLogins = prevTotalLogins > 0 
+        ? Math.round(((usersInPeriod.length - prevTotalLogins) / prevTotalLogins) * 100) 
+        : (usersInPeriod.length > 0 ? 100 : 0);
+      
+      const prevUniqueUsers = new Set(usersInPrevPeriod.map(u => u.id)).size;
+      const trendUsers = prevUniqueUsers > 0 
+        ? Math.round(((currentUniqueUsers - prevUniqueUsers) / prevUniqueUsers) * 100)
+        : (currentUniqueUsers > 0 ? 100 : 0);
+      
+      const newUsersInPrevPeriod = users.filter(u => 
+        u.createdAt && new Date(u.createdAt) >= prevStartDate && new Date(u.createdAt) <= prevEndDate
+      ).length;
+      const trendNewUsers = newUsersInPrevPeriod > 0 
+        ? Math.round(((newUsersInPeriod - newUsersInPrevPeriod) / newUsersInPrevPeriod) * 100)
+        : (newUsersInPeriod > 0 ? 100 : 0);
+      
+      // Mettre à jour immédiatement avec les données locales
+      const currentStats = {
+        totalLogins: usersInPeriod.length,
+        totalConnexions: usersInPeriod.length,
+        uniqueUsers: currentUniqueUsers,
+        newUsers: newUsersInPeriod,
+        admins: adminsCount,
+        techniciens: techniciensCount,
+        sociaux: sociauxCount,
+        agents: agentsCount,
+        otpUsage: 65
+      };
+      
+      const periodKey = period === 'custom' ? 'custom' : period;
+      setCurrentPeriodStats(prev => ({ ...prev, [periodKey]: currentStats }));
+      setTrendStats({ logins: trendLogins, users: trendUsers, newUsers: trendNewUsers, otp: 0 });
+      
+      // Appels API en parallèle (non bloquants)
+      Promise.all([
+        fetch(`${process.env.REACT_APP_API_URL}/api/auth/stats/connexions?period=${period === 'custom' ? 'today' : period}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).catch(() => null),
+        fetch(`${process.env.REACT_APP_API_URL}/api/otp/stats`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).catch(() => null)
+      ]).then(async ([apiRes, otpRes]) => {
+        let newTotalLogins = usersInPeriod.length;
+        let newOtpUsage = 65;
         
-      case 'week':
-        const day = now.getDay();
-        const diff = day === 0 ? 6 : day - 1;
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - diff);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
+        if (apiRes && apiRes.ok) {
+          const apiData = await apiRes.json();
+          if (apiData.success && apiData.stats) {
+            newTotalLogins = apiData.stats.total || usersInPeriod.length;
+          }
+        }
         
-        prevStartDate = new Date(startDate);
-        prevStartDate.setDate(startDate.getDate() - 7);
-        prevStartDate.setHours(0, 0, 0, 0);
-        prevEndDate = new Date(startDate);
-        prevEndDate.setDate(startDate.getDate() - 1);
-        prevEndDate.setHours(23, 59, 59, 999);
-        break;
+        if (otpRes && otpRes.ok) {
+          const otpData = await otpRes.json();
+          if (otpData.success) {
+            newOtpUsage = otpData.successRate || 65;
+          }
+        }
         
-      case 'month':
-        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-        
-        prevStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        prevStartDate.setHours(0, 0, 0, 0);
-        prevEndDate = new Date(now.getFullYear(), now.getMonth(), 0);
-        prevEndDate.setHours(23, 59, 59, 999);
-        break;
-        
-      case 'year':
-        startDate = new Date(now.getFullYear(), 0, 1);
-        startDate.setHours(0, 0, 0, 0);
-        endDate.setHours(23, 59, 59, 999);
-        
-        prevStartDate = new Date(now.getFullYear() - 1, 0, 1);
-        prevStartDate.setHours(0, 0, 0, 0);
-        prevEndDate = new Date(now.getFullYear() - 1, 11, 31);
-        prevEndDate.setHours(23, 59, 59, 999);
-        break;
-        
-      default:
-        return;
+        setCurrentPeriodStats(prev => ({
+          ...prev,
+          [periodKey]: { ...prev[periodKey], totalLogins: newTotalLogins, totalConnexions: newTotalLogins, otpUsage: newOtpUsage }
+        }));
+      });
+      
+      console.log(`✅ Stats mises à jour pour ${period} en ${Date.now() - startTime}ms`);
+      
+    } catch (error) {
+      console.error('❌ Erreur updateStatsForPeriod:', error);
+    } finally {
+      setIsRefreshingStats(false);
     }
-    
-    const usersInPeriod = users.filter(u => 
-      u.lastLogin && new Date(u.lastLogin) >= startDate && new Date(u.lastLogin) <= endDate
-    );
-    
-    const usersInPrevPeriod = users.filter(u => 
-      u.lastLogin && new Date(u.lastLogin) >= prevStartDate && new Date(u.lastLogin) <= prevEndDate
-    );
-    
-    const newUsersInPeriod = users.filter(u => 
-      u.createdAt && new Date(u.createdAt) >= startDate && new Date(u.createdAt) <= endDate
-    ).length;
-    
-    const newUsersInPrevPeriod = users.filter(u => 
-      u.createdAt && new Date(u.createdAt) >= prevStartDate && new Date(u.createdAt) <= prevEndDate
-    ).length;
-    
-    const currentStats = {
-      totalLogins: usersInPeriod.length,
-      uniqueUsers: new Set(usersInPeriod.map(u => u.id)).size,
-      newUsers: newUsersInPeriod,
-      admins: usersInPeriod.filter(u => u.role === 'admin').length,
-      techniciens: usersInPeriod.filter(u => u.role === 'technicien').length,
-      sociaux: usersInPeriod.filter(u => u.role === 'social').length,
-      agents: usersInPeriod.filter(u => u.role === 'agent').length,
-      otpUsage: usersInPeriod.length > 0 ? Math.round((usersInPeriod.filter(u => u.loginCount > 0).length / usersInPeriod.length) * 100) : 0
-    };
-    
-    const prevTotalLogins = usersInPrevPeriod.length;
-    const trendLogins = prevTotalLogins > 0 
-      ? Math.round(((currentStats.totalLogins - prevTotalLogins) / prevTotalLogins) * 100) 
-      : (currentStats.totalLogins > 0 ? 100 : 0);
-    
-    const prevUniqueUsers = new Set(usersInPrevPeriod.map(u => u.id)).size;
-    const trendUsers = prevUniqueUsers > 0 
-      ? Math.round(((currentStats.uniqueUsers - prevUniqueUsers) / prevUniqueUsers) * 100)
-      : (currentStats.uniqueUsers > 0 ? 100 : 0);
-    
-    const trendNewUsers = newUsersInPrevPeriod > 0 
-      ? Math.round(((currentStats.newUsers - newUsersInPrevPeriod) / newUsersInPrevPeriod) * 100)
-      : (currentStats.newUsers > 0 ? 100 : 0);
-    
-    const prevOtpUsage = usersInPrevPeriod.length > 0 ? Math.round((usersInPrevPeriod.filter(u => u.loginCount > 0).length / usersInPrevPeriod.length) * 100) : 0;
-    const trendOtp = prevOtpUsage > 0 
-      ? Math.round(((currentStats.otpUsage - prevOtpUsage) / prevOtpUsage) * 100)
-      : (currentStats.otpUsage > 0 ? 100 : 0);
-    
-    setTrendStats({
-      logins: trendLogins,
-      users: trendUsers,
-      newUsers: trendNewUsers,
-      otp: trendOtp
-    });
-    
-    setCurrentPeriodStats(prev => ({
-      ...prev,
-      [period]: currentStats
-    }));
-  };
+  }, [users]);
 
   // ========== CHANGEMENT DE PÉRIODE ==========
-  const handlePeriodChange = (period) => {
-    setSelectedPeriod(period);
-    updateStatsForPeriod(period);
-  };
+  const handlePeriodChange = useCallback((period) => {
+    setPeriodType(period);
+    
+    if (period === 'custom') {
+      setShowDatePicker(true);
+      const today = new Date();
+      setSelectedDate(today.toISOString().split('T')[0]);
+    } else {
+      setShowDatePicker(false);
+      updateStatsForPeriod(period);
+    }
+  }, [updateStatsForPeriod]);
 
-  // ========== CHARGEMENT DES UTILISATEURS ==========
-  const fetchUsers = async () => {
+  // ========== APPLIQUER LA DATE PERSONNALISÉE ==========
+  const applyCustomDateRange = useCallback(() => {
+    if (!selectedDate) {
+      showNotification({
+        type: 'error',
+        title: '❌ Erreur',
+        message: 'Veuillez sélectionner une date'
+      });
+      return;
+    }
+    
+    updateStatsForPeriod('custom', selectedDate, selectedDate);
+    setShowDatePicker(false);
+    
+    showNotification({
+      type: 'success',
+      title: '✅ Date appliquée',
+      message: `Statistiques pour le ${new Date(selectedDate).toLocaleDateString('fr-FR')}`
+    });
+  }, [selectedDate, updateStatsForPeriod]);
+
+  // ========== ANNULER LE SÉLECTEUR DE DATES ==========
+  const cancelDatePicker = useCallback(() => {
+    setShowDatePicker(false);
+    setSelectedDate('');
+    setPeriodType('today');
+    updateStatsForPeriod('today');
+  }, [updateStatsForPeriod]);
+
+  // ========== CHARGEMENT OPTIMISÉ DES UTILISATEURS ==========
+  const fetchUsers = useCallback(async (forceRefresh = false) => {
+    const CACHE_DURATION = 5 * 60 * 1000;
+    const now = Date.now();
+    
+    if (!forceRefresh && cachedUsers && lastFetchTime && (now - lastFetchTime < CACHE_DURATION)) {
+      console.log('📦 Utilisation du cache utilisateurs');
+      setUsers(cachedUsers);
+      setFilteredUsers(cachedUsers);
+      calculateHourlyData(cachedUsers);
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -424,8 +522,6 @@ const AdminDashboard = () => {
       const data = await response.json();
 
       if (data.success && Array.isArray(data.users)) {
-        console.log('📦 Données brutes de l\'API:', data.users);
-        
         const realUsers = data.users.map(user => ({
           id: user.id,
           email: user.email,
@@ -438,32 +534,39 @@ const AdminDashboard = () => {
           lastActive: user.lastActive || null
         }));
         
-        console.log('✅ Utilisateurs transformés avec ID:', realUsers);
-        
+        setCachedUsers(realUsers);
+        setLastFetchTime(now);
         setUsers(realUsers);
         setFilteredUsers(realUsers);
         
         const roles = [...new Set(realUsers.map(u => u.role).filter(Boolean))];
         setAvailableRoles(roles);
         
-        calculateSimpleStats(realUsers);
         calculateHourlyData(realUsers);
-        
-        updateStatsForPeriod(selectedPeriod);
+        await updateStatsForPeriod(periodType);
+        await fetchOtpStats();
+        await fetchTrendData();
       }
-
-      await fetchOtpStats();
-      await fetchTrendData();
-      
     } catch (err) {
       setError('Erreur de connexion');
     } finally {
       setLoading(false);
     }
-  };
+  }, [cachedUsers, lastFetchTime, navigate, periodType, updateStatsForPeriod]);
+
+  // ========== RECHERCHE AVEC DEBOUNCE ==========
+  const handleSearchDebounced = useCallback((value) => {
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+    }
+    const timer = setTimeout(() => {
+      setFilters(prev => ({...prev, search: value}));
+    }, 300);
+    setSearchDebounceTimer(timer);
+  }, [searchDebounceTimer]);
 
   // ========== CHARGEMENT DES STATISTIQUES OTP ==========
-  const fetchOtpStats = async () => {
+  const fetchOtpStats = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/otp/stats`, {
@@ -472,20 +575,6 @@ const AdminDashboard = () => {
       const data = await response.json();
       
       if (data.success) {
-        const totalByRole = {
-          admin: users.filter(u => u.role === 'admin').length,
-          technicien: users.filter(u => u.role === 'technicien').length,
-          social: users.filter(u => u.role === 'social').length,
-          agent: users.filter(u => u.role === 'agent').length
-        };
-
-        const usedByRole = {
-          admin: Math.floor(totalByRole.admin * 0.75),
-          technicien: Math.floor(totalByRole.technicien * 0.45),
-          social: Math.floor(totalByRole.social * 0.60),
-          agent: Math.floor(totalByRole.agent * 0.30)
-        };
-
         setOtpStats({
           total: data.total || 0,
           used: data.used || 0,
@@ -494,20 +583,20 @@ const AdminDashboard = () => {
           successRate: data.successRate || 0,
           averageAttempts: data.averageAttempts || 0,
           byRole: {
-            admin: { total: totalByRole.admin, used: usedByRole.admin },
-            technicien: { total: totalByRole.technicien, used: usedByRole.technicien },
-            social: { total: totalByRole.social, used: usedByRole.social },
-            agent: { total: totalByRole.agent, used: usedByRole.agent }
+            admin: { total: 0, used: 0 },
+            technicien: { total: 0, used: 0 },
+            social: { total: 0, used: 0 },
+            agent: { total: 0, used: 0 }
           }
         });
       }
     } catch (err) {
       console.error('Erreur chargement stats OTP:', err);
     }
-  };
+  }, []);
 
   // ========== CHARGEMENT DES DONNÉES DE TENDANCE ==========
-  const fetchTrendData = async () => {
+  const fetchTrendData = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       
@@ -550,40 +639,14 @@ const AdminDashboard = () => {
           values: reorderedValues,
           variations
         });
-        
-        console.log('✅ Données de tendance chargées:', reorderedValues);
       }
     } catch (err) {
       console.error('❌ Erreur chargement tendance:', err);
     }
-  };
-
-  // ========== CALCUL DES STATS SIMPLES ==========
-  const calculateSimpleStats = (usersData) => {
-    const total = usersData.length;
-    const active = usersData.filter(u => u.status === 'active').length;
-    const inactive = usersData.filter(u => u.status === 'inactive').length;
-    const totalConnexions = usersData.reduce((sum, u) => sum + (u.loginCount || 0), 0);
-    
-    const admins = usersData.filter(u => u.role === 'admin').length;
-    const techniciens = usersData.filter(u => u.role === 'technicien').length;
-    const sociaux = usersData.filter(u => u.role === 'social').length;
-    const agents = usersData.filter(u => u.role === 'agent').length;
-    
-    setStats({
-      total,
-      active,
-      inactive,
-      admins,
-      techniciens,
-      sociaux,
-      agents,
-      totalConnexions
-    });
-  };
+  }, []);
 
   // ========== CALCUL DES DONNÉES HORAIRES ==========
-  const calculateHourlyData = (usersData) => {
+  const calculateHourlyData = useCallback((usersData) => {
     const values = Array(24).fill(0);
     
     usersData.forEach(user => {
@@ -597,10 +660,10 @@ const AdminDashboard = () => {
       labels: Array.from({ length: 24 }, (_, i) => `${i}h`), 
       values 
     });
-  };
+  }, []);
 
   // ========== FONCTION POUR OBTENIR LES DATES D'UNE PÉRIODE ==========
-  const getDateRangeForPeriod = (periodType) => {
+  const getDateRangeForPeriod = useCallback((periodType) => {
     const now = new Date();
     let startDate, endDate = new Date(now);
 
@@ -666,10 +729,10 @@ const AdminDashboard = () => {
     }
 
     return { startDate, endDate };
-  };
+  }, []);
 
   // ========== CALCULER LES STATISTIQUES POUR UNE PÉRIODE ==========
-  const calculateStatsForPeriod = (usersData, periodType, startDate, endDate) => {
+  const calculateStatsForPeriod = useCallback((usersData, periodType, startDate, endDate) => {
     const usersInPeriod = usersData.filter(u => 
       u.lastLogin && new Date(u.lastLogin) >= startDate && new Date(u.lastLogin) <= endDate
     );
@@ -699,15 +762,138 @@ const AdminDashboard = () => {
       sociaux: usersInPeriod.filter(u => u.role === 'social').length,
       agents: usersInPeriod.filter(u => u.role === 'agent').length
     };
-  };
+  }, []);
 
   // ========== OUVERTURE MODALE COMPARAISON ==========
-  const openComparisonModal = () => {
+  const openComparisonModal = useCallback(() => {
+    setShowCustomComparison(false);
     setShowComparisonModal(true);
-  };
+  }, []);
+
+  // ========== ACTIVER MODE DATES PERSONNALISÉES POUR COMPARAISON ==========
+  const enableCustomComparison = useCallback(() => {
+    setShowCustomComparison(true);
+    const today = new Date();
+    const weekAgo = new Date();
+    weekAgo.setDate(today.getDate() - 7);
+    setCustomPeriod1({
+      startDate: weekAgo.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0],
+      label: 'Période 1'
+    });
+    setCustomPeriod2({
+      startDate: weekAgo.toISOString().split('T')[0],
+      endDate: today.toISOString().split('T')[0],
+      label: 'Période 2'
+    });
+  }, []);
+
+  // ========== COMPARAISON AVEC DATES PERSONNALISÉES ==========
+  const performCustomComparison = useCallback(async () => {
+    if (!customPeriod1.startDate || !customPeriod1.endDate || !customPeriod2.startDate || !customPeriod2.endDate) {
+      showNotification({
+        type: 'error',
+        title: '❌ Erreur',
+        message: 'Veuillez sélectionner les deux plages de dates'
+      });
+      return;
+    }
+
+    setLoadingStats(true);
+    
+    try {
+      const period1Label = `${customPeriod1.startDate} → ${customPeriod1.endDate}`;
+      const period2Label = `${customPeriod2.startDate} → ${customPeriod2.endDate}`;
+      
+      const start1 = new Date(customPeriod1.startDate);
+      start1.setHours(0, 0, 0, 0);
+      const end1 = new Date(customPeriod1.endDate);
+      end1.setHours(23, 59, 59, 999);
+      
+      const usersInPeriod1 = users.filter(u => 
+        u.lastLogin && new Date(u.lastLogin) >= start1 && new Date(u.lastLogin) <= end1
+      );
+      
+      const start2 = new Date(customPeriod2.startDate);
+      start2.setHours(0, 0, 0, 0);
+      const end2 = new Date(customPeriod2.endDate);
+      end2.setHours(23, 59, 59, 999);
+      
+      const usersInPeriod2 = users.filter(u => 
+        u.lastLogin && new Date(u.lastLogin) >= start2 && new Date(u.lastLogin) <= end2
+      );
+      
+      const metrics = [
+        { name: 'Connexions totales', key1: usersInPeriod1.length, key2: usersInPeriod2.length, unit: '' },
+        { name: 'Utilisateurs uniques', key1: new Set(usersInPeriod1.map(u => u.id)).size, key2: new Set(usersInPeriod2.map(u => u.id)).size, unit: '' },
+        { name: 'Administrateurs actifs', key1: usersInPeriod1.filter(u => u.role === 'admin').length, key2: usersInPeriod2.filter(u => u.role === 'admin').length, unit: '' },
+        { name: 'Techniciens actifs', key1: usersInPeriod1.filter(u => u.role === 'technicien').length, key2: usersInPeriod2.filter(u => u.role === 'technicien').length, unit: '' },
+        { name: 'Service Social actif', key1: usersInPeriod1.filter(u => u.role === 'social').length, key2: usersInPeriod2.filter(u => u.role === 'social').length, unit: '' },
+        { name: 'Agents actifs', key1: usersInPeriod1.filter(u => u.role === 'agent').length, key2: usersInPeriod2.filter(u => u.role === 'agent').length, unit: '' }
+      ];
+
+      const result = metrics.map(metric => {
+        const val1 = metric.key1;
+        const val2 = metric.key2;
+        
+        let evolution = 0;
+        if (val2 === 0 && val1 === 0) {
+          evolution = 0;
+        } else if (val2 === 0 && val1 > 0) {
+          evolution = 100;
+        } else if (val2 > 0) {
+          evolution = Math.round(((val1 - val2) / val2) * 100);
+        }
+        
+        let trend = 'stable';
+        if (evolution > 5) trend = 'up';
+        else if (evolution < -5) trend = 'down';
+        
+        let analysis = '';
+        if (evolution > 0) analysis = `Augmentation de ${Math.abs(evolution)}% (${Math.abs(val1 - val2)} unités)`;
+        else if (evolution < 0) analysis = `Baisse de ${Math.abs(evolution)}% (${Math.abs(val1 - val2)} unités)`;
+        else analysis = 'Stable, aucune variation significative';
+        
+        return {
+          metric: metric.name,
+          period1: val1,
+          period2: val2,
+          evolution: evolution,
+          trend: trend,
+          analysis: analysis,
+          unit: metric.unit
+        };
+      });
+
+      setComparisonResult({
+        period1Label: period1Label,
+        period2Label: period2Label,
+        data: result
+      });
+      
+      setShowComparisonModal(false);
+      setShowCustomComparison(false);
+      
+      showNotification({
+        type: 'success',
+        title: '✅ Comparaison terminée',
+        message: 'Les résultats de la comparaison sont affichés ci-dessous'
+      });
+      
+    } catch (err) {
+      console.error('❌ Erreur comparaison:', err);
+      showNotification({
+        type: 'error',
+        title: '❌ Erreur',
+        message: 'Erreur lors de la comparaison'
+      });
+    } finally {
+      setLoadingStats(false);
+    }
+  }, [customPeriod1, customPeriod2, users]);
 
   // ========== CHANGEMENT PÉRIODE 1 ==========
-  const handlePeriod1Change = (e) => {
+  const handlePeriod1Change = useCallback((e) => {
     const type = e.target.value;
     let label = "";
     
@@ -723,11 +909,11 @@ const AdminDashboard = () => {
       default: label = type;
     }
     
-    setPeriod1({ ...period1, type, label });
-  };
+    setPeriod1(prev => ({ ...prev, type, label }));
+  }, []);
 
   // ========== CHANGEMENT PÉRIODE 2 ==========
-  const handlePeriod2Change = (e) => {
+  const handlePeriod2Change = useCallback((e) => {
     const type = e.target.value;
     let label = "";
     
@@ -743,11 +929,11 @@ const AdminDashboard = () => {
       default: label = type;
     }
     
-    setPeriod2({ ...period2, type, label });
-  };
+    setPeriod2(prev => ({ ...prev, type, label }));
+  }, []);
 
   // ========== EFFECTUER LA COMPARAISON ==========
-  const performComparison = async () => {
+  const performComparison = useCallback(async () => {
     setLoadingStats(true);
     
     try {
@@ -860,10 +1046,10 @@ const AdminDashboard = () => {
     } finally {
       setLoadingStats(false);
     }
-  };
+  }, [period1, period2]);
 
   // ========== FALLBACK AVEC DONNÉES LOCALES ==========
-  const fallbackLocalComparison = () => {
+  const fallbackLocalComparison = useCallback(() => {
     const range1 = getDateRangeForPeriod(period1.type);
     const stats1 = calculateStatsForPeriod(users, period1.type, range1.startDate, range1.endDate);
     
@@ -952,7 +1138,7 @@ const AdminDashboard = () => {
       title: 'ℹ️ Mode dégradé',
       message: 'Utilisation des données locales'
     });
-  };
+  }, [period1, period2, users, getDateRangeForPeriod, calculateStatsForPeriod]);
 
   // ========== FILTRAGE AVANCÉ ==========
   useEffect(() => {
@@ -1058,7 +1244,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
   
   useEffect(() => {
     window.debugUsers = users;
@@ -1083,12 +1269,6 @@ const AdminDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       
-      console.log('📝 Création utilisateur:', { 
-        email: formData.email, 
-        role: formData.role,
-        matricule: formData.matricule 
-      });
-
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
@@ -1104,7 +1284,6 @@ const AdminDashboard = () => {
       });
 
       const data = await response.json();
-      console.log('📦 Réponse:', data);
 
       if (response.ok && data.success) {
         showNotification({ 
@@ -1115,7 +1294,7 @@ const AdminDashboard = () => {
         
         setShowAddUserModal(false);
         setFormData({ email: '', role: 'agent', matricule: '', password: '' });
-        await fetchUsers();
+        await fetchUsers(true);
         
       } else {
         showNotification({ 
@@ -1158,7 +1337,7 @@ const AdminDashboard = () => {
           title: '✅ Succès', 
           message: `Utilisateur ${editFormData.email} modifié avec succès` 
         });
-        fetchUsers();
+        fetchUsers(true);
         setShowEditUserModal(false);
         setSelectedUser(null);
       } else {
@@ -1209,7 +1388,7 @@ const AdminDashboard = () => {
           title: '🗑️ Suppression', 
           message: `L'utilisateur ${userToDelete.email} a été supprimé` 
         });
-        fetchUsers();
+        fetchUsers(true);
         setShowDeleteConfirmModal(false);
         setUserToDelete(null);
       } else {
@@ -1233,8 +1412,18 @@ const AdminDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const user = users.find(u => u.id === userId);
+      
+      if (!user) {
+        showNotification({ 
+          type: 'error', 
+          title: '❌ Erreur', 
+          message: 'Utilisateur non trouvé' 
+        });
+        return;
+      }
+      
       const newStatus = user.status === 'active' ? 'inactive' : 'active';
-
+      
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/users/${userId}/status`, {
         method: 'PUT',
         headers: {
@@ -1252,9 +1441,7 @@ const AdminDashboard = () => {
         );
         setUsers(updatedUsers);
         setFilteredUsers(updatedUsers);
-        calculateSimpleStats(updatedUsers);
-        updateStatsForPeriod(selectedPeriod);
-        calculateHourlyData(updatedUsers);
+        setCachedUsers(updatedUsers);
         
         showNotification({ 
           type: 'success', 
@@ -1278,9 +1465,6 @@ const AdminDashboard = () => {
   };
 
   const handleResetPassword = async () => {
-    console.log('🟢 ===== DÉBOGAGE RÉINITIALISATION =====');
-    console.log('🟢 selectedResetUser:', selectedResetUser);
-    
     if (!selectedResetUser) {
       showNotification({ 
         type: 'error', 
@@ -1290,25 +1474,16 @@ const AdminDashboard = () => {
       return;
     }
 
-    let userId = selectedResetUser.id || 
-                 selectedResetUser.Id_utilisateur || 
-                 selectedResetUser.userId ||
-                 selectedResetUser._id;
-
-    console.log('🟢 ID trouvé:', userId);
-    console.log('🟢 Type ID:', typeof userId);
+    let userId = selectedResetUser.id || selectedResetUser.Id_utilisateur || selectedResetUser.userId || selectedResetUser._id;
 
     if (!userId && window.debugUsers) {
-      console.log('🟢 Recherche dans debugUsers...');
       const foundUser = window.debugUsers.find(u => u.email === selectedResetUser.email);
       if (foundUser) {
         userId = foundUser.id;
-        console.log('🟢 ID trouvé dans debugUsers:', userId);
       }
     }
 
     if (!userId) {
-      console.error('❌ AUCUN ID TROUVÉ DANS:', selectedResetUser);
       showNotification({ 
         type: 'error', 
         title: '❌ Erreur', 
@@ -1335,8 +1510,6 @@ const AdminDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       
-      console.log('📝 Envoi requête à:', `${process.env.REACT_APP_API_URL}/api/auth/users/${userId}/reset-password`);
-      
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/users/${userId}/reset-password`, {
         method: 'POST',
         headers: {
@@ -1349,7 +1522,6 @@ const AdminDashboard = () => {
       });
 
       const data = await response.json();
-      console.log('📦 Réponse:', data);
 
       if (response.ok) {
         setResetSuccess(true);
@@ -1486,7 +1658,7 @@ const AdminDashboard = () => {
           title: '✅ Succès', 
           message: data.message || `Action "${action}" effectuée sur ${selectedUsers.length} utilisateur(s)` 
         });
-        fetchUsers();
+        fetchUsers(true);
         setSelectedUsers([]);
         setShowBulkActionsModal(false);
       } else {
@@ -1644,6 +1816,7 @@ const AdminDashboard = () => {
   const currentItems = filteredUsers.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
 
+  // ========== RENDU PRINCIPAL ==========
   return (
     <div className={`dashboard-container theme-${settings.theme}`}>
       
@@ -1749,12 +1922,15 @@ const AdminDashboard = () => {
         <button className={`menu-btn ${activeTab === 'historique' ? 'active' : ''}`} onClick={() => navigate('/admin/historique')}>
           <History size={18} /> <span>{t.historique}</span>
         </button>
+        <button className={`menu-btn ${activeTab === 'audit' ? 'active' : ''}`} onClick={() => setActiveTab('audit')}>
+          <FileTextIcon size={18} /> <span>Journal d'audit</span>
+        </button>
       </div>
 
       {/* CONTENU */}
       <div className="dashboard-content">
         
-        {/* DASHBOARD */}
+        {/* ACCUEIL */}
         {activeTab === 'dashboard' && (
           <div className="dashboard-page">
             <h2>{t.dashboard}</h2>
@@ -1768,7 +1944,7 @@ const AdminDashboard = () => {
                 <AlertCircle size={48} />
                 <h3>Erreur de chargement</h3>
                 <p>{error}</p>
-                <button className="retry-btn" onClick={fetchUsers}>
+                <button className="retry-btn" onClick={() => fetchUsers(true)}>
                   <RefreshCw size={16} /> Réessayer
                 </button>
               </div>
@@ -1782,20 +1958,7 @@ const AdminDashboard = () => {
                       <div className="stat-value">{stats.total}</div>
                     </div>
                   </div>
-                  <div className="stat-card">
-                    <div className="stat-icon" style={{ color: '#10b981' }}><UserCheck size={24} /></div>
-                    <div className="stat-content">
-                      <div className="stat-label">Nombre des utilisateurs Actifs</div>
-                      <div className="stat-value">{stats.active}</div>
-                    </div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-icon" style={{ color: '#ef4444' }}><UserX size={24} /></div>
-                    <div className="stat-content">
-                      <div className="stat-label">Nombre des utilisateurs Inactifs</div>
-                      <div className="stat-value">{stats.inactive}</div>
-                    </div>
-                  </div>
+                  
                   <div className="stat-card">
                     <div className="stat-icon" style={{ color: '#2563eb' }}><Crown size={24} /></div>
                     <div className="stat-content">
@@ -1827,7 +1990,7 @@ const AdminDashboard = () => {
                   <div className="stat-card">
                     <div className="stat-icon" style={{ color: '#2563eb' }}><Zap size={24} /></div>
                     <div className="stat-content">
-                      <div className="stat-label">Nombre Total des  connexions</div>
+                      <div className="stat-label">Nombre Total des connexions</div>
                       <div className="stat-value">{stats.totalConnexions}</div>
                     </div>
                   </div>
@@ -1861,7 +2024,7 @@ const AdminDashboard = () => {
                       <button onClick={() => setShowExportModal(true)}>
                         <Download size={16} /> Exporter
                       </button>
-                      <button onClick={fetchUsers}>
+                      <button onClick={() => fetchUsers(true)}>
                         <RefreshCw size={16} /> Actualiser
                       </button>
                       <button onClick={() => setActiveTab('stats')}>
@@ -1885,8 +2048,8 @@ const AdminDashboard = () => {
                   <Search size={16} />
                   <input 
                     placeholder={t.search} 
-                    value={filters.search} 
-                    onChange={e => setFilters({...filters, search: e.target.value})} 
+                    defaultValue={filters.search}
+                    onChange={e => handleSearchDebounced(e.target.value)} 
                   />
                   {filters.search && (
                     <button className="clear-search" onClick={() => setFilters({...filters, search: ''})}>
@@ -2446,7 +2609,7 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* STATISTIQUES */}
+        {/* TABLEAU DE BORD (STATISTIQUES) - VERSION OPTIMISÉE */}
         {activeTab === 'stats' && (
           <div className="stats-page">
             <div className="stats-header">
@@ -2455,38 +2618,89 @@ const AdminDashboard = () => {
                 <p className="stats-subtitle">Visualisez, analysez et optimisez vos performances</p>
               </div>
               
-              <div className="period-selector-premium">
-                <button 
-                  className={`period-btn-premium ${selectedPeriod === 'today' ? 'active' : ''}`}
-                  onClick={() => handlePeriodChange('today')}
-                >
-                  <Calendar size={14} />
-                  <span>Aujourd'hui</span>
-                </button>
-                <button 
-                  className={`period-btn-premium ${selectedPeriod === 'week' ? 'active' : ''}`}
-                  onClick={() => handlePeriodChange('week')}
-                >
-                  <CalendarDays size={14} />
-                  <span>Cette semaine</span>
-                </button>
-                <button 
-                  className={`period-btn-premium ${selectedPeriod === 'month' ? 'active' : ''}`}
-                  onClick={() => handlePeriodChange('month')}
-                >
-                  <CalendarRange size={14} />
-                  <span>Ce mois</span>
-                </button>
-                <button 
-                  className={`period-btn-premium ${selectedPeriod === 'year' ? 'active' : ''}`}
-                  onClick={() => handlePeriodChange('year')}
-                >
-                  <CalendarIcon size={14} />
-                  <span>Cette année</span>
-                </button>
+              {/* SÉLECTEUR DE PÉRIODE AVEC DATE UNIQUE */}
+              <div className="period-selector-premium-v2">
+                <div className="period-slider-container">
+                  <button 
+                    className={`period-slide-btn ${periodType === 'today' ? 'active' : ''}`}
+                    onClick={() => handlePeriodChange('today')}
+                  >
+                    <CalendarIcon size={14} />
+                    <span>Aujourd'hui</span>
+                  </button>
+                  <button 
+                    className={`period-slide-btn ${periodType === 'week' ? 'active' : ''}`}
+                    onClick={() => handlePeriodChange('week')}
+                  >
+                    <CalendarDays size={14} />
+                    <span>Cette semaine</span>
+                  </button>
+                  <button 
+                    className={`period-slide-btn ${periodType === 'month' ? 'active' : ''}`}
+                    onClick={() => handlePeriodChange('month')}
+                  >
+                    <CalendarRange size={14} />
+                    <span>Ce mois</span>
+                  </button>
+                  <button 
+                    className={`period-slide-btn ${periodType === 'year' ? 'active' : ''}`}
+                    onClick={() => handlePeriodChange('year')}
+                  >
+                    <CalendarIcon size={14} />
+                    <span>Cette année</span>
+                  </button>
+                  <button 
+                    className={`period-slide-btn ${periodType === 'custom' ? 'active' : ''}`}
+                    onClick={() => handlePeriodChange('custom')}
+                  >
+                    <SlidersHorizontal size={14} />
+                    <span>Date personnalisée</span>
+                  </button>
+                </div>
+                
+                {/* DATE PICKER - UNIQUEMENT DATE UNIQUE */}
+                {showDatePicker && (
+                  <div className="custom-date-panel-simple">
+                    <div className="single-date-input">
+                      <label>📅 Sélectionnez une date</label>
+                      <input 
+                        type="date" 
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="date-input-simple"
+                      />
+                    </div>
+                    
+                    <div className="custom-date-actions">
+                      <button className="cancel-date-btn" onClick={cancelDatePicker}>
+                        <XCircle size={14} />
+                        Annuler
+                      </button>
+                      <button className="apply-date-btn-simple" onClick={applyCustomDateRange} disabled={isRefreshingStats}>
+                        {isRefreshingStats ? (
+                          <span className="spinner-small"></span>
+                        ) : (
+                          <>
+                            <Check size={14} />
+                            Appliquer
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
+            {/* Indicateur de chargement non bloquant */}
+            {isRefreshingStats && (
+              <div className="stats-loading-toast">
+                <div className="loading-spinner-small"></div>
+                <span>Mise à jour...</span>
+              </div>
+            )}
+
+            {/* KPI CARDS */}
             <div className="kpi-premium-grid">
               <div className="kpi-premium-card blue">
                 <div className="kpi-premium-icon">
@@ -2495,7 +2709,8 @@ const AdminDashboard = () => {
                 <div className="kpi-premium-content">
                   <span className="kpi-premium-label">Connexions</span>
                   <span className="kpi-premium-value">
-                    {currentPeriodStats[selectedPeriod]?.totalLogins || 0}
+                    {currentPeriodStats[periodType === 'custom' ? 'custom' : periodType]?.totalConnexions || 
+                     currentPeriodStats[periodType === 'custom' ? 'custom' : periodType]?.totalLogins || 0}
                   </span>
                   <span className={`kpi-premium-trend ${trendStats.logins >= 0 ? 'positive' : 'negative'}`}>
                     {trendStats.logins >= 0 ? '+' : ''}{trendStats.logins}%
@@ -2510,7 +2725,7 @@ const AdminDashboard = () => {
                 <div className="kpi-premium-content">
                   <span className="kpi-premium-label">Utilisateurs actifs</span>
                   <span className="kpi-premium-value">
-                    {currentPeriodStats[selectedPeriod]?.uniqueUsers || 0}
+                    {currentPeriodStats[periodType === 'custom' ? 'custom' : periodType]?.uniqueUsers || 0}
                   </span>
                   <span className={`kpi-premium-trend ${trendStats.users >= 0 ? 'positive' : 'negative'}`}>
                     {trendStats.users >= 0 ? '+' : ''}{trendStats.users}%
@@ -2525,7 +2740,7 @@ const AdminDashboard = () => {
                 <div className="kpi-premium-content">
                   <span className="kpi-premium-label">Nouveaux utilisateurs</span>
                   <span className="kpi-premium-value">
-                    {currentPeriodStats[selectedPeriod]?.newUsers || 0}
+                    {currentPeriodStats[periodType === 'custom' ? 'custom' : periodType]?.newUsers || 0}
                   </span>
                   <span className={`kpi-premium-trend ${trendStats.newUsers >= 0 ? 'positive' : 'negative'}`}>
                     {trendStats.newUsers >= 0 ? '+' : ''}{trendStats.newUsers}%
@@ -2540,7 +2755,7 @@ const AdminDashboard = () => {
                 <div className="kpi-premium-content">
                   <span className="kpi-premium-label">Taux OTP</span>
                   <span className="kpi-premium-value">
-                    {currentPeriodStats[selectedPeriod]?.otpUsage || 0}%
+                    {currentPeriodStats[periodType === 'custom' ? 'custom' : periodType]?.otpUsage || 0}%
                   </span>
                   <span className={`kpi-premium-trend ${trendStats.otp >= 0 ? 'positive' : 'negative'}`}>
                     {trendStats.otp >= 0 ? '+' : ''}{trendStats.otp}%
@@ -2867,14 +3082,18 @@ const AdminDashboard = () => {
             )}
           </div>
         )}
+
+        {/* JOURNAL D'AUDIT */}
+        {activeTab === 'audit' && <AuditLog />}
+
       </div>
 
-      {/* MODALES */}
+      {/* ========== MODALES ========== */}
       
-      {/* MODALE DE COMPARAISON */}
+      {/* MODALE DE COMPARAISON AVEC OPTION DATES PERSONNALISÉES */}
       {showComparisonModal && (
         <div className="modal-overlay" onClick={() => setShowComparisonModal(false)}>
-          <div className="modal-content comparison-modal-simple" onClick={e => e.stopPropagation()}>
+          <div className="modal-content comparison-modal-enhanced" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="header-icon" style={{ background: 'linear-gradient(135deg, #2563eb, #1e40af)' }}>
                 <BarChart size={24} />
@@ -2886,75 +3105,123 @@ const AdminDashboard = () => {
             </div>
             
             <div className="modal-body">
-              <div className="comparison-simple">
-                <div className="comparison-period-block">
-                  <label>Période 1</label>
-                  <select 
-                    className="period-select-simple"
-                    value={period1.type}
-                    onChange={handlePeriod1Change}
-                  >
-                    <option value="today">Aujourd'hui</option>
-                    <option value="yesterday">Hier</option>
-                    <option value="week">Cette semaine</option>
-                    <option value="lastWeek">Semaine dernière</option>
-                    <option value="month">Ce mois</option>
-                    <option value="lastMonth">Mois dernier</option>
-                    <option value="year">Cette année</option>
-                    <option value="lastYear">Année dernière</option>
-                  </select>
-                </div>
+              {!showCustomComparison ? (
+                <div className="comparison-options">
+                  <div className="comparison-simple">
+                    <div className="comparison-period-block">
+                      <label>Période 1</label>
+                      <select 
+                        className="period-select-simple"
+                        value={period1.type}
+                        onChange={handlePeriod1Change}
+                      >
+                        <option value="today">Aujourd'hui</option>
+                        <option value="yesterday">Hier</option>
+                        <option value="week">Cette semaine</option>
+                        <option value="lastWeek">Semaine dernière</option>
+                        <option value="month">Ce mois</option>
+                        <option value="lastMonth">Mois dernier</option>
+                        <option value="year">Cette année</option>
+                        <option value="lastYear">Année dernière</option>
+                      </select>
+                    </div>
 
-                <div className="comparison-vs-block">
-                  <span>VS</span>
-                </div>
+                    <div className="comparison-vs-block">
+                      <span>VS</span>
+                    </div>
 
-                <div className="comparison-period-block">
-                  <label>Période 2</label>
-                  <select 
-                    className="period-select-simple"
-                    value={period2.type}
-                    onChange={handlePeriod2Change}
-                  >
-                    <option value="today">Aujourd'hui</option>
-                    <option value="yesterday">Hier</option>
-                    <option value="week">Cette semaine</option>
-                    <option value="lastWeek">Semaine dernière</option>
-                    <option value="month">Ce mois</option>
-                    <option value="lastMonth">Mois dernier</option>
-                    <option value="year">Cette année</option>
-                    <option value="lastYear">Année dernière</option>
-                  </select>
+                    <div className="comparison-period-block">
+                      <label>Période 2</label>
+                      <select 
+                        className="period-select-simple"
+                        value={period2.type}
+                        onChange={handlePeriod2Change}
+                      >
+                        <option value="today">Aujourd'hui</option>
+                        <option value="yesterday">Hier</option>
+                        <option value="week">Cette semaine</option>
+                        <option value="lastWeek">Semaine dernière</option>
+                        <option value="month">Ce mois</option>
+                        <option value="lastMonth">Mois dernier</option>
+                        <option value="year">Cette année</option>
+                        <option value="lastYear">Année dernière</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div className="comparison-divider">
+                    <span>ou</span>
+                  </div>
+                  
+                  <button className="custom-compare-btn" onClick={enableCustomComparison}>
+                    <SlidersHorizontal size={16} />
+                    Comparer avec des dates personnalisées
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <div className="custom-comparison-panel">
+                  <h3>📅 Comparaison personnalisée</h3>
+                  
+                  <div className="custom-period-group">
+                    <label>Période 1</label>
+                    <div className="date-range-group">
+                      <input 
+                        type="date" 
+                        value={customPeriod1.startDate}
+                        onChange={(e) => setCustomPeriod1({...customPeriod1, startDate: e.target.value})}
+                        className="date-input-custom"
+                      />
+                      <span>→</span>
+                      <input 
+                        type="date" 
+                        value={customPeriod1.endDate}
+                        onChange={(e) => setCustomPeriod1({...customPeriod1, endDate: e.target.value})}
+                        className="date-input-custom"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="custom-period-group">
+                    <label>Période 2</label>
+                    <div className="date-range-group">
+                      <input 
+                        type="date" 
+                        value={customPeriod2.startDate}
+                        onChange={(e) => setCustomPeriod2({...customPeriod2, startDate: e.target.value})}
+                        className="date-input-custom"
+                      />
+                      <span>→</span>
+                      <input 
+                        type="date" 
+                        value={customPeriod2.endDate}
+                        onChange={(e) => setCustomPeriod2({...customPeriod2, endDate: e.target.value})}
+                        className="date-input-custom"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="custom-comparison-actions">
+                    <button className="btn-back" onClick={() => setShowCustomComparison(false)}>
+                      ← Retour
+                    </button>
+                    <button className="btn-compare" onClick={performCustomComparison} disabled={loadingStats}>
+                      {loadingStats ? <span className="spinner-small"></span> : 'Comparer'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="modal-footer">
               <button className="btn-secondary" onClick={() => setShowComparisonModal(false)}>
                 Annuler
               </button>
-              <button 
-                className="btn-primary" 
-                onClick={performComparison}
-                disabled={loadingStats}
-              >
-                {loadingStats ? (
-                  <>
-                    <span className="spinner-small"></span>
-                    Chargement...
-                  </>
-                ) : (
-                  <>
-                    <BarChart size={16} /> Comparer
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODALE DE MODIFICATION */}
+      {/* MODALE DE MODIFICATION - AVEC CHAMPS GRISÉS */}
       {showEditUserModal && selectedUser && (
         <div className="modal-overlay" onClick={() => setShowEditUserModal(false)}>
           <div className="modal-content edit-modal-pro" onClick={e => e.stopPropagation()}>
@@ -3007,33 +3274,46 @@ const AdminDashboard = () => {
                     </div>
                   </div>
 
+                  {/* CHAMP RÔLE - GRISÉ ET DÉSACTIVÉ */}
                   <div className="form-field">
-                    <label>Rôle</label>
-                    <div className="input-group">
+                    <label>Rôle <span className="field-disabled-note">(Non modifiable)</span></label>
+                    <div className="input-group disabled-group">
                       <UserCog size={16} className="field-icon" />
                       <select 
                         value={editFormData.role} 
-                        onChange={e => setEditFormData({...editFormData, role: e.target.value})}
-                        required
+                        disabled
+                        className="disabled-input"
+                        style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed', opacity: 0.7 }}
                       >
                         <option value="admin">Administrateur</option>
                         <option value="technicien">Technicien</option>
                         <option value="social">Service Social</option>
                         <option value="agent">Agent</option>
                       </select>
+                      <div className="disabled-overlay">
+                        <Lock size={14} />
+                        <span>Verrouillé</span>
+                      </div>
                     </div>
                   </div>
 
+                  {/* CHAMP MATRICULE - GRISÉ ET DÉSACTIVÉ */}
                   <div className="form-field">
-                    <label>Matricule</label>
-                    <div className="input-group">
+                    <label>Matricule <span className="field-disabled-note">(Non modifiable)</span></label>
+                    <div className="input-group disabled-group">
                       <Hash size={16} className="field-icon" />
                       <input 
                         type="text" 
                         value={editFormData.matricule} 
-                        onChange={e => setEditFormData({...editFormData, matricule: e.target.value})} 
+                        disabled
+                        className="disabled-input"
+                        style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed', opacity: 0.7 }}
                         placeholder="Numéro de matricule"
                       />
+                      <div className="disabled-overlay">
+                        <Lock size={14} />
+                        <span>Verrouillé</span>
+                      </div>
                     </div>
                   </div>
 
@@ -3057,7 +3337,10 @@ const AdminDashboard = () => {
                     <button 
                       type="button" 
                       className={`action-pro ${selectedUser.status === 'active' ? 'warning' : 'success'}`}
-                      onClick={() => handleToggleStatus(selectedUser.id)}
+                      onClick={() => {
+                        handleToggleStatus(selectedUser.id);
+                        setShowEditUserModal(false);
+                      }}
                     >
                       {selectedUser.status === 'active' ? (
                         <>
@@ -3496,73 +3779,66 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* MODALE AJOUT UTILISATEUR */}
+      {/* MODALE AJOUT UTILISATEUR - VERSION PROFESSIONNELLE */}
       {showAddUserModal && (
         <div className="modal-overlay" onClick={() => setShowAddUserModal(false)}>
-          <div className="modal-content modal-add-user scrollable-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header premium-header">
-              <div className="header-icon-wrapper">
-                <div className="header-icon-glow"></div>
-                <div className="header-icon" style={{ background: 'linear-gradient(135deg, #2563eb, #1e40af, #1e3a8a)' }}>
-                  <UserPlus size={24} />
-                </div>
+          <div className="modal-content modal-add-user enhanced" onClick={e => e.stopPropagation()}>
+            <div className="modal-header enhanced">
+              <div className="header-icon enhanced">
+                <UserPlus size={28} />
               </div>
-              <div className="header-title">
-                <h2 style={{ color: 'white' }}>Nouvel utilisateur</h2>
-                <p>Ajouter un compte</p>
+              <div className="header-content">
+                <h2>Créer un nouvel utilisateur</h2>
+                <p>Remplissez les informations ci-dessous pour ajouter un compte</p>
               </div>
-              <button className="modal-close premium-close" onClick={() => setShowAddUserModal(false)}>
-                <X size={18} />
+              <button className="modal-close enhanced" onClick={() => setShowAddUserModal(false)}>
+                <X size={20} />
               </button>
             </div>
-            
-            <form onSubmit={handleAddUser} className="modal-form">
-              <div className="modal-body scrollable-content">
-                <div className="form-step compact">
-                  <div className="step-header compact">
-                    <div className="step-number small">1</div>
-                    <div className="step-title">
-                      <h4>Connexion</h4>
+
+            <form onSubmit={handleAddUser}>
+              <div className="modal-body enhanced">
+                {/* Section 1: Informations de connexion */}
+                <div className="form-section enhanced">
+                  <div className="section-title">
+                    <div className="title-icon">
+                      <Key size={18} />
+                    </div>
+                    <div>
+                      <h3>Informations de connexion</h3>
+                      <p>Identifiants permettant à l'utilisateur d'accéder à la plateforme</p>
                     </div>
                   </div>
                   
-                  <div className="step-content">
-                    <div className="form-group premium-group compact">
+                  <div className="form-row">
+                    <div className="form-field full-width">
                       <label>
                         <Mail size={14} />
-                        <span>Email <span className="required">*</span></span>
+                        Email <span className="required">*</span>
                       </label>
-                      <div className="input-wrapper">
-                        <input 
-                          type="email" 
-                          value={formData.email} 
-                          onChange={e => setFormData({...formData, email: e.target.value})} 
-                          placeholder="exemple@email.com"
-                          required 
-                        />
-                        {formData.email && (
-                          <span className="input-valid">
-                            <CheckCircle size={14} />
-                          </span>
-                        )}
-                      </div>
+                      <input 
+                        type="email" 
+                        value={formData.email} 
+                        onChange={e => setFormData({...formData, email: e.target.value})} 
+                        placeholder="exemple@email.com"
+                        required 
+                      />
                     </div>
+                  </div>
 
-                    <div className="form-group premium-group compact">
+                  <div className="form-row">
+                    <div className="form-field full-width">
                       <label>
                         <Key size={14} />
-                        <span>Mot de passe <span className="required">*</span></span>
+                        Mot de passe <span className="required">*</span>
                       </label>
-                      <div className="input-wrapper">
-                        <input 
-                          type="password" 
-                          value={formData.password} 
-                          onChange={e => setFormData({...formData, password: e.target.value})} 
-                          placeholder="••••••••"
-                          required 
-                        />
-                      </div>
-                      
+                      <input 
+                        type="password" 
+                        value={formData.password} 
+                        onChange={e => setFormData({...formData, password: e.target.value})} 
+                        placeholder="••••••••"
+                        required 
+                      />
                       {formData.password && (
                         <div className="password-strength-mini">
                           <div className="strength-bar-mini">
@@ -3581,60 +3857,61 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                <div className="form-step compact">
-                  <div className="step-header compact">
-                    <div className="step-number small">2</div>
-                    <div className="step-title">
-                      <h4>Profil</h4>
+                {/* Section 2: Informations professionnelles */}
+                <div className="form-section enhanced">
+                  <div className="section-title">
+                    <div className="title-icon">
+                      <Briefcase size={18} />
+                    </div>
+                    <div>
+                      <h3>Informations professionnelles</h3>
+                      <p>Définissez le rôle et les informations de l'utilisateur</p>
                     </div>
                   </div>
-                  
-                  <div className="step-content">
-                    <div className="form-group premium-group compact">
+
+                  <div className="form-row two-cols">
+                    <div className="form-field">
                       <label>
                         <UserCog size={14} />
-                        <span>Rôle <span className="required">*</span></span>
+                        Rôle <span className="required">*</span>
                       </label>
-                      <div className="select-wrapper compact">
-                        <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} required>
-                          <option value="admin">Administrateur</option>
-                          <option value="technicien">Technicien</option>
-                          <option value="social">Service Social</option>
-                          <option value="agent">Agent</option>
-                        </select>
-                        <ChevronDown size={14} className="select-arrow" />
-                      </div>
+                      <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} required>
+                        <option value="admin">Administrateur</option>
+                        <option value="technicien">Technicien</option>
+                        <option value="social">Service Social</option>
+                        <option value="agent">Agent</option>
+                      </select>
                     </div>
 
-                    <div className="form-group premium-group compact">
+                    <div className="form-field">
                       <label>
                         <Hash size={14} />
-                        <span>Matricule</span>
+                        Matricule
                       </label>
-                      <div className="input-wrapper">
-                        <input 
-                          type="text" 
-                          value={formData.matricule} 
-                          onChange={e => setFormData({...formData, matricule: e.target.value})} 
-                          placeholder="Optionnel"
-                        />
-                      </div>
+                      <input 
+                        type="text" 
+                        value={formData.matricule} 
+                        onChange={e => setFormData({...formData, matricule: e.target.value})} 
+                        placeholder="Optionnel"
+                      />
                     </div>
                   </div>
                 </div>
 
+                {/* Section 3: Note */}
                 <div className="form-note">
                   <Info size={14} />
                   <span>Email de confirmation envoyé après création</span>
                 </div>
               </div>
 
-              <div className="modal-footer premium-footer compact">
-                <button type="button" className="btn-outline small" onClick={() => setShowAddUserModal(false)}>
+              <div className="modal-footer enhanced">
+                <button type="button" className="btn-cancel" onClick={() => setShowAddUserModal(false)}>
                   Annuler
                 </button>
-                <button type="submit" className="btn-premium small">
-                  <UserPlus size={14} /> Créer
+                <button type="submit" className="btn-submit">
+                  <UserPlus size={16} />
+                  Créer l'utilisateur
                 </button>
               </div>
             </form>
@@ -3645,4 +3922,4 @@ const AdminDashboard = () => {
   );
 };
 
-export default AdminDashboard;               
+export default AdminDashboard;      

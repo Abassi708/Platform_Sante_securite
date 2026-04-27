@@ -16,7 +16,17 @@ const cx = (...classes) => classes.filter(Boolean).map(c => `${PREFIX}${c}`).joi
 
 // ========== FONCTIONS UTILITAIRES ==========
 const getNumeroSemaine = (date) => moment(date).isoWeek();
-const getLundiSemaine = (numeroSemaine, annee) => moment().year(annee).isoWeek(numeroSemaine).day(1).format('YYYY-MM-DD');
+
+// ✅ FONCTION CORRIGÉE - Calcul correct du lundi d'une semaine ISO
+const getLundiSemaine = (numeroSemaine, annee) => {
+  const date = new Date(annee, 0, 4);
+  const jour = date.getDay();
+  const decalage = (jour === 0 ? 6 : jour - 1);
+  date.setDate(date.getDate() - decalage);
+  date.setDate(date.getDate() + (numeroSemaine - 1) * 7);
+  return date.toISOString().split('T')[0];
+};
+
 const formatDate = (date) => date ? date.split('-').reverse().join('/') : '';
 const formatDateLong = (date) => {
   if (!date) return '';
@@ -172,34 +182,32 @@ const PlanningPage = () => {
     } catch (err) { console.error(err); }
   };
 
- // frontend/components/visites/PlanningPage.jsx
-const fetchPlanningSemaine = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    // ✅ S'assurer que semaine et annee sont des nombres
-    const semaine = parseInt(semaineCourante.numero);
-    const annee = parseInt(semaineCourante.annee);
-    
-    if (isNaN(semaine) || isNaN(annee)) {
-      console.error('Semaine ou année invalide:', semaine, annee);
-      return;
+  const fetchPlanningSemaine = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const semaine = parseInt(semaineCourante.numero);
+      const annee = parseInt(semaineCourante.annee);
+      
+      if (isNaN(semaine) || isNaN(annee)) {
+        console.error('Semaine ou année invalide:', semaine, annee);
+        return;
+      }
+      
+      const url = `${process.env.REACT_APP_API_URL}/api/planning/${semaine}/${annee}`;
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await res.json();
+      if (data.success) {
+        const planningWithData = (data.planning || []).map(p => ({
+          ...p,
+          a_des_actions: p.historique?.length > 0 || false
+        }));
+        setPlanning(planningWithData);
+      }
+    } catch (err) { 
+      console.error('Erreur fetch planning:', err);
+      setPlanning([]); 
     }
-    
-    const url = `${process.env.REACT_APP_API_URL}/api/planning/${semaine}/${annee}`;
-    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-    const data = await res.json();
-    if (data.success) {
-      const planningWithData = (data.planning || []).map(p => ({
-        ...p,
-        a_des_actions: p.historique?.length > 0 || false
-      }));
-      setPlanning(planningWithData);
-    }
-  } catch (err) { 
-    console.error('Erreur fetch planning:', err);
-    setPlanning([]); 
-  }
-};
+  };
 
   const fetchVisiteDetails = async (idPlanning) => {
     try {
@@ -919,57 +927,53 @@ const fetchPlanningSemaine = async () => {
     }
   };
 
-  // Modifier la fonction handleEnvoyerToutesConvocations
-const handleEnvoyerToutesConvocations = () => {
-  // ✅ CORRECTION : Filtrer uniquement Périodique et Reprise
-  const aEnvoyer = planning.filter(p => 
-    !p.convocation_envoyee && 
-    p.statut === 'Programmé' && 
-    !p.visite_effectuee &&
-    (p.type_visite === 'Périodique' || p.type_visite === 'Reprise')
-  );
-  if (aEnvoyer.length === 0) {
-    showNotification({ type: 'info', title: 'ℹ️ Info', message: 'Aucune convocation à envoyer (uniquement Périodique et Reprise)' });
-    return;
-  }
-  setGroupeConvocationCount(aEnvoyer.length);
-  setShowGroupeConvocationModal(true);
-};
-
-// Modifier la fonction confirmerEnvoiToutesConvocations
-const confirmerEnvoiToutesConvocations = async () => {
-  // ✅ CORRECTION : Filtrer uniquement Périodique et Reprise
-  const aEnvoyer = planning.filter(p => 
-    !p.convocation_envoyee && 
-    p.statut === 'Programmé' && 
-    !p.visite_effectuee &&
-    (p.type_visite === 'Périodique' || p.type_visite === 'Reprise')
-  );
-  if (aEnvoyer.length === 0) return;
-  
-  setGroupeConvocationLoading(true);
-  setShowGroupeConvocationModal(false);
-  
-  try {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/envoyer-convocations-groupees`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids_planning: aEnvoyer.map(p => p.id_planning) })
-    });
-    const data = await res.json();
-    if (data.success) {
-      showNotification({ type: 'success', title: '📧 Convocations envoyées', message: `${aEnvoyer.length} convocation(s) envoyée(s) au GRH` });
-      fetchPlanningSemaine();
-    } else {
-      showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
+  const handleEnvoyerToutesConvocations = () => {
+    const aEnvoyer = planning.filter(p => 
+      !p.convocation_envoyee && 
+      p.statut === 'Programmé' && 
+      !p.visite_effectuee &&
+      (p.type_visite === 'Périodique' || p.type_visite === 'Reprise')
+    );
+    if (aEnvoyer.length === 0) {
+      showNotification({ type: 'info', title: 'ℹ️ Info', message: 'Aucune convocation à envoyer (uniquement Périodique et Reprise)' });
+      return;
     }
-  } catch (err) {
-    showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur lors de l\'envoi' });
-  } finally {
-    setGroupeConvocationLoading(false);
-  }
-};
+    setGroupeConvocationCount(aEnvoyer.length);
+    setShowGroupeConvocationModal(true);
+  };
+
+  const confirmerEnvoiToutesConvocations = async () => {
+    const aEnvoyer = planning.filter(p => 
+      !p.convocation_envoyee && 
+      p.statut === 'Programmé' && 
+      !p.visite_effectuee &&
+      (p.type_visite === 'Périodique' || p.type_visite === 'Reprise')
+    );
+    if (aEnvoyer.length === 0) return;
+    
+    setGroupeConvocationLoading(true);
+    setShowGroupeConvocationModal(false);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/envoyer-convocations-groupees`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids_planning: aEnvoyer.map(p => p.id_planning) })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification({ type: 'success', title: '📧 Convocations envoyées', message: `${aEnvoyer.length} convocation(s) envoyée(s) au GRH` });
+        fetchPlanningSemaine();
+      } else {
+        showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
+      }
+    } catch (err) {
+      showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur lors de l\'envoi' });
+    } finally {
+      setGroupeConvocationLoading(false);
+    }
+  };
 
   // ========== NAVIGATION ==========
   const changerSemaine = (direction) => {
@@ -995,22 +999,20 @@ const confirmerEnvoiToutesConvocations = async () => {
     return true;
   }), [planning, selectedAgentFilter, selectedTypeFilter, selectedStatusFilter, searchTerm, getAgentNom]);
 
-  // Dans le composant PlanningPage, modifier le calcul de convocationsRestantes
-const stats = useMemo(() => ({
-  total: planning.length,
-  programme: planning.filter(p => p.statut === 'Programmé' && !p.visite_effectuee).length,
-  effectue: planning.filter(p => p.visite_effectuee).length,
-  reporte: planning.filter(p => p.statut === 'Reporté').length,
-  annule: planning.filter(p => p.statut === 'Annulé').length,
-  convocationsEnvoyees: planning.filter(p => p.convocation_envoyee).length,
-  // ✅ CORRECTION : Compter uniquement les visites Périodique et Reprise
-  convocationsRestantes: planning.filter(p => 
-    !p.convocation_envoyee && 
-    p.statut === 'Programmé' && 
-    !p.visite_effectuee &&
-    (p.type_visite === 'Périodique' || p.type_visite === 'Reprise')
-  ).length
-}), [planning]);
+  const stats = useMemo(() => ({
+    total: planning.length,
+    programme: planning.filter(p => p.statut === 'Programmé' && !p.visite_effectuee).length,
+    effectue: planning.filter(p => p.visite_effectuee).length,
+    reporte: planning.filter(p => p.statut === 'Reporté').length,
+    annule: planning.filter(p => p.statut === 'Annulé').length,
+    convocationsEnvoyees: planning.filter(p => p.convocation_envoyee).length,
+    convocationsRestantes: planning.filter(p => 
+      !p.convocation_envoyee && 
+      p.statut === 'Programmé' && 
+      !p.visite_effectuee &&
+      (p.type_visite === 'Périodique' || p.type_visite === 'Reprise')
+    ).length
+  }), [planning]);
 
   // ========== COMPOSANT HISTORIQUE POPUP ==========
   const HistoriquePopup = ({ visite, onClose }) => {
@@ -1123,7 +1125,7 @@ const stats = useMemo(() => ({
     );
   };
 
-  // ========== COMPOSANT MODAL HISTORIQUE AGENT (SANS ANIMATION) ==========
+  // ========== COMPOSANT MODAL HISTORIQUE AGENT ==========
   const AgentHistoryModal = ({ matricule, onClose }) => {
     const [loadingHisto, setLoadingHisto] = useState(true);
     const [historiqueAgent, setHistoriqueAgent] = useState([]);
@@ -1145,13 +1147,11 @@ const stats = useMemo(() => ({
         try {
           const token = localStorage.getItem('token');
           
-          // Charger l'historique des visites effectuées
           const resHistorique = await fetch(`${process.env.REACT_APP_API_URL}/api/historique/agent/${matricule}?limit=100`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           const dataHistorique = await resHistorique.json();
           
-          // Charger les visites programmées (non effectuées)
           const resPlanning = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/agent/${matricule}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
@@ -1212,7 +1212,6 @@ const stats = useMemo(() => ({
             <button className="ha-close-btn" onClick={onClose}>✕</button>
           </div>
 
-          {/* Statistiques */}
           <div className="ha-stats-grid">
             <div className="ha-stat-card">
               <div className="ha-stat-value">{statsAgent.total || 0}</div>
@@ -1236,7 +1235,6 @@ const stats = useMemo(() => ({
             </div>
           </div>
 
-          {/* Filtres */}
           <div className="ha-filters">
             <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
               <option value="all">📋 Tous les types</option>
@@ -1256,7 +1254,6 @@ const stats = useMemo(() => ({
             </button>
           </div>
 
-          {/* Section: Visites programmées */}
           {filteredProgrammees.length > 0 && (
             <>
               <div className="ha-section-title">
@@ -1312,7 +1309,6 @@ const stats = useMemo(() => ({
             </>
           )}
 
-          {/* Section: Historique des visites effectuées */}
           <div className="ha-section-title">
             <History size={16} />
             <span>Historique des visites effectuées</span>
@@ -1371,7 +1367,6 @@ const stats = useMemo(() => ({
                         </div>
                       )}
                       
-                      {/* Détails spécifiques selon le type */}
                       {item.details?.prochaine_visite && (
                         <div className="ha-detail-row highlight">
                           <Calendar size={14} />
@@ -1506,135 +1501,131 @@ const stats = useMemo(() => ({
     );
   };
 
-const VisitCard = ({ visite }) => {
-  const isExpanded = expandedCards.has(visite.id_planning);
-  const agent = getAgentDetails(visite.matricule_agent);
-  const actionDetailsDisplay = getActionDetailsDisplay(visite);
-  
-  
-  // ✅ Filtrer les valeurs null/undefined/0 pour ne PAS les afficher
-  const shouldShow = (value) => {
-    return value !== null && value !== undefined && value !== 0 && value !== '';
+  const VisitCard = ({ visite }) => {
+    const isExpanded = expandedCards.has(visite.id_planning);
+    const agent = getAgentDetails(visite.matricule_agent);
+    const actionDetailsDisplay = getActionDetailsDisplay(visite);
+    
+    const shouldShow = (value) => {
+      return value !== null && value !== undefined && value !== 0 && value !== '';
+    };
+
+    return (
+      <div className={getCardClassName(visite)}>
+        <div className={cx('visit-card-header')}>
+          <div className={cx('visit-card-header-left')}>
+            <div className={cx('agent-avatar')}>
+              <span>
+                {(() => {
+                  const nom = getAgentNom(visite.matricule_agent);
+                  if (!nom || nom === 'Agent inconnu' || nom === 'Agent 0') return '?';
+                  const parts = nom.split(' ');
+                  return parts.map(n => n[0]).join('').slice(0, 2);
+                })()}
+              </span>
+            </div>
+            <div>
+              <div className={cx('agent-name')}>
+                {getAgentNom(visite.matricule_agent).replace('Agent 0', 'Agent ?')}
+              </div>
+              <div className={cx('agent-matricule')}>
+                {visite.matricule_agent ? `#${visite.matricule_agent}` : '#?'}
+              </div>
+            </div>
+          </div>
+          <div className={cx('visit-card-header-right')}>
+            {getStatusBadge(visite.statut, visite.visite_effectuee, visite.creneau_bloque)}
+            <button className={cx('card-expand-btn')} onClick={() => toggleCardExpand(visite.id_planning)}>
+              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+          </div>
+        </div>
+        
+        <div className={cx('visit-card-body')}>
+          <div className={cx('visit-datetime')}>
+            <div><Calendar size={14} /> {formatDate(visite.date_visite)}</div>
+            <div><Clock size={14} /> {visite.heure_visite?.substring(0,5)}</div>
+          </div>
+          
+          <div className={cx('visit-badges')}>
+            {getTypeVisiteBadge(visite.type_visite)}
+            {getPeriodiciteBadge(visite.matricule_agent)}
+            {getSourceBadge(visite.source_planification, visite.motif_reprogrammation)}
+            {visite.convocation_envoyee && <Badge variant="success" icon={Mail}>Convocation envoyée</Badge>}
+          </div>
+          
+          {agent && shouldShow(agent.code_agence) && (
+            <div className={cx('visit-details')}>
+              <span><Building size={12} /> Agence {agent.code_agence}</span>
+              <span className={cx('visit-details-separator')}>•</span>
+              <span><History size={12} /> Dernière visite: {getDerniereVisite(visite.matricule_agent)}</span>
+            </div>
+          )}
+          
+          {actionDetailsDisplay && (
+            <div className={cx('action-details-wrapper')}>
+              {actionDetailsDisplay}
+            </div>
+          )}
+          
+          {visite.reprogrammee && visite.creneau_bloque && !actionDetailsDisplay && (
+            <div className={cx('reprogram-info')}>
+              <div><RefreshCw size={12} /> <strong>Reprogrammé</strong></div>
+              {shouldShow(visite.motif_reprogrammation) && <div><FileText size={10} /> {visite.motif_reprogrammation}</div>}
+              {visite.nouvelle_date_visite && <div><Calendar size={10} /> Nouveau: {formatDate(visite.nouvelle_date_visite)} {visite.nouvelle_heure_visite?.substring(0,5)}</div>}
+            </div>
+          )}
+
+          {visite.motif_annulation && (
+            <div className={cx('annulation-motif')}>
+              <AlertCircle size={12} />
+              <span>Motif: {visite.motif_annulation}</span>
+            </div>
+          )}
+        </div>
+        
+        <div className={cx('visit-card-actions')}>
+          {!visite.visite_effectuee && visite.statut === 'Programmé' && !visite.creneau_bloque && (
+            <>
+              <Button variant="success" size="sm" icon={CheckCircle} onClick={() => handleEnregistrerVisite(visite)}>Effectuer</Button>
+              <Button variant="warning" size="sm" icon={Calendar} onClick={() => handleReprogrammerManuel(visite)}>Reprogrammer</Button>
+              <Button variant="info" size="sm" icon={Zap} onClick={() => handleReprogrammerAuto(visite)}>Auto</Button>
+              {visite.type_visite === 'Reprise' && <Button variant="danger" size="sm" icon={XCircle} onClick={() => handleAnnulerVisite(visite)}>Annuler</Button>}
+            </>
+          )}
+          
+          {!visite.visite_effectuee && visite.statut === 'Programmé' && !visite.convocation_envoyee && !visite.creneau_bloque && 
+           (visite.type_visite === 'Périodique' || visite.type_visite === 'Reprise') && (
+            <>
+              <Button variant="info" size="sm" icon={Eye} onClick={() => { setConvocationToPreview(visite); setShowConvocationPreview(true); }}>Aperçu</Button>
+              <Button variant="success" size="sm" icon={Mail} onClick={() => handleEnvoyerConvocation(visite)}>Envoyer</Button>
+            </>
+          )}
+          
+          {(visite.historique?.length > 0 || visite.a_des_actions === true) && (
+            <Button variant="ghost" size="sm" icon={History} onClick={() => {
+              if (!visite.historique) {
+                fetchVisiteDetails(visite.id_planning);
+              }
+              setShowHistorique(visite.id_planning);
+            }}>
+              Historique ({visite.historique?.length || 0})
+            </Button>
+          )}
+        </div>
+        
+        {visite.visite_effectuee && (
+          <div className={cx('visit-completed-badge')}>
+            <CheckCircle size={14} /> Effectuée le {formatDate(visite.date_visite)}
+          </div>
+        )}
+      </div>
+    );
   };
-
-  return (
-    <div className={getCardClassName(visite)}>
-      <div className={cx('visit-card-header')}>
-        <div className={cx('visit-card-header-left')}>
-          <div className={cx('agent-avatar')}>
-            <span>
-              {(() => {
-                const nom = getAgentNom(visite.matricule_agent);
-                if (!nom || nom === 'Agent inconnu' || nom === 'Agent 0') return '?';
-                const parts = nom.split(' ');
-                return parts.map(n => n[0]).join('').slice(0, 2);
-              })()}
-            </span>
-          </div>
-          <div>
-            <div className={cx('agent-name')}>
-              {getAgentNom(visite.matricule_agent).replace('Agent 0', 'Agent ?')}
-            </div>
-            <div className={cx('agent-matricule')}>
-              {visite.matricule_agent ? `#${visite.matricule_agent}` : '#?'}
-            </div>
-          </div>
-        </div>
-        <div className={cx('visit-card-header-right')}>
-          {getStatusBadge(visite.statut, visite.visite_effectuee, visite.creneau_bloque)}
-          <button className={cx('card-expand-btn')} onClick={() => toggleCardExpand(visite.id_planning)}>
-            {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
-        </div>
-      </div>
-      
-      <div className={cx('visit-card-body')}>
-        <div className={cx('visit-datetime')}>
-          <div><Calendar size={14} /> {formatDate(visite.date_visite)}</div>
-          <div><Clock size={14} /> {visite.heure_visite?.substring(0,5)}</div>
-        </div>
-        
-        <div className={cx('visit-badges')}>
-          {getTypeVisiteBadge(visite.type_visite)}
-          {getPeriodiciteBadge(visite.matricule_agent)}
-          {getSourceBadge(visite.source_planification, visite.motif_reprogrammation)}
-          {visite.convocation_envoyee && <Badge variant="success" icon={Mail}>Convocation envoyée</Badge>}
-        </div>
-        
-        {agent && shouldShow(agent.code_agence) && (
-          <div className={cx('visit-details')}>
-            <span><Building size={12} /> Agence {agent.code_agence}</span>
-            <span className={cx('visit-details-separator')}>•</span>
-            <span><History size={12} /> Dernière visite: {getDerniereVisite(visite.matricule_agent)}</span>
-          </div>
-        )}
-        
-        {actionDetailsDisplay && (
-          <div className={cx('action-details-wrapper')}>
-            {actionDetailsDisplay}
-          </div>
-        )}
-        
-        {visite.reprogrammee && visite.creneau_bloque && !actionDetailsDisplay && (
-          <div className={cx('reprogram-info')}>
-            <div><RefreshCw size={12} /> <strong>Reprogrammé</strong></div>
-            {shouldShow(visite.motif_reprogrammation) && <div><FileText size={10} /> {visite.motif_reprogrammation}</div>}
-            {visite.nouvelle_date_visite && <div><Calendar size={10} /> Nouveau: {formatDate(visite.nouvelle_date_visite)} {visite.nouvelle_heure_visite?.substring(0,5)}</div>}
-          </div>
-        )}
-
-        {visite.motif_annulation && (
-          <div className={cx('annulation-motif')}>
-            <AlertCircle size={12} />
-            <span>Motif: {visite.motif_annulation}</span>
-          </div>
-        )}
-      </div>
-      
-      {/* Boutons d'action */}
-      <div className={cx('visit-card-actions')}>
-        {!visite.visite_effectuee && visite.statut === 'Programmé' && !visite.creneau_bloque && (
-          <>
-            <Button variant="success" size="sm" icon={CheckCircle} onClick={() => handleEnregistrerVisite(visite)}>Effectuer</Button>
-            <Button variant="warning" size="sm" icon={Calendar} onClick={() => handleReprogrammerManuel(visite)}>Reprogrammer</Button>
-            <Button variant="info" size="sm" icon={Zap} onClick={() => handleReprogrammerAuto(visite)}>Auto</Button>
-            {visite.type_visite === 'Reprise' && <Button variant="danger" size="sm" icon={XCircle} onClick={() => handleAnnulerVisite(visite)}>Annuler</Button>}
-          </>
-        )}
-        
-        {!visite.visite_effectuee && visite.statut === 'Programmé' && !visite.convocation_envoyee && !visite.creneau_bloque && 
-         (visite.type_visite === 'Périodique' || visite.type_visite === 'Reprise') && (
-          <>
-            <Button variant="info" size="sm" icon={Eye} onClick={() => { setConvocationToPreview(visite); setShowConvocationPreview(true); }}>Aperçu</Button>
-            <Button variant="success" size="sm" icon={Mail} onClick={() => handleEnvoyerConvocation(visite)}>Envoyer</Button>
-          </>
-        )}
-        
-        {(visite.historique?.length > 0 || visite.a_des_actions === true) && (
-          <Button variant="ghost" size="sm" icon={History} onClick={() => {
-            if (!visite.historique) {
-              fetchVisiteDetails(visite.id_planning);
-            }
-            setShowHistorique(visite.id_planning);
-          }}>
-            Historique ({visite.historique?.length || 0})
-          </Button>
-        )}
-      </div>
-      
-      {visite.visite_effectuee && (
-        <div className={cx('visit-completed-badge')}>
-          <CheckCircle size={14} /> Effectuée le {formatDate(visite.date_visite)}
-        </div>
-      )}
-    </div>
-  );
-};
 
   // ========== RENDU ==========
   return (
     <div className={cx('planning-page')}>
-      {/* NOTIFICATION */}
       {notification.show && (
         <div className={`${cx('notification-container')} ${notification.type}`}>
           <div className={cx('notification-content')}>
@@ -1653,7 +1644,6 @@ const VisitCard = ({ visite }) => {
         </div>
       )}
 
-      {/* EN-TÊTE */}
       <div className={cx('planning-header')}>
         <div className={cx('header-left')}>
           <div className={cx('header-icon-wrapper')}>
@@ -1691,7 +1681,6 @@ const VisitCard = ({ visite }) => {
             {searchTerm && <button onClick={() => setSearchTerm('')}><X size={14} /></button>}
           </div>
           
-          {/* Sélecteur agent pour historique */}
           <select 
             className={cx('agent-history-select')}
             value={selectedAgentForHistory} 
@@ -1710,11 +1699,17 @@ const VisitCard = ({ visite }) => {
             ))}
           </select>
           
-          {/* Bouton Historique agent */}
           <Button 
             variant="info" 
             icon={History} 
             onClick={handleOpenAgentHistory}
+            style={{ 
+              background: '#0f5b63',
+              backgroundImage: 'linear-gradient(135deg, #0f5b63 0%, #0a4a50 100%)',
+              color: 'white',
+              border: 'none',
+              boxShadow: '0 2px 8px rgba(15, 91, 99, 0.3)'
+            }}
           >
             Historique agent
           </Button>
@@ -1731,7 +1726,6 @@ const VisitCard = ({ visite }) => {
         </div>
       </div>
 
-      {/* FILTRES */}
       {showFilters && (
         <div className={cx('filters-panel')}>
           <div className={cx('filters-header')}>
@@ -1763,7 +1757,6 @@ const VisitCard = ({ visite }) => {
         </div>
       )}
 
-      {/* STATISTIQUES */}
       <div className={cx('stats-grid')}>
         <StatCard title="Total visites" value={stats.total} icon={Calendar} variant="primary" />
         <StatCard title="Programmées" value={stats.programme} icon={Clock} variant="warning" />
@@ -1773,7 +1766,6 @@ const VisitCard = ({ visite }) => {
         <StatCard title="Convocations" value={stats.convocationsEnvoyees} icon={Mail} variant="info" />
       </div>
 
-      {/* LÉGENDE */}
       <div className={cx('legend-bar')}>
         <div className={cx('legend-item')}><span className={`${cx('legend-dot')} programme`}></span><span>Programmé</span></div>
         <div className={cx('legend-item')}><span className={`${cx('legend-dot')} effectue`}></span><span>Effectué</span></div>
@@ -1788,7 +1780,6 @@ const VisitCard = ({ visite }) => {
         <div className={cx('legend-item')}><Badge variant="info" size="sm">Contrôle auto</Badge><span>Contrôle auto</span></div>
       </div>
 
-      {/* GRILLE PRINCIPALE */}
       {loading ? (
         <div className={cx('loading-state')}>
           <div className={cx('spinner')}></div>
@@ -1843,7 +1834,7 @@ const VisitCard = ({ visite }) => {
         </div>
       )}
 
-      {/* MODALES SANS ANIMATION */}
+      {/* MODALES */}
       {showGenererPlanningModal && (
         <div className={cx('modal-overlay')} onClick={() => setShowGenererPlanningModal(false)}>
           <div className={`${cx('modal-content')} small`} onClick={e => e.stopPropagation()}>
@@ -2142,4 +2133,4 @@ const VisitCard = ({ visite }) => {
   );
 };
 
-export default PlanningPage; 
+export default PlanningPage;

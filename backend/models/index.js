@@ -29,8 +29,10 @@ globalModels.forEach(modelName => {
 });
 
 // ========== CHARGER LES MODÈLES DE LA BASE LOCALE ==========
-// ✅ AJOUTER 'ChatHistory' DANS LA LISTE
-const localModels = ['Accident', 'Planning', 'Visite', 'User', 'Historique', 'Notification', 'NotificationIntelligente', 'CodeOTP', 'ChatHistory'];
+// ✅ AJOUTER 'ActivityLog' DANS LA LISTE
+const localModels = ['Accident', 'Planning', 'Visite', 'User', 'Historique', 
+                     'Notification', 'NotificationIntelligente', 'CodeOTP', 
+                     'ChatHistory', 'ActivityLog'];  // ← ActivityLog ajouté
 
 localModels.forEach(modelName => {
   try {
@@ -49,9 +51,6 @@ localModels.forEach(modelName => {
 });
 
 // ========== APPLIQUER LES ASSOCIATIONS (SANS CROSS-DATABASE JOIN) ==========
-// Les associations cross-database ne sont pas supportées directement par Sequelize
-// Nous devons donc les gérer manuellement dans les requêtes
-
 Object.keys(db.global).forEach(modelName => {
   if (db.global[modelName].associate) {
     db.global[modelName].associate(db);
@@ -61,7 +60,6 @@ Object.keys(db.global).forEach(modelName => {
 
 Object.keys(db.local).forEach(modelName => {
   if (db.local[modelName].associate) {
-    // Pour les associations locales, on les garde
     db.local[modelName].associate(db);
     console.log(`🔗 Associations LOCAL appliquées: ${modelName}`);
   }

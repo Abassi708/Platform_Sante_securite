@@ -1,454 +1,656 @@
-// frontend/components/visites/ConvocationsPage.js
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+// frontend/components/visites/ConvocationsPage.jsx
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
-  Send, Mail, Calendar, Clock, User, FileText, CheckCircle, XCircle,
-  AlertCircle, Info, RefreshCw, Download, Eye, X, ChevronRight,
-  Users, MapPin, Award, Bell, TrendingUp, Loader
+  Mail, Send, Calendar, Clock, User, FileText,
+  CheckCircle, AlertCircle, Info, Search, X,
+  Building, RefreshCw, Eye, Loader, MapPin, Award, Bell, TrendingUp, Users
 } from 'lucide-react';
 import '../../styles/ConvocationsPage.css';
 
+// ============================================
+// UTILITAIRES
+// ============================================
+
+const initials = (nom, prenom) => {
+  if (!nom && !prenom) return '?';
+  if (nom && prenom) return (nom.charAt(0) + prenom.charAt(0)).toUpperCase();
+  if (nom) return nom.substring(0, 2).toUpperCase();
+  return '?';
+};
+
+const fmtDate = (d) => {
+  if (!d) return '';
+  const [year, month, day] = d.split('-');
+  return `${day}/${month}/${year}`;
+};
+
+const fmtDateLong = (d) => {
+  if (!d) return '';
+  const [year, month, day] = d.split('-');
+  const months = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+  const weekdays = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+  const date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+  return `${weekdays[date.getUTCDay()]} ${parseInt(day)} ${months[parseInt(month) - 1]} ${year}`;
+};
+
+const getWeekNumber = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  return Math.ceil(((now - start) / 86400000 + start.getDay() + 1) / 7);
+};
+
+const avatarColor = (type) => {
+  const map = { Périodique: 'blue', Reprise: 'amber', Reclassement: 'violet', Embauche: 'emerald' };
+  return map[type] || 'blue';
+};
+
+const typeBadgeClass = (type) => {
+  const map = { Périodique: 'periodique', Reprise: 'reprise', Reclassement: 'reclassement', Embauche: 'embauche' };
+  return map[type] || 'periodique';
+};
+
+// ============================================
+// COMPOSANT MODAL APERÇU (VERSION RÉDUITE)
+// ============================================
+
+const PreviewModal = ({ item, open, onClose }) => {
+  if (!item) return null;
+  const color = avatarColor(item.type_visite);
+  const agentName = item.planningAgent?.nom && item.planningAgent?.prenom 
+    ? `${item.planningAgent.nom} ${item.planningAgent.prenom}` 
+    : (item.nom_complet || `Agent ${item.matricule_agent}`);
+
+  return (
+    <div className={`conv-modal-overlay${open ? ' open' : ''}`} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="conv-modal" style={{ maxWidth: 380 }}>
+        <div className="conv-modal-head" style={{ padding: '14px 18px' }}>
+          <div className="conv-modal-head-icon"><Eye size={16} color="#3b82f6" /></div>
+          <h3 style={{ fontSize: 14 }}>Aperçu convocation</h3>
+          <button className="conv-modal-close" onClick={onClose}><X size={14} /></button>
+        </div>
+
+        <div className="conv-modal-body" style={{ padding: '16px 18px' }}>
+          {/* Logo - réduit */}
+          <div style={{ textAlign: 'center', marginBottom: 12 }}>
+            <div style={{ 
+              background: 'linear-gradient(135deg, #10b981, #059669)', 
+              width: 36, height: 36, borderRadius: 10, 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              margin: '0 auto 8px' 
+            }}>
+              <Mail size={18} color="white" />
+            </div>
+            <h4 style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', margin: 0 }}>SRTB - Service HSE</h4>
+          </div>
+
+          {/* Agent - compact */}
+          <div className="conv-modal-agent-card" style={{ 
+            padding: '8px 10px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10,
+            background: '#f8fafc', borderRadius: 10, border: '0.5px solid #e2e8f0'
+          }}>
+            <div className={`conv-avatar ${color}`} style={{ width: 32, height: 32, fontSize: 12 }}>
+              {initials(item.planningAgent?.nom, item.planningAgent?.prenom) || initials(item.nom_complet, null)}
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 500 }}>{agentName}</div>
+              <div style={{ fontSize: 10, color: '#64748b' }}>#{item.matricule_agent} · {item.type_visite}</div>
+            </div>
+          </div>
+
+          {/* Détails - 2 colonnes compact */}
+          <div style={{ 
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12,
+            background: '#f8fafc', borderRadius: 10, padding: 10, border: '0.5px solid #e2e8f0'
+          }}>
+            <div>
+              <div style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase' }}>Date</div>
+              <div style={{ fontSize: 11, fontWeight: 500 }}>{fmtDate(item.date_visite)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase' }}>Heure</div>
+              <div style={{ fontSize: 11, fontWeight: 500 }}>{item.heure_visite?.substring(0, 5)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase' }}>Médecin</div>
+              <div style={{ fontSize: 11 }}>Dr. M. Khelifi</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: '#94a3b8', textTransform: 'uppercase' }}>Lieu</div>
+              <div style={{ fontSize: 11 }}>Infirmerie SRTB</div>
+            </div>
+          </div>
+
+          {/* Instructions - compact */}
+          <div style={{ 
+            background: '#fef3c7', borderRadius: 8, padding: '8px 12px', marginBottom: 12,
+            borderLeft: '2px solid #f59e0b'
+          }}>
+            <strong style={{ fontSize: 10, display: 'block', marginBottom: 4, color: '#92400e' }}>📋 Instructions</strong>
+            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 10, color: '#78350f' }}>
+              <li>Présence 15 min avant</li>
+              <li>Carte d'identité</li>
+              <li>Être à jeun si nécessaire</li>
+            </ul>
+          </div>
+
+          {/* Signature - compact */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: 8 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ width: 100, height: 1, background: '#cbd5e1', margin: '0 auto 4px' }}></div>
+              <p style={{ fontSize: 9, color: '#64748b', margin: 0 }}>Dr. Mahmoud Khelifi</p>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ 
+                width: 36, height: 36, border: '1px solid #cbd5e1', borderRadius: '50%', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                fontSize: 7, fontWeight: 600, color: '#94a3b8'
+              }}>
+                SRTB<br/>HSE
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="conv-modal-foot" style={{ padding: '10px 18px' }}>
+          <button className="conv-btn-cancel-modal" onClick={onClose} style={{ padding: '6px 14px', fontSize: 12 }}>Fermer</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// COMPOSANT CARTE CONVOCATION
+// ============================================
+
+const ConvCard = ({ item, isSelected, onToggleSelect, onSend, onPreview }) => {
+  const sent = item.convocation_envoyee;
+  const urgent = item.urgent;
+  const color = avatarColor(item.type_visite);
+  const agentName = item.planningAgent?.nom && item.planningAgent?.prenom 
+    ? `${item.planningAgent.nom} ${item.planningAgent.prenom}` 
+    : (item.nom_complet || `Agent ${item.matricule_agent}`);
+
+  const cardClass = [
+    'conv-card',
+    isSelected ? 'selected' : '',
+    sent ? 'sent' : '',
+    urgent && !sent ? 'urgent' : '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <div className={cardClass}>
+      <div className="conv-card-cb">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => onToggleSelect(item.id_planning, e.target.checked)}
+          disabled={sent}
+        />
+      </div>
+
+      <div className={`conv-avatar ${color}`}>
+        {initials(item.planningAgent?.nom, item.planningAgent?.prenom) || initials(item.nom_complet, null)}
+      </div>
+
+      <div className="conv-card-body">
+        <div className="conv-agent-row">
+          <span className="conv-agent-name">{agentName}</span>
+          <span className="conv-agent-mat">#{item.matricule_agent}</span>
+          <span className={`conv-badge ${typeBadgeClass(item.type_visite)}`}>{item.type_visite}</span>
+          {urgent && !sent && <span className="conv-badge urgent">🔴 Urgent</span>}
+          {sent && <span className="conv-badge sent">✅ Envoyée</span>}
+        </div>
+        <div className="conv-meta-row">
+          <span className="conv-meta-item"><Calendar size={12} /> {fmtDate(item.date_visite)}</span>
+          <span className="conv-meta-dot" />
+          <span className="conv-meta-item"><Clock size={12} /> {item.heure_visite?.substring(0, 5)}</span>
+          <span className="conv-meta-dot" />
+          <span className="conv-meta-item"><User size={12} /> Dr. M. Khelifi</span>
+          <span className="conv-meta-dot" />
+          <span className="conv-meta-item"><Building size={12} /> Infirmerie SRTB</span>
+        </div>
+      </div>
+
+      <div className="conv-card-actions">
+        {sent ? (
+          <span className="conv-sent-label"><CheckCircle size={14} /> Convocation envoyée</span>
+        ) : (
+          <>
+            <button className="conv-btn-preview" onClick={() => onPreview(item)}>
+              <Eye size={13} /> Aperçu
+            </button>
+            <button className="conv-btn-send" onClick={() => onSend(item)}>
+              <Mail size={13} /> Envoyer
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// COMPOSANT MODAL ENVOI
+// ============================================
+
+const SendModal = ({ item, count, type, open, onClose, onConfirm, loading }) => {
+  const isSingle = type === 'single';
+  const color = item ? avatarColor(item.type_visite) : 'blue';
+  const agentName = item?.planningAgent?.nom && item?.planningAgent?.prenom 
+    ? `${item.planningAgent.nom} ${item.planningAgent.prenom}` 
+    : (item?.nom_complet || `Agent ${item?.matricule_agent}`);
+
+  return (
+    <div className={`conv-modal-overlay${open ? ' open' : ''}`} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="conv-modal">
+        <div className="conv-modal-head">
+          <div className="conv-modal-head-icon"><Send size={18} color="#34d399" /></div>
+          <h3>{isSingle ? 'Envoyer la convocation' : `Envoi groupé (${count})`}</h3>
+          {!loading && <button className="conv-modal-close" onClick={onClose}><X size={15} /></button>}
+        </div>
+
+        <div className="conv-modal-body">
+          {isSingle && item ? (
+            <>
+              <div className="conv-modal-agent-card">
+                <div className={`conv-avatar ${color}`} style={{ width: 36, height: 36, fontSize: 12 }}>
+                  {initials(item.planningAgent?.nom, item.planningAgent?.prenom) || initials(item.nom_complet, null)}
+                </div>
+                <div>
+                  <div className="conv-modal-agent-name">{agentName}</div>
+                  <div className="conv-modal-agent-sub">Matricule #{item.matricule_agent} · {item.type_visite}</div>
+                </div>
+              </div>
+
+              <div className="conv-modal-details-grid">
+                <div className="conv-modal-detail-item">
+                  <div className="conv-modal-detail-label">Date de visite</div>
+                  <div className="conv-modal-detail-value">{fmtDate(item.date_visite)}</div>
+                </div>
+                <div className="conv-modal-detail-item">
+                  <div className="conv-modal-detail-label">Heure</div>
+                  <div className="conv-modal-detail-value">{item.heure_visite?.substring(0, 5)}</div>
+                </div>
+                <div className="conv-modal-detail-item">
+                  <div className="conv-modal-detail-label">Médecin</div>
+                  <div className="conv-modal-detail-value">Dr. M. Khelifi</div>
+                </div>
+                <div className="conv-modal-detail-item">
+                  <div className="conv-modal-detail-label">Lieu</div>
+                  <div className="conv-modal-detail-value">Infirmerie SRTB</div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '10px 0 20px' }}>
+              <div style={{ fontSize: 44, marginBottom: 14 }}>📬</div>
+              <div style={{ fontSize: 22, fontWeight: 600, color: '#1e293b', marginBottom: 6 }}>
+                {count} convocation{count > 1 ? 's' : ''}
+              </div>
+              <div style={{ fontSize: 13, color: '#64748b' }}>seront envoyées au service GRH</div>
+            </div>
+          )}
+
+          <div className="conv-modal-info-box">
+            <Info size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+            La convocation sera transmise au service GRH pour distribution à l'agent.
+          </div>
+        </div>
+
+        <div className="conv-modal-foot">
+          <button className="conv-btn-cancel-modal" onClick={onClose} disabled={loading}>Annuler</button>
+          <button className="conv-btn-confirm-modal" onClick={onConfirm} disabled={loading}>
+            {loading ? <Loader size={13} className="spinning" style={{ animation: 'conv-spin 0.8s linear infinite' }} /> : <Send size={13} />}
+            {isSingle ? 'Envoyer' : 'Confirmer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// COMPOSANT PRINCIPAL
+// ============================================
+
 const ConvocationsPage = () => {
-  const [loading, setLoading] = useState(false);
   const [convocations, setConvocations] = useState([]);
-  const [stats, setStats] = useState({ total_envoyees: 0, total_a_envoyer: 0, a_envoyer_j7: 0 });
-  const [notification, setNotification] = useState({ show: false, type: 'info', title: '', message: '' });
-  const [selectedConvocations, setSelectedConvocations] = useState([]);
-  const [selectAll, setSelectAll] = useState(false);
-  
-  // ✅ ÉTATS POUR LE MODAL
-  const [modal, setModal] = useState({ show: false, type: '', id: null, ids: [], loading: false });
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeType, setActiveType] = useState('all');
+  const [selected, setSelected] = useState(new Set());
+  const [sendItem, setSendItem] = useState(null);
+  const [sendLoading, setSendLoading] = useState(false);
+  const [showSendAll, setShowSendAll] = useState(false);
+  const [sendAllLoading, setSendAllLoading] = useState(false);
+  const [previewItem, setPreviewItem] = useState(null);
+  const [notification, setNotification] = useState({ show: false, type: 'info', message: '' });
 
-  useEffect(() => {
-    chargerDonnees();
-  }, []);
+  // ============================================
+  // CHARGEMENT
+  // ============================================
 
-  const chargerDonnees = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      await Promise.all([fetchConvocations(), fetchStats()]);
-    } catch (error) {
-      showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur de chargement' });
+      const token = localStorage.getItem('token');
+      const [convRes, statsRes] = await Promise.all([
+        fetch(`${process.env.REACT_APP_API_URL}/api/planning/convocations-a-envoyer`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`${process.env.REACT_APP_API_URL}/api/planning/convocations-stats`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      ]);
+      
+      const convData = await convRes.json();
+      const statsData = await statsRes.json();
+      
+      if (convData.success) setConvocations(convData.convocations || []);
+      if (statsData.success) {
+        // Stocker les stats si nécessaire
+      }
+    } catch (err) {
+      console.error(err);
+      showNotif('error', 'Erreur de chargement des données');
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // ============================================
+  // NOTIFICATION
+  // ============================================
+
+  const showNotif = (type, message) => {
+    setNotification({ show: true, type, message });
+    setTimeout(() => setNotification(prev => ({ ...prev, show: false })), 4000);
   };
 
-  const fetchConvocations = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/convocations-a-envoyer`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success) setConvocations(data.convocations || []);
-    } catch (err) {
-      console.error('Erreur chargement convocations:', err);
-    }
-  };
+  // ============================================
+  // FILTRES & STATS
+  // ============================================
 
-  const fetchStats = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/convocations-stats`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success) setStats(data.stats);
-    } catch (err) {
-      console.error('Erreur chargement stats:', err);
-    }
-  };
+  const pendingTypes = ['Périodique', 'Reprise'];
 
-  // ✅ MODAL DE CONFIRMATION POUR UNE CONVOCATION
-  const openConfirmModal = (id_planning) => {
-    setModal({ show: true, type: 'single', id: id_planning, ids: [], loading: false });
-  };
-
-  // ✅ MODAL DE CONFIRMATION POUR PLUSIEURS CONVOCATIONS
-  const openConfirmGroupModal = () => {
-    if (selectedConvocations.length === 0) {
-      showNotification({ type: 'warning', title: '⚠️ Aucune sélection', message: 'Sélectionnez au moins une convocation' });
-      return;
-    }
-    setModal({ show: true, type: 'group', id: null, ids: [...selectedConvocations], loading: false });
-  };
-
-  // ✅ ENVOI D'UNE CONVOCATION
-  const confirmEnvoyer = async () => {
-    setModal(prev => ({ ...prev, loading: true }));
+  const filtered = useMemo(() => convocations.filter((item) => {
+    const q = search.toLowerCase();
+    const agentName = item.planningAgent?.nom && item.planningAgent?.prenom 
+      ? `${item.planningAgent.nom} ${item.planningAgent.prenom}`.toLowerCase()
+      : (item.nom_complet?.toLowerCase() || `Agent ${item.matricule_agent}`.toLowerCase());
     
+    if (q && !agentName.includes(q) && !String(item.matricule_agent).includes(q)) return false;
+    if (activeFilter === 'pending' && item.convocation_envoyee) return false;
+    if (activeFilter === 'sent' && !item.convocation_envoyee) return false;
+    if (activeFilter === 'urgent' && !item.urgent) return false;
+    if (activeType !== 'all' && item.type_visite !== activeType) return false;
+    return true;
+  }), [convocations, search, activeFilter, activeType]);
+
+  const stats = useMemo(() => ({
+    total: convocations.length,
+    pending: convocations.filter(p => !p.convocation_envoyee && pendingTypes.includes(p.type_visite)).length,
+    sent: convocations.filter(p => p.convocation_envoyee).length,
+    urgent: convocations.filter(p => p.urgent && !p.convocation_envoyee).length,
+  }), [convocations]);
+
+  // ============================================
+  // SÉLECTION
+  // ============================================
+
+  const toggleSelect = (id, checked) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      checked ? next.add(id) : next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelected(new Set(filtered.map(d => d.id_planning)));
+    } else {
+      setSelected(new Set());
+    }
+  };
+
+  const allSelected = filtered.length > 0 && filtered.every(d => selected.has(d.id_planning));
+  const someSelected = filtered.some(d => selected.has(d.id_planning)) && !allSelected;
+
+  // ============================================
+  // ENVOI INDIVIDUEL
+  // ============================================
+
+  const confirmSend = async () => {
+    if (!sendItem) return;
+    setSendLoading(true);
     try {
       const token = localStorage.getItem('token');
-      let response;
-      
-      if (modal.type === 'single') {
-        response = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/envoyer-convocation`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ id_planning: modal.id })
-        });
-      } else {
-        response = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/envoyer-convocations-groupees`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ ids_planning: modal.ids })
-        });
-      }
-      
-      const data = await response.json();
-      
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/envoyer-convocation`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_planning: sendItem.id_planning }),
+      });
+      const data = await res.json();
       if (data.success) {
-        setModal({ show: false, type: '', id: null, ids: [], loading: false });
-        setSelectedConvocations([]);
-        setSelectAll(false);
-        chargerDonnees();
-        
-        const message = modal.type === 'single' 
-          ? 'Convocation envoyée avec succès au service GRH'
-          : `${modal.ids.length} convocations envoyées avec succès`;
-        
-        showNotification({ type: 'success', title: '✅ Envoi réussi', message });
+        showNotif('success', `Convocation envoyée pour ${sendItem.planningAgent?.nom || sendItem.nom_complet || sendItem.matricule_agent}`);
+        setSendItem(null);
+        fetchData();
       } else {
-        setModal(prev => ({ ...prev, loading: false }));
-        showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
+        showNotif('error', data.message || 'Erreur lors de l\'envoi');
       }
-    } catch (err) {
-      setModal(prev => ({ ...prev, loading: false }));
-      showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur lors de l\'envoi' });
+    } catch {
+      showNotif('error', 'Erreur de connexion');
+    } finally {
+      setSendLoading(false);
     }
   };
 
-  const closeModal = () => {
-    if (!modal.loading) {
-      setModal({ show: false, type: '', id: null, ids: [], loading: false });
+  // ============================================
+  // ENVOI GROUPÉ
+  // ============================================
+
+  const pendingItems = convocations.filter(p => !p.convocation_envoyee && pendingTypes.includes(p.type_visite));
+
+  const confirmSendAll = async () => {
+    setSendAllLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const ids = pendingItems.map(p => p.id_planning);
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/envoyer-convocations-groupees`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids_planning: ids }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotif('success', `${ids.length} convocation${ids.length > 1 ? 's' : ''} envoyée${ids.length > 1 ? 's' : ''} au GRH`);
+        setShowSendAll(false);
+        setSelected(new Set());
+        fetchData();
+      } else {
+        showNotif('error', data.message || 'Erreur lors de l\'envoi groupé');
+      }
+    } catch {
+      showNotif('error', 'Erreur de connexion');
+    } finally {
+      setSendAllLoading(false);
     }
   };
 
-  const handleSelectAll = () => {
-    if (selectAll) {
-      setSelectedConvocations([]);
-    } else {
-      setSelectedConvocations(convocations.map(c => c.id_planning));
-    }
-    setSelectAll(!selectAll);
-  };
-
-  const handleSelectOne = (id) => {
-    if (selectedConvocations.includes(id)) {
-      setSelectedConvocations(selectedConvocations.filter(i => i !== id));
-    } else {
-      setSelectedConvocations([...selectedConvocations, id]);
-    }
-  };
-
-  const showNotification = ({ type, title, message }) => {
-    setNotification({ show: true, type, title, message });
-    setTimeout(() => setNotification({ show: false, type: '', title: '', message: '' }), 5000);
-  };
-
-  // ✅ FONCTIONS DE FORMATAGE CORRIGÉES
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '';
-    const [year, month, day] = dateStr.split('-');
-    return `${day}/${month}/${year}`;
-  };
-
-  const formatDateLong = (dateStr) => {
-    if (!dateStr) return '';
-    const [year, month, day] = dateStr.split('-');
-    const months = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-    const weekdays = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-    const date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
-    const weekday = weekdays[date.getUTCDay()];
-    const monthName = months[parseInt(month) - 1];
-    return `${weekday} ${parseInt(day)} ${monthName} ${year}`;
-  };
-
-  const getTypeBadge = (type) => {
-    switch(type) {
-      case 'Périodique': return <span className="type-badge periodique">📋 Périodique</span>;
-      case 'Reprise': return <span className="type-badge reprise">🔄 Reprise</span>;
-      case 'Reclassement': return <span className="type-badge reclassement">📝 Reclassement</span>;
-      default: return <span className="type-badge">{type}</span>;
-    }
-  };
-
-  const getPosteBadge = (code_affectation) => {
-    if (code_affectation === 3) {
-      return <span className="poste-badge chauffeur">🚌 Chauffeur</span>;
-    }
-    return <span className="poste-badge autre">👤 Contrôleur</span>;
-  };
+  // ============================================
+  // RENDU
+  // ============================================
 
   return (
-    <div className="convocations-page">
-      
-      {/* MODAL DE CONFIRMATION MODERNE */}
-      <AnimatePresence>
-        {modal.show && (
-          <motion.div 
-            className="modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeModal}
-          >
-            <motion.div 
-              className="modal-container"
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="modal-header">
-                <div className="modal-icon">
-                  <Send size={24} />
-                </div>
-                <h3>Confirmer l'envoi</h3>
-                {!modal.loading && (
-                  <button className="modal-close" onClick={closeModal}>
-                    <X size={20} />
-                  </button>
-                )}
-              </div>
-              
-              <div className="modal-body">
-                <p>
-                  {modal.type === 'single' 
-                    ? 'Voulez-vous vraiment envoyer cette convocation au service GRH ?'
-                    : `Voulez-vous vraiment envoyer ${modal.ids.length} convocation(s) au service GRH ?`
-                  }
-                </p>
-                <div className="modal-info">
-                  <Info size={16} />
-                  <span>Un email avec PDF sera envoyé au service GRH</span>
-                </div>
-              </div>
-              
-              <div className="modal-footer">
-                <button 
-                  className="btn-cancel" 
-                  onClick={closeModal}
-                  disabled={modal.loading}
-                >
-                  Annuler
-                </button>
-                <button 
-                  className="btn-confirm" 
-                  onClick={confirmEnvoyer}
-                  disabled={modal.loading}
-                >
-                  {modal.loading ? (
-                    <>
-                      <Loader size={16} className="spinning" />
-                      Envoi en cours...
-                    </>
-                  ) : (
-                    <>
-                      <Send size={16} />
-                      Confirmer l'envoi
-                    </>
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="conv-page">
 
-      {/* NOTIFICATION FLUIDE */}
-      <AnimatePresence>
-        {notification.show && (
-          <motion.div 
-            className={`notification-toast ${notification.type}`}
-            initial={{ x: 400, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 400, opacity: 0 }}
-            transition={{ type: 'spring', damping: 20 }}
-          >
-            <div className="notification-icon">
-              {notification.type === 'success' && <CheckCircle size={20} />}
-              {notification.type === 'error' && <XCircle size={20} />}
-              {notification.type === 'warning' && <AlertCircle size={20} />}
-              {notification.type === 'info' && <Info size={20} />}
-            </div>
-            <div className="notification-content">
-              <strong>{notification.title}</strong>
-              <p>{notification.message}</p>
-            </div>
-            <button className="notification-close-btn" onClick={() => setNotification({...notification, show: false})}>
-              <X size={16} />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* NOTIFICATION */}
+      <div className={`conv-notif${notification.show ? ' show' : ''}`}>
+        {notification.type === 'success' && <CheckCircle size={16} color="#10b981" />}
+        {notification.type === 'error' && <AlertCircle size={16} color="#ef4444" />}
+        <span>{notification.message}</span>
+        <button className="conv-notif-close" onClick={() => setNotification(prev => ({ ...prev, show: false }))}>
+          <X size={14} />
+        </button>
+      </div>
+
+      {/* MODAL APERÇU */}
+      <PreviewModal
+        item={previewItem}
+        open={!!previewItem}
+        onClose={() => setPreviewItem(null)}
+      />
+
+      {/* MODAL ENVOI SIMPLE */}
+      <SendModal
+        item={sendItem}
+        type="single"
+        open={!!sendItem}
+        onClose={() => setSendItem(null)}
+        onConfirm={confirmSend}
+        loading={sendLoading}
+      />
+
+      {/* MODAL ENVOI GROUPÉ */}
+      <SendModal
+        item={null}
+        type="group"
+        count={pendingItems.length}
+        open={showSendAll}
+        onClose={() => setShowSendAll(false)}
+        onConfirm={confirmSendAll}
+        loading={sendAllLoading}
+      />
 
       {/* HEADER */}
-      <div className="convocations-header">
-        <div className="header-left">
-          <div className="header-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-            <Send size={28} />
+      <div className="conv-header">
+        <div className="conv-header-left">
+          <div className="conv-header-icon">
+            <Mail size={24} />
           </div>
-          <div className="header-title">
-            <h1>Convocations GRH</h1>
-            <p>Envoyez les convocations au service GRH pour distribution aux agents</p>
+          <div className="conv-header-text">
+            <h1>Convocations médicales</h1>
+            <p>Gestion et envoi des convocations · Service HSE</p>
           </div>
         </div>
-        <div className="header-right">
-          <button className="btn-icon" onClick={chargerDonnees} title="Actualiser">
-            <RefreshCw size={18} />
+        <div className="conv-header-right">
+          <div className="conv-week-pill">
+            <span>Semaine</span>
+            <strong>S{getWeekNumber()} · {new Date().getFullYear()}</strong>
+          </div>
+          <button className="conv-btn conv-btn-ghost-light" onClick={fetchData}>
+            <RefreshCw size={14} /> Actualiser
           </button>
-          {selectedConvocations.length > 0 && (
-            <motion.button 
-              className="btn-primary"
-              onClick={openConfirmGroupModal}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <Send size={16} /> Envoyer ({selectedConvocations.length})
-            </motion.button>
+          {stats.pending > 0 && (
+            <button className="conv-btn conv-btn-emerald" onClick={() => setShowSendAll(true)}>
+              <Send size={14} /> Envoyer {stats.pending} convoc.
+            </button>
           )}
         </div>
       </div>
 
-      {/* STATS */}
-      <div className="stats-grid">
-        <motion.div className="stat-card" whileHover={{ y: -2 }}>
-          <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}><Mail size={24} /></div>
-          <div className="stat-content">
-            <span className="stat-label">Convocations envoyées</span>
-            <span className="stat-value">{stats.total_envoyees}</span>
+      {/* STATISTIQUES */}
+      <div className="conv-stats-row">
+        {[
+          { key: 'all', label: 'Convocations totales', value: stats.total, iconClass: 'blue', icon: <FileText size={20} /> },
+          { key: 'pending', label: 'En attente d\'envoi', value: stats.pending, iconClass: 'amber', icon: <Clock size={20} /> },
+          { key: 'sent', label: 'Envoyées', value: stats.sent, iconClass: 'emerald', icon: <CheckCircle size={20} /> },
+          { key: 'urgent', label: 'Urgentes', value: stats.urgent, iconClass: 'red', icon: <AlertCircle size={20} /> },
+        ].map((s) => (
+          <div
+            key={s.key}
+            className={`conv-stat-card${activeFilter === s.key ? ' active-filter' : ''}`}
+            onClick={() => setActiveFilter(s.key)}
+          >
+            <div className={`conv-stat-icon ${s.iconClass}`}>{s.icon}</div>
+            <div>
+              <div className="conv-stat-value">{s.value}</div>
+              <div className="conv-stat-label">{s.label}</div>
+            </div>
           </div>
-        </motion.div>
-        <motion.div className="stat-card" whileHover={{ y: -2 }}>
-          <div className="stat-icon" style={{ background: '#f59e0b20', color: '#f59e0b' }}><Clock size={24} /></div>
-          <div className="stat-content">
-            <span className="stat-label">À envoyer (total)</span>
-            <span className="stat-value">{stats.total_a_envoyer}</span>
-          </div>
-        </motion.div>
-        <motion.div className="stat-card warning" whileHover={{ y: -2 }}>
-          <div className="stat-icon" style={{ background: '#ef444420', color: '#ef4444' }}><Bell size={24} /></div>
-          <div className="stat-content">
-            <span className="stat-label">À envoyer (J+7)</span>
-            <span className="stat-value">{stats.a_envoyer_j7}</span>
-          </div>
-        </motion.div>
+        ))}
       </div>
 
-      {/* INFO BANNER */}
-      <div className="info-banner">
-        <Info size={20} />
-        <div>
-          <strong>Convocation J+7</strong>
-          <p>Les convocations sont envoyées 7 jours avant la date de visite pour permettre au GRH de contacter les agents.</p>
+      {/* TOOLBAR */}
+      <div className="conv-toolbar">
+        <div className="conv-search-wrap">
+          <span className="conv-search-icon"><Search size={14} /></span>
+          <input
+            type="text"
+            placeholder="Rechercher un agent..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
+        {[
+          { key: 'all', label: 'Tous' },
+          { key: 'Périodique', label: 'Périodique' },
+          { key: 'Reprise', label: 'Reprise' },
+          { key: 'Reclassement', label: 'Reclassement' },
+          { key: 'Embauche', label: 'Embauche' },
+        ].map((f) => (
+          <button
+            key={f.key}
+            className={`conv-filter-pill${activeType === f.key ? ' active' : ''}`}
+            onClick={() => setActiveType(f.key)}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
-      {/* LISTE DES CONVOCATIONS */}
+      {/* SELECT ALL ROW */}
+      <div className="conv-select-row">
+        <label className="conv-select-all-label">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            ref={(el) => { if (el) el.indeterminate = someSelected; }}
+            onChange={toggleSelectAll}
+          />
+          Sélectionner tout
+        </label>
+        {selected.size > 0 && (
+          <span className="conv-sel-count">{selected.size} sélectionné{selected.size > 1 ? 's' : ''}</span>
+        )}
+      </div>
+
+      {/* LISTE */}
       {loading ? (
-        <div className="loading-state">
-          <div className="spinner"></div>
-          <p>Chargement des convocations...</p>
+        <div className="conv-loading-state">
+          <div className="conv-spinner" />
+          <span>Chargement des convocations…</span>
         </div>
-      ) : convocations.length === 0 ? (
-        <motion.div className="empty-state" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <Send size={48} />
-          <h3>Aucune convocation à envoyer</h3>
-          <p>Toutes les convocations ont été envoyées pour les 7 prochains jours</p>
-        </motion.div>
+      ) : filtered.length === 0 ? (
+        <div className="conv-empty-state">
+          <div className="conv-empty-state-icon">📭</div>
+          <p>Aucune convocation trouvée</p>
+        </div>
       ) : (
-        <>
-          <div className="convocations-actions">
-            <label className="select-all">
-              <input type="checkbox" checked={selectAll} onChange={handleSelectAll} />
-              <span>Tout sélectionner</span>
-            </label>
-            <span className="selection-count">{selectedConvocations.length} sélectionnée(s)</span>
-          </div>
-
-          <div className="convocations-list">
-            <AnimatePresence>
-              {convocations.map(conv => (
-                <motion.div 
-                  key={conv.id_planning} 
-                  className="convocation-card"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -100 }}
-                  whileHover={{ scale: 1.01 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="card-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedConvocations.includes(conv.id_planning)}
-                      onChange={() => handleSelectOne(conv.id_planning)}
-                    />
-                  </div>
-                  <div className="card-content">
-                    <div className="card-header">
-                      <div className="agent-info">
-                        <div className="agent-avatar">
-                          {conv.planningAgent?.nom?.charAt(0)}{conv.planningAgent?.prenom?.charAt(0)}
-                        </div>
-                        <div>
-                          <h3>{conv.planningAgent?.nom} {conv.planningAgent?.prenom}</h3>
-                          <span className="agent-matricule">#{conv.matricule_agent}</span>
-                          {getPosteBadge(conv.planningAgent?.code_affectation)}
-                        </div>
-                      </div>
-                      {getTypeBadge(conv.type_visite)}
-                    </div>
-                    
-                    <div className="card-details">
-                      <div className="detail-item">
-                        <Calendar size={14} />
-                        <span>{formatDateLong(conv.date_visite)}</span>
-                      </div>
-                      <div className="detail-item">
-                        <Clock size={14} />
-                        <span>{conv.heure_visite?.substring(0,5)}</span>
-                      </div>
-                      <div className="detail-item">
-                        <MapPin size={14} />
-                        <span>Infirmerie SRTB</span>
-                      </div>
-                      <div className="detail-item">
-                        <Award size={14} />
-                        <span>Dr. Mahmoud Khelifi</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="card-actions">
-                    <motion.button 
-                      className="btn-small primary"
-                      onClick={() => openConfirmModal(conv.id_planning)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      <Send size={14} /> Envoyer
-                    </motion.button>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        </>
+        <div className="conv-list">
+          {filtered.map((item) => (
+            <ConvCard
+              key={item.id_planning}
+              item={item}
+              isSelected={selected.has(item.id_planning)}
+              onToggleSelect={toggleSelect}
+              onSend={(i) => setSendItem(i)}
+              onPreview={(i) => setPreviewItem(i)}
+            />
+          ))}
+        </div>
       )}
 
       {/* FOOTER */}
-      <div className="convocations-footer">
-        <p>📧 Les convocations sont envoyées au format PDF au service GRH</p>
-        <p>Le GRH se charge de contacter les agents et de distribuer les convocations</p>
+      <div className="conv-footer-note">
+        SRTB · Service HSE · Infirmerie · Dr. Mahmoud Khelifi · Bizerte
       </div>
+
     </div>
   );
 };

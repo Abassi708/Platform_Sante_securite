@@ -1880,4 +1880,4 @@ accidentsAvecAgent.forEach(acc => {
   );
 };
 
-export default SocialAccidents;
+export default SocialAccidents;             

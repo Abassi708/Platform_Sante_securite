@@ -1,5 +1,5 @@
 // src/components/AgentDashboard.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, Clock, Calendar, MapPin, LogOut,
@@ -20,6 +20,8 @@ import '../styles/AgentDashboard.css';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
+// ========== FONCTIONS UTILITAIRES ==========
+
 const getNumeroSemaine = (date) => {
   const d = new Date(date);
   const dayNum = d.getDay();
@@ -35,8 +37,7 @@ const getDaysLeft = (dateString) => {
   const targetDate = new Date(dateString);
   targetDate.setHours(0, 0, 0, 0);
   const diffTime = targetDate - today;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays;
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 };
 
 const formatDate = (dateString) => {
@@ -55,11 +56,8 @@ const formatDateTime = (dateString) => {
   if (!dateString) return 'Non renseigné';
   const date = new Date(dateString);
   return date.toLocaleDateString('fr-FR', { 
-    day: '2-digit', 
-    month: '2-digit', 
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
   });
 };
 
@@ -153,7 +151,6 @@ const AgentDashboard = () => {
     totalJoursArret: accidents.reduce((sum, a) => sum + (a.jour_arret || 0), 0),
     accidentsCetteAnnee: accidents.filter(a => new Date(a.date_accident).getFullYear() === new Date().getFullYear()).length,
     joursArretCetteAnnee: accidents.filter(a => new Date(a.date_accident).getFullYear() === new Date().getFullYear()).reduce((sum, a) => sum + (a.jour_arret || 0), 0),
-    dernierAccident: accidents.length > 0 ? new Date(Math.max(...accidents.map(a => new Date(a.date_accident)))) : null,
     visitesAptes: visites.filter(v => v.resultat === 'Apte').length,
     tauxAptitude: visites.length > 0 ? ((visites.filter(v => v.resultat === 'Apte').length / visites.length) * 100).toFixed(0) : 100,
     joursSansAccident: (() => {
@@ -257,93 +254,114 @@ const AgentDashboard = () => {
     navigate('/agent');
   };
 
-  // ========== CHARGEMENT DES DONNÉES ==========
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem('token');
-        const userData = JSON.parse(localStorage.getItem('user'));
-        if (!token || !userData) { 
-          navigate('/agent'); 
-          return; 
-        }
-        
-        setUser(userData);
-        const matricule = userData.matricule_agent || userData.id;
-        
-        const agentRes = await fetch(`${API_URL}/api/agents`, { 
-          headers: { 'Authorization': `Bearer ${token}` } 
-        });
-        if (agentRes.ok) {
-          const data = await agentRes.json();
-          if (data.success) {
-            const agent = data.agents.find(a => a.matricule_agent === parseInt(matricule));
-            if (agent) setAgentData(agent);
-          }
-        }
-        
-        const visitesRes = await fetch(`${API_URL}/api/historique/formulaire?matricule=${matricule}&limit=50`, { 
-          headers: { 'Authorization': `Bearer ${token}` } 
-        });
-        if (visitesRes.ok) {
-          const data = await visitesRes.json();
-          if (data.success) setVisites(data.historique || []);
-        }
-        
-        const aujourdhui = new Date().toISOString().split('T')[0];
-        const toutesVisitesTemp = [];
-        
-        for(let i = 0; i <= 20; i++) {
-          const dateTemp = new Date();
-          dateTemp.setDate(dateTemp.getDate() + (i * 7));
-          const semaineTemp = getNumeroSemaine(dateTemp);
-          const anneeTemp = dateTemp.getFullYear();
-          
-          try {
-            const planningRes = await fetch(`${API_URL}/api/planning/${semaineTemp}/${anneeTemp}`, { 
-              headers: { 'Authorization': `Bearer ${token}` } 
-            });
-            if (planningRes.ok) {
-              const data = await planningRes.json();
-              if (data.success) {
-                const visites = data.planning.filter(p => 
-                  p.matricule_agent === parseInt(matricule) && 
-                  p.statut === 'Programmé'
-                );
-                toutesVisitesTemp.push(...visites);
-              }
-            }
-          } catch(e) {}
-        }
-        
-        const visitesFutures = toutesVisitesTemp
-          .filter(v => v.date_visite >= aujourdhui)
-          .sort((a, b) => new Date(a.date_visite) - new Date(b.date_visite));
-        
-        setProchainesVisites(visitesFutures);
-        
-        const accidentsRes = await fetch(`${API_URL}/api/accidents`, { 
-          headers: { 'Authorization': `Bearer ${token}` } 
-        });
-        if (accidentsRes.ok) {
-          const data = await accidentsRes.json();
-          if (data.success) {
-            setAccidents(data.accidents.filter(a => a.matricule_agent === parseInt(matricule)));
-          }
-        }
-        
-      } catch (error) {
-        console.error('Erreur chargement:', error);
-      } finally {
-        setLoading(false);
+  // ========== FONCTION DE CHARGEMENT DES DONNÉES CORRIGÉE ==========
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const userData = JSON.parse(localStorage.getItem('user'));
+      if (!token || !userData) { 
+        navigate('/agent'); 
+        return; 
       }
-    };
-    
+      
+      setUser(userData);
+      const matricule = userData.matricule_agent || userData.id;
+      
+      // Requêtes parallèles
+      const [agentRes, visitesRes, accidentsRes] = await Promise.all([
+        fetch(`${API_URL}/api/technicien/agents?limit=100`, { 
+          headers: { 'Authorization': `Bearer ${token}` } 
+        }),
+        fetch(`${API_URL}/api/historique/formulaire?matricule=${matricule}&limit=50`, { 
+          headers: { 'Authorization': `Bearer ${token}` } 
+        }),
+        fetch(`${API_URL}/api/accidents`, { 
+          headers: { 'Authorization': `Bearer ${token}` } 
+        })
+      ]);
+      
+      // Traitement agent
+      if (agentRes.ok) {
+        const data = await agentRes.json();
+        if (data.success && data.data?.agents) {
+          const agent = data.data.agents.find(a => a.matricule_agent === parseInt(matricule));
+          if (agent) {
+            setAgentData(agent);
+            console.log('✅ Agent chargé:', agent);
+          } else {
+            setAgentData({
+              matricule_agent: parseInt(matricule),
+              nom: userData.nom || 'Agent',
+              prenom: userData.prenom || '',
+              statut: 'actif',
+              date_derniere_visite: null
+            });
+          }
+        }
+      }
+      
+      // Traitement visites
+      if (visitesRes.ok) {
+        const data = await visitesRes.json();
+        if (data.success) setVisites(data.historique || []);
+      }
+      
+      // Traitement accidents
+      if (accidentsRes.ok) {
+        const data = await accidentsRes.json();
+        if (data.success) {
+          setAccidents(data.accidents.filter(a => a.matricule_agent === parseInt(matricule)));
+        }
+      }
+      
+      // ✅ RECHERCHE DES VISITES FUTURES (26 semaines)
+      const aujourdhui = new Date().toISOString().split('T')[0];
+      const toutesVisitesTemp = [];
+      
+      for(let i = 0; i <= 26; i++) {
+        const dateTemp = new Date();
+        dateTemp.setDate(dateTemp.getDate() + (i * 7));
+        const semaineTemp = getNumeroSemaine(dateTemp);
+        const anneeTemp = dateTemp.getFullYear();
+        
+        try {
+          const planningRes = await fetch(`${API_URL}/api/planning/${semaineTemp}/${anneeTemp}`, { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+          });
+          if (planningRes.ok) {
+            const data = await planningRes.json();
+            if (data.success) {
+              const visites = data.planning.filter(p => 
+                p.matricule_agent === parseInt(matricule) && 
+                p.statut === 'Programmé'
+              );
+              toutesVisitesTemp.push(...visites);
+            }
+          }
+        } catch(e) {}
+      }
+      
+      const visitesFutures = toutesVisitesTemp
+        .filter(v => v.date_visite >= aujourdhui)
+        .sort((a, b) => new Date(a.date_visite) - new Date(b.date_visite));
+      
+      setProchainesVisites(visitesFutures);
+      console.log('✅ Visites futures chargées:', visitesFutures.length);
+      
+    } catch (error) {
+      console.error('Erreur chargement:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
+  // ========== CHARGEMENT INITIAL ==========
+  useEffect(() => {
     if (localStorage.getItem('token')) {
       loadData();
     }
-  }, [navigate]);
+  }, [loadData]);
 
   useEffect(() => {
     if (user?.id) fetchNotifications(user.id);
@@ -366,10 +384,7 @@ const AgentDashboard = () => {
       onMouseLeave={() => setIsRobotHovered(false)}
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      animate={{
-        y: [0, -3, 0],
-        transition: { duration: 3, repeat: Infinity, ease: "easeInOut" }
-      }}
+      animate={{ y: [0, -3, 0], transition: { duration: 3, repeat: Infinity, ease: "easeInOut" } }}
     >
       <div className="ad-robot-3d-container">
         <div className="ad-robot-3d-shadow"></div>
@@ -380,9 +395,7 @@ const AgentDashboard = () => {
               <div className="ad-helmet-light"></div>
             </div>
             <div className="ad-robot-3d-face">
-              <div className="ad-robot-3d-visor">
-                <div className="ad-visor-glow"></div>
-              </div>
+              <div className="ad-robot-3d-visor"><div className="ad-visor-glow"></div></div>
               <div className="ad-robot-3d-eyes">
                 <div className="ad-eye-3d left"></div>
                 <div className="ad-eye-3d right"></div>
@@ -396,67 +409,28 @@ const AgentDashboard = () => {
           <div className="ad-robot-3d-neck"></div>
           <div className="ad-robot-3d-torso">
             <div className="ad-torso-panel top"></div>
-            <div className="ad-torso-panel center">
-              <div className="ad-power-core">
-                <div className="ad-core-inner"></div>
-              </div>
-            </div>
+            <div className="ad-torso-panel center"><div className="ad-power-core"><div className="ad-core-inner"></div></div></div>
             <div className="ad-torso-panel bottom"></div>
-            <div className="ad-robot-3d-badge">
-              <Shield size={14} />
-            </div>
+            <div className="ad-robot-3d-badge"><Shield size={14} /></div>
           </div>
-          <div className="ad-robot-3d-arm left">
-            <div className="ad-arm-shoulder"></div>
-            <div className="ad-arm-forearm"></div>
-            <div className="ad-arm-hand"></div>
-          </div>
-          <div className="ad-robot-3d-arm right">
-            <div className="ad-arm-shoulder"></div>
-            <div className="ad-arm-forearm"></div>
-            <div className="ad-arm-hand"></div>
-          </div>
+          <div className="ad-robot-3d-arm left"><div className="ad-arm-shoulder"></div><div className="ad-arm-forearm"></div><div className="ad-arm-hand"></div></div>
+          <div className="ad-robot-3d-arm right"><div className="ad-arm-shoulder"></div><div className="ad-arm-forearm"></div><div className="ad-arm-hand"></div></div>
           <div className="ad-robot-3d-legs">
-            <div className="ad-leg left">
-              <div className="ad-leg-upper"></div>
-              <div className="ad-leg-lower"></div>
-              <div className="ad-leg-foot"></div>
-            </div>
-            <div className="ad-leg right">
-              <div className="ad-leg-upper"></div>
-              <div className="ad-leg-lower"></div>
-              <div className="ad-leg-foot"></div>
-            </div>
+            <div className="ad-leg left"><div className="ad-leg-upper"></div><div className="ad-leg-lower"></div><div className="ad-leg-foot"></div></div>
+            <div className="ad-leg right"><div className="ad-leg-upper"></div><div className="ad-leg-lower"></div><div className="ad-leg-foot"></div></div>
           </div>
         </div>
         <div className="ad-robot-3d-glow"></div>
-        
         <AnimatePresence>
           {isRobotHovered && !isChatbotOpen && (
-            <motion.div 
-              className="ad-robot-3d-bubble"
-              initial={{ opacity: 0, scale: 0.9, x: -20 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 0.9, x: -20 }}
-              transition={{ duration: 0.2 }}
-            >
-              <div className="ad-bubble-icon">
-                <Bot size={16} />
-              </div>
-              <div className="ad-bubble-content">
-                <span className="ad-bubble-title">Assistant SRTB</span>
-                <span className="ad-bubble-desc">Bonjour ! Comment puis-je vous aider ? 👋</span>
-              </div>
+            <motion.div className="ad-robot-3d-bubble" initial={{ opacity: 0, scale: 0.9, x: -20 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9, x: -20 }} transition={{ duration: 0.2 }}>
+              <div className="ad-bubble-icon"><Bot size={16} /></div>
+              <div className="ad-bubble-content"><span className="ad-bubble-title">Assistant SRTB</span><span className="ad-bubble-desc">Bonjour ! Comment puis-je vous aider ? 👋</span></div>
               <div className="ad-bubble-tail"></div>
             </motion.div>
           )}
         </AnimatePresence>
-        
-        {!isChatbotOpen && unreadCount > 0 && (
-          <div className="ad-robot-3d-badge-notification">
-            <span>{unreadCount}</span>
-          </div>
-        )}
+        {!isChatbotOpen && unreadCount > 0 && (<div className="ad-robot-3d-badge-notification"><span>{unreadCount}</span></div>)}
       </div>
     </motion.button>
   );
@@ -480,19 +454,14 @@ const AgentDashboard = () => {
         <div className="ad-header-left">
           <div className="ad-logo">
             <Shield size={32} color="#c4a962" />
-            <div>
-              <h1>Espace Agent</h1>
-              <p>{greeting}, {agentData?.prenom || 'Agent'} {agentData?.nom || ''}</p>
-            </div>
+            <div><h1>Espace Agent</h1><p>{greeting}, {agentData?.prenom || user?.prenom || 'Agent'} {agentData?.nom || user?.nom || ''}</p></div>
           </div>
         </div>
         
         <div className="ad-header-right">
           <div className="ad-datetime">
-            <Clock size={14} />
-            <span>{currentTime.toLocaleTimeString('fr-FR')}</span>
-            <Calendar size={14} />
-            <span>{currentTime.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            <Clock size={14} /><span>{currentTime.toLocaleTimeString('fr-FR')}</span>
+            <Calendar size={14} /><span>{currentTime.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
           </div>
           
           <div className="ad-notifications-wrapper">
@@ -503,10 +472,7 @@ const AgentDashboard = () => {
             <AnimatePresence>
               {showNotifications && (
                 <motion.div className="ad-notif-dropdown" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                  <div className="ad-notif-header">
-                    <h3>Notifications</h3>
-                    <button onClick={() => setShowNotifications(false)}><X size={16} /></button>
-                  </div>
+                  <div className="ad-notif-header"><h3>Notifications</h3><button onClick={() => setShowNotifications(false)}><X size={16} /></button></div>
                   <div className="ad-notif-list">
                     {loadingNotifications ? <div className="ad-spinner"></div> :
                      notifications.length === 0 ? <div className="ad-notif-empty"><Bell size={32} /><p>Aucune notification</p></div> :
@@ -527,21 +493,14 @@ const AgentDashboard = () => {
             </AnimatePresence>
           </div>
           
-          <button className="ad-logout-btn" onClick={handleLogout}>
-            <LogOut size={18} />
-            <span>Déconnexion</span>
-          </button>
+          <button className="ad-logout-btn" onClick={handleLogout}><LogOut size={18} /><span>Déconnexion</span></button>
         </div>
       </header>
 
       {/* ONGLETS DE NAVIGATION */}
       <nav className="ad-tabs-nav">
         {tabs.map(tab => (
-          <button
-            key={tab.id}
-            className={`ad-tab-btn-v2 ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
+          <button key={tab.id} className={`ad-tab-btn-v2 ${activeTab === tab.id ? 'active' : ''}`} onClick={() => setActiveTab(tab.id)}>
             <tab.icon size={18} style={{ color: activeTab === tab.id ? tab.color : '#6b7280' }} />
             <span>{tab.label}</span>
             {activeTab === tab.id && <motion.div className="ad-tab-indicator" layoutId="tabIndicator" />}
@@ -554,75 +513,47 @@ const AgentDashboard = () => {
         <AnimatePresence mode="wait">
           <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
             
-            {/* ========== ONGLET 1 : VUE D'ENSEMBLE ========== */}
+            {/* ONGLET 1 : VUE D'ENSEMBLE */}
             {activeTab === 'overview' && (
               <div className="ad-tab-panel">
-                {/* KPI Cards */}
                 <div className="ad-kpi-grid-v2">
                   <div className="ad-kpi-card-v2">
                     <div className="ad-kpi-icon" style={{ background: '#fef3c7', color: '#d97706' }}><User size={20} /></div>
-                    <div className="ad-kpi-info">
-                      <span className="ad-kpi-label">Statut</span>
-                      <span className="ad-kpi-value">{getStatutTexte(agentData?.statut)}</span>
-                    </div>
+                    <div className="ad-kpi-info"><span className="ad-kpi-label">Statut</span><span className="ad-kpi-value">{getStatutTexte(agentData?.statut || user?.statut || 'actif')}</span></div>
                   </div>
                   <div className="ad-kpi-card-v2">
                     <div className="ad-kpi-icon" style={{ background: '#d1fae5', color: '#059669' }}><CalendarDays size={20} /></div>
-                    <div className="ad-kpi-info">
-                      <span className="ad-kpi-label">Prochaine visite</span>
-                      <span className="ad-kpi-value">
-                        {prochainesVisites && prochainesVisites.length > 0 && prochainesVisites[0]?.date_visite 
-                          ? formatDate(prochainesVisites[0].date_visite) 
-                          : 'Non programmée'}
-                      </span>
-                    </div>
+                    <div className="ad-kpi-info"><span className="ad-kpi-label">Prochaine visite</span><span className="ad-kpi-value">{prochainesVisites[0]?.date_visite ? formatDate(prochainesVisites[0].date_visite) : 'Non programmée'}</span></div>
                   </div>
                   <div className="ad-kpi-card-v2">
                     <div className="ad-kpi-icon" style={{ background: '#fee2e2', color: '#dc2626' }}><Hospital size={20} /></div>
                     <div className="ad-kpi-info">
                       <span className="ad-kpi-label">Dernière visite</span>
                       <span className="ad-kpi-value">
-                        {visites[0]?.date_visite ? formatDate(visites[0].date_visite) : 'Jamais'}
+                        {visites[0]?.date_visite ? formatDate(visites[0].date_visite) : 
+                         (agentData?.date_derniere_visite ? formatDate(agentData.date_derniere_visite) : 
+                         (user?.date_derniere_visite ? formatDate(user.date_derniere_visite) : 'Jamais'))}
                       </span>
                     </div>
                   </div>
                   <div className="ad-kpi-card-v2">
                     <div className="ad-kpi-icon" style={{ background: '#e0e7ff', color: '#4f46e5' }}><BriefcaseMedical size={20} /></div>
-                    <div className="ad-kpi-info">
-                      <span className="ad-kpi-label">Accidents</span>
-                      <span className="ad-kpi-value">{stats.totalAccidents}</span>
-                    </div>
+                    <div className="ad-kpi-info"><span className="ad-kpi-label">Accidents</span><span className="ad-kpi-value">{stats.totalAccidents}</span></div>
                   </div>
                 </div>
 
-                {/* SECTION ÉVOLUTION DES CONNEXIONS - SUPPRIMÉE */}
-
-                {/* Alertes */}
                 {alerts.length > 0 && (
-                  <div className="ad-alerts-section">
-                    <h3><AlertTriangle size={16} /> Alertes</h3>
-                    {alerts.map((alert, i) => (
-                      <div key={i} className={`ad-alert-card ${alert.type}`}>
-                        <span className="ad-alert-icon">{alert.icon}</span>
-                        <div>
-                          <div className="ad-alert-title">{alert.title}</div>
-                          <div className="ad-alert-msg">{alert.message}</div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="ad-alerts-section"><h3><AlertTriangle size={16} /> Alertes</h3>
+                    {alerts.map((alert, i) => (<div key={i} className={`ad-alert-card ${alert.type}`}><span className="ad-alert-icon">{alert.icon}</span><div><div className="ad-alert-title">{alert.title}</div><div className="ad-alert-msg">{alert.message}</div></div></div>))}
                   </div>
                 )}
 
-                {/* Derniers accidents */}
                 {accidents.slice(0, 3).length > 0 && (
-                  <div className="ad-recent-list">
-                    <h3><AlertCircle size={16} /> Derniers accidents</h3>
+                  <div className="ad-recent-list"><h3><AlertCircle size={16} /> Derniers accidents</h3>
                     {accidents.slice(0, 3).map(acc => (
                       <div key={acc.id_accident} className="ad-recent-item">
                         <div className="ad-recent-date">{formatDate(acc.date_accident)}</div>
-                        <div className="ad-recent-badge" style={{ background: getGraviteColor(acc.gravite) }}>
-                          {getGraviteIcon(acc.gravite)} {acc.gravite || 'Non définie'}
-                        </div>
+                        <div className="ad-recent-badge" style={{ background: getGraviteColor(acc.gravite) }}>{getGraviteIcon(acc.gravite)} {acc.gravite || 'Non définie'}</div>
                         <div className="ad-recent-info">{acc.lieu_accident || 'Lieu non spécifié'}</div>
                         <div className="ad-recent-duration">{acc.jour_arret || 0} jours</div>
                       </div>
@@ -630,9 +561,7 @@ const AgentDashboard = () => {
                   </div>
                 )}
 
-                {/* Actions rapides */}
-                <div className="ad-quick-actions">
-                  <h3><ExternalLink size={16} /> Accès rapides</h3>
+                <div className="ad-quick-actions"><h3><ExternalLink size={16} /> Accès rapides</h3>
                   <div className="ad-actions-grid">
                     <button className="ad-action-btn" onClick={() => setActiveTab('medical')}><Stethoscope size={18} /><span>Suivi médical</span></button>
                     <button className="ad-action-btn" onClick={() => setActiveTab('accidents')}><AlertCircle size={18} /><span>Mes accidents</span></button>
@@ -642,12 +571,12 @@ const AgentDashboard = () => {
               </div>
             )}
 
-            {/* ========== ONGLET 2 : SUIVI MÉDICAL ========== */}
+            {/* ONGLET 2 : SUIVI MÉDICAL */}
             {activeTab === 'medical' && (
               <div className="ad-tab-panel">
                 <div className="ad-card">
                   <div className="ad-card-header"><CalendarDays size={18} /><h3>Prochaine visite médicale</h3></div>
-                  {prochainesVisites && prochainesVisites.length > 0 && prochainesVisites[0] ? (
+                  {prochainesVisites[0] ? (
                     <div className="ad-next-visit">
                       <div className="ad-visit-date-large">{formatDateLong(prochainesVisites[0].date_visite)}</div>
                       <div className="ad-visit-details">
@@ -667,13 +596,14 @@ const AgentDashboard = () => {
                       <div className="ad-visit-details">
                         <span><strong>Type :</strong> {getTypeVisiteIcon(visites[0].type_visite)} {visites[0].type_visite || 'Visite médicale'}</span>
                         <span><strong>Médecin :</strong> {visites[0].medecin || 'Dr. Mahmoud Khelifi'}</span>
-                        <span><strong>Résultat :</strong> <span className={visites[0].resultat === 'Apte' ? 'ad-resultat-success' : 'ad-resultat-warning'}>
-                          {getResultatIcon(visites[0].resultat)} {visites[0].resultat || 'Non spécifié'}
-                        </span></span>
+                        <span><strong>Résultat :</strong> <span className={visites[0].resultat === 'Apte' ? 'ad-resultat-success' : 'ad-resultat-warning'}>{getResultatIcon(visites[0].resultat)} {visites[0].resultat || 'Non spécifié'}</span></span>
                         {visites[0].observation && <span><strong>Observation :</strong> {visites[0].observation}</span>}
-                        {visites[0].type_action && <span><strong>Action :</strong> {visites[0].type_action}</span>}
-                        {visites[0].source && <span><strong>Source :</strong> {visites[0].source === 'FORMULAIRE' ? 'Formulaire' : 'Planning automatique'}</span>}
                       </div>
+                    </div>
+                  ) : (agentData?.date_derniere_visite || user?.date_derniere_visite) ? (
+                    <div className="ad-last-visit">
+                      <div className="ad-visit-date">{formatDateLong(agentData?.date_derniere_visite || user?.date_derniere_visite)}</div>
+                      <div className="ad-visit-details"><span><strong>Type :</strong> Non spécifié</span><span><strong>Médecin :</strong> Non renseigné</span><span><strong>Résultat :</strong> Non renseigné</span></div>
                     </div>
                   ) : <p className="ad-empty">Aucune visite enregistrée</p>}
                 </div>
@@ -682,33 +612,21 @@ const AgentDashboard = () => {
                   <div className="ad-card">
                     <div className="ad-card-header"><FolderOpen size={18} /><h3>Historique des visites</h3></div>
                     <div className="ad-table">
-                      {visites.slice(0, 10).map((v, i) => (
+                      {visites.slice(0, 5).map((v, i) => (
                         <div key={i} className="ad-table-row">
                           <div className="ad-table-cell">{formatDate(v.date_visite)}</div>
                           <div className="ad-table-cell">{getTypeVisiteIcon(v.type_visite)} {v.type_visite || 'Périodique'}</div>
                           <div className="ad-table-cell">{v.medecin || 'Médecin'}</div>
-                          <div className={`ad-table-cell ${v.resultat === 'Apte' ? 'success' : 'warning'}`}>
-                            {getResultatIcon(v.resultat)} {v.resultat || 'Effectuée'}
-                          </div>
+                          <div className={`ad-table-cell ${v.resultat === 'Apte' ? 'success' : 'warning'}`}>{getResultatIcon(v.resultat)} {v.resultat || 'Effectuée'}</div>
                         </div>
                       ))}
-                    </div>
-                  </div>
-                )}
-
-                {agentData?.date_fin_inaptitude && (
-                  <div className="ad-card warning">
-                    <div className="ad-card-header"><AlertTriangle size={18} /><h3>Période d'inaptitude</h3></div>
-                    <div className="ad-inaptitude-info">
-                      <span>Du {formatDate(agentData.date_debut_inaptitude)} au {formatDate(agentData.date_fin_inaptitude)}</span>
-                      {getDaysLeft(agentData.date_fin_inaptitude) > 0 && <span className="ad-badge-warning">{getDaysLeft(agentData.date_fin_inaptitude)} jours restants</span>}
                     </div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* ========== ONGLET 3 : ACCIDENTS ========== */}
+            {/* ONGLET 3 : ACCIDENTS */}
             {activeTab === 'accidents' && (
               <div className="ad-tab-panel">
                 <div className="ad-stats-row">
@@ -726,25 +644,14 @@ const AgentDashboard = () => {
                         <div key={acc.id_accident} className="ad-accident-card">
                           <div className="ad-accident-header">
                             <span className="ad-accident-date">{formatDate(acc.date_accident)}</span>
-                            <span className="ad-accident-badge" style={{ background: getGraviteColor(acc.gravite) }}>
-                              {getGraviteIcon(acc.gravite)} {acc.gravite || 'Non définie'}
-                            </span>
-                            <span className={`ad-accident-status ${acc.statut === 'declare' ? 'declared' : 'draft'}`}>
-                              {acc.statut === 'declare' ? '✓ Déclaré' : '📝 Brouillon'}
-                            </span>
+                            <span className="ad-accident-badge" style={{ background: getGraviteColor(acc.gravite) }}>{getGraviteIcon(acc.gravite)} {acc.gravite || 'Non définie'}</span>
+                            <span className={`ad-accident-status ${acc.statut === 'declare' ? 'declared' : 'draft'}`}>{acc.statut === 'declare' ? '✓ Déclaré' : '📝 Brouillon'}</span>
                           </div>
                           <div className="ad-accident-body">
                             {acc.numero_accident && <div className="ad-accident-detail"><strong>📄 N° accident :</strong> {acc.numero_accident}</div>}
                             {acc.lieu_accident && <div className="ad-accident-detail"><strong>📍 Lieu :</strong> {acc.lieu_accident}</div>}
                             {acc.nature_blessures && <div className="ad-accident-detail"><strong>🩺 Nature des blessures :</strong> {acc.nature_blessures}</div>}
-                            {acc.endroit_blessures && <div className="ad-accident-detail"><strong>🎯 Endroit des blessures :</strong> {acc.endroit_blessures}</div>}
-                            {acc.facteurs_materiels && <div className="ad-accident-detail"><strong>🔧 Facteurs matériels :</strong> {acc.facteurs_materiels}</div>}
-                            {acc.condition_accident && <div className="ad-accident-detail"><strong>📋 Conditions :</strong> {acc.condition_accident}</div>}
-                            {acc.mode_survenue && <div className="ad-accident-detail"><strong>⚡ Mode de survenue :</strong> {acc.mode_survenue}</div>}
                             <div className="ad-accident-detail"><strong>⏱️ Jours d'arrêt :</strong> {acc.jour_arret || 0} jours</div>
-                            {(acc.temoin1 || acc.temoin2) && <div className="ad-accident-detail"><strong>👥 Témoins :</strong> {acc.temoin1}{acc.temoin2 ? `, ${acc.temoin2}` : ''}</div>}
-                            {acc.numero_pv && <div className="ad-accident-detail"><strong>📎 PV n° :</strong> {acc.numero_pv}</div>}
-                            {acc.tiers_responsable && <div className="ad-accident-detail"><strong>⚠️ Tiers responsable :</strong> {acc.nom_tiers || 'Oui'}</div>}
                             {acc.heure_accident && <div className="ad-accident-detail"><strong>🕐 Heure :</strong> {acc.heure_accident.substring(0,5)}</div>}
                           </div>
                         </div>
@@ -752,60 +659,44 @@ const AgentDashboard = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="ad-empty-state">
-                    <Shield size={48} />
-                    <p>Aucun accident de travail déclaré</p>
-                    <span>Continuez à travailler en toute sécurité !</span>
-                  </div>
+                  <div className="ad-empty-state"><Shield size={48} /><p>Aucun accident de travail déclaré</p><span>Continuez à travailler en toute sécurité !</span></div>
                 )}
               </div>
             )}
 
-            {/* ========== ONGLET 4 : MON PROFIL ========== */}
+            {/* ONGLET 4 : MON PROFIL */}
             {activeTab === 'profile' && (
               <div className="ad-tab-panel">
                 <div className="ad-profile-header">
                   <div className="ad-profile-avatar"><UserCircle size={64} /></div>
                   <div className="ad-profile-info">
-                    <h2>{agentData?.prenom || 'Agent'} {agentData?.nom || ''}</h2>
-                    <p className="ad-profile-role">
-                      {agentData?.code_affectation === 3 ? 'Chauffeur' : 
-                       agentData?.code_affectation === 5 ? 'Contrôle' : 
-                       agentData?.code_affectation === 1 ? 'Administratif' : 'Agent de sécurité'}
-                    </p>
-                    <div className={`ad-profile-status ${agentData?.statut || 'actif'}`}>{getStatutTexte(agentData?.statut)}</div>
+                    <h2>{agentData?.prenom || user?.prenom || 'Agent'} {agentData?.nom || user?.nom || ''}</h2>
+                    <p className="ad-profile-role">{agentData?.code_affectation === 3 ? 'Chauffeur' : agentData?.code_affectation === 5 ? 'Contrôle' : 'Agent de sécurité'}</p>
+                    <div className={`ad-profile-status ${agentData?.statut || user?.statut || 'actif'}`}>{getStatutTexte(agentData?.statut || user?.statut || 'actif')}</div>
                   </div>
                 </div>
 
                 <div className="ad-profile-grid">
-                  <div className="ad-card">
-                    <div className="ad-card-header"><User size={16} /><h3>Informations personnelles</h3></div>
+                  <div className="ad-card"><div className="ad-card-header"><User size={16} /><h3>Informations personnelles</h3></div>
                     <div className="ad-info-list">
                       <div><label>Matricule</label><span>{agentData?.matricule_agent || user?.id}</span></div>
-                      <div><label>Nom complet</label><span>{agentData?.prenom || ''} {agentData?.nom || ''}</span></div>
+                      <div><label>Nom complet</label><span>{agentData?.prenom || user?.prenom || ''} {agentData?.nom || user?.nom || ''}</span></div>
                       <div><label>Email</label><span>{user?.email || 'Non renseigné'}</span></div>
-                      <div><label>📅 Date de naissance</label><span>{agentData?.date_naissance ? formatDateLong(agentData.date_naissance) : 'Non renseignée'}</span></div>
+                      <div><label>📅 Date de naissance</label><span>{agentData?.date_naissance ? formatDateLong(agentData.date_naissance) : (user?.date_naissance ? formatDateLong(user.date_naissance) : 'Non renseignée')}</span></div>
                     </div>
                   </div>
 
-                  <div className="ad-card">
-                    <div className="ad-card-header"><Briefcase size={16} /><h3>Informations professionnelles</h3></div>
+                  <div className="ad-card"><div className="ad-card-header"><Briefcase size={16} /><h3>Informations professionnelles</h3></div>
                     <div className="ad-info-list">
-                      <div><label>Agence</label><span>{agentData?.code_agence || 'Non renseignée'}</span></div>
-                      <div><label>Affectation</label><span>
-                        {agentData?.code_affectation === 3 ? 'Chauffeur' : 
-                         agentData?.code_affectation === 5 ? 'Contrôle' : 
-                         agentData?.code_affectation === 1 ? 'Administratif' : 'Agent de sécurité'}
-                      </span></div>
+                      <div><label>Agence</label><span>{agentData?.code_agence || user?.code_agence || 'Non renseignée'}</span></div>
+                      <div><label>Affectation</label><span>{agentData?.code_affectation === 3 ? 'Chauffeur' : agentData?.code_affectation === 5 ? 'Contrôle' : 'Agent de sécurité'}</span></div>
                       {agentData?.direction && <div><label>🏢 Direction</label><span>{agentData.direction}</span></div>}
                       {agentData?.periodicite_jours && <div><label>⏱️ Périodicité visites</label><span>{agentData.periodicite_jours} jours</span></div>}
-                      {agentData?.date_debut_inaptitude && <div className="warning"><label>⚠️ Inaptitude</label><span>du {formatDate(agentData.date_debut_inaptitude)} au {formatDate(agentData.date_fin_inaptitude)}</span></div>}
                     </div>
                   </div>
                 </div>
 
-                <div className="ad-card">
-                  <div className="ad-card-header"><BarChart3 size={16} /><h3>Bilan {new Date().getFullYear()}</h3></div>
+                <div className="ad-card"><div className="ad-card-header"><BarChart3 size={16} /><h3>Bilan {new Date().getFullYear()}</h3></div>
                   <div className="ad-bilan-grid">
                     <div><span>Visites médicales</span><strong>{stats.visitesCetteAnnee}</strong></div>
                     <div><span>Accidents</span><strong>{stats.accidentsCetteAnnee}</strong></div>
@@ -814,13 +705,11 @@ const AgentDashboard = () => {
                   </div>
                 </div>
 
-                <div className="ad-card">
-                  <div className="ad-card-header"><AwardIcon size={16} /><h3>Récompenses</h3></div>
+                <div className="ad-card"><div className="ad-card-header"><AwardIcon size={16} /><h3>Récompenses</h3></div>
                   <div className="ad-badges">
                     {stats.joursSansAccident > 365 && <div className="ad-badge gold">🏆 Plus d'un an sans accident</div>}
                     {stats.tauxAptitude === 100 && stats.totalVisites > 0 && <div className="ad-badge green">✅ 100% d'aptitude</div>}
                     {stats.scoreSecurite >= 90 && <div className="ad-badge blue">🛡️ Score sécurité excellent</div>}
-                    {stats.joursSansAccident === 0 && <div className="ad-badge gray">📋 Nouvel agent</div>}
                   </div>
                 </div>
 
@@ -837,18 +726,9 @@ const AgentDashboard = () => {
         {showNotificationModal && selectedNotification && (
           <motion.div className="ad-modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowNotificationModal(false)}>
             <motion.div className="ad-modal-content" initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} onClick={e => e.stopPropagation()}>
-              <div className="ad-modal-header">
-                <h2><Bell size={18} /> Notification</h2>
-                <button onClick={() => setShowNotificationModal(false)}><X size={18} /></button>
-              </div>
-              <div className="ad-modal-body">
-                <div><label>Date :</label><span>{formatDateTime(selectedNotification.created_at)}</span></div>
-                <div><label>Message :</label><span>{selectedNotification.message}</span></div>
-              </div>
-              <div className="ad-modal-footer">
-                <button className="ad-btn-delete" onClick={() => { deleteNotification(selectedNotification.id); setShowNotificationModal(false); }}><Trash2 size={14} /> Supprimer</button>
-                <button className="ad-btn-close" onClick={() => setShowNotificationModal(false)}>Fermer</button>
-              </div>
+              <div className="ad-modal-header"><h2><Bell size={18} /> Notification</h2><button onClick={() => setShowNotificationModal(false)}><X size={18} /></button></div>
+              <div className="ad-modal-body"><div><label>Date :</label><span>{formatDateTime(selectedNotification.created_at)}</span></div><div><label>Message :</label><span>{selectedNotification.message}</span></div></div>
+              <div className="ad-modal-footer"><button className="ad-btn-delete" onClick={() => { deleteNotification(selectedNotification.id); setShowNotificationModal(false); }}><Trash2 size={14} /> Supprimer</button><button className="ad-btn-close" onClick={() => setShowNotificationModal(false)}>Fermer</button></div>
             </motion.div>
           </motion.div>
         )}

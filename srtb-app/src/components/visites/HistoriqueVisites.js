@@ -1,5 +1,5 @@
 // frontend/components/visites/HistoriqueVisites.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Calendar, Clock, User, FileText, CheckCircle, XCircle,
   AlertCircle, Info, RefreshCw, Eye, Layers, PenTool, History, 
@@ -9,6 +9,11 @@ import {
 } from 'lucide-react';
 import '../../styles/HistoriqueVisites.css';
 
+/**
+ * Composant HistoriqueVisites
+ * Complètement isolé avec des classes prefixées 'hv-'
+ * Aucun conflit CSS avec le reste de l'application
+ */
 const HistoriqueVisites = () => {
   // ========== ÉTATS PRINCIPAUX ==========
   const [activeTab, setActiveTab] = useState('planning');
@@ -38,33 +43,32 @@ const HistoriqueVisites = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedAction, setSelectedAction] = useState(null);
 
-  // ========== CHARGEMENT INITIAL ==========
-  useEffect(() => {
-    chargerAgents();
-    chargerStats();
-    chargerToutesActions();
+  // ========== FONCTIONS UTILITAIRES (définies avant utilisation) ==========
+  const getActionLabel = useCallback((action) => {
+    const labels = {
+      'PROGRAMMATION': 'Programmation',
+      'EFFECTUEE': 'Visite effectuée',
+      'REPROGRAMMEE': 'Reprogrammation',
+      'ANNULEE': 'Annulation',
+      'REAFFECTEE': 'Réaffectation',
+      'SAISIE_MANUELLE': 'Saisie manuelle'
+    };
+    return labels[action] || action;
   }, []);
 
-  useEffect(() => {
-    setCurrentPage(1);
-    chargerToutesActions();
-  }, [activeTab, selectedAgent, dateDebut, dateFin, filterTypeVisite, filterSource, filterResultat, filterAction]);
+  const getActionIcon = useCallback((action) => {
+    const icons = {
+      'PROGRAMMATION': '📅',
+      'EFFECTUEE': '✅',
+      'REPROGRAMMEE': '🔄',
+      'ANNULEE': '❌',
+      'REAFFECTEE': '👥',
+      'SAISIE_MANUELLE': '✏️'
+    };
+    return icons[action] || '📋';
+  }, []);
 
-  // ========== APPELS API ==========
-  const chargerAgents = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success) setAgents(data.agents);
-    } catch (err) {
-      console.error('Erreur chargement agents:', err);
-    }
-  };
-
-  const chargerToutesActions = async () => {
+  const chargerToutesActions = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -172,6 +176,19 @@ const HistoriqueVisites = () => {
     } finally {
       setLoading(false);
     }
+  }, [activeTab, selectedAgent, dateDebut, dateFin, filterTypeVisite, filterSource, filterResultat, filterAction, getActionLabel, getActionIcon]);
+
+  const chargerAgents = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.success) setAgents(data.agents);
+    } catch (err) {
+      console.error('Erreur chargement agents:', err);
+    }
   };
 
   const chargerStats = async () => {
@@ -200,30 +217,17 @@ const HistoriqueVisites = () => {
     }
   };
 
-  // ========== FONCTIONS UTILITAIRES ==========
-  const getActionLabel = (action) => {
-    const labels = {
-      'PROGRAMMATION': 'Programmation',
-      'EFFECTUEE': 'Visite effectuée',
-      'REPROGRAMMEE': 'Reprogrammation',
-      'ANNULEE': 'Annulation',
-      'REAFFECTEE': 'Réaffectation',
-      'SAISIE_MANUELLE': 'Saisie manuelle'
-    };
-    return labels[action] || action;
-  };
+  // ========== CHARGEMENT INITIAL ==========
+  useEffect(() => {
+    chargerAgents();
+    chargerStats();
+    chargerToutesActions();
+  }, [chargerToutesActions]);
 
-  const getActionIcon = (action) => {
-    const icons = {
-      'PROGRAMMATION': '📅',
-      'EFFECTUEE': '✅',
-      'REPROGRAMMEE': '🔄',
-      'ANNULEE': '❌',
-      'REAFFECTEE': '👥',
-      'SAISIE_MANUELLE': '✏️'
-    };
-    return icons[action] || '📋';
-  };
+  useEffect(() => {
+    setCurrentPage(1);
+    chargerToutesActions();
+  }, [activeTab, selectedAgent, dateDebut, dateFin, filterTypeVisite, filterSource, filterResultat, filterAction, chargerToutesActions]);
 
   const getActionColor = (action) => {
     const colors = {
@@ -251,10 +255,10 @@ const HistoriqueVisites = () => {
 
   const getResultatConfig = (resultat) => {
     const configs = {
-      'Apte': { class: 'apte', icon: <CheckCircle size={14} />, color: '#10b981' },
-      'Apte avec réserves': { class: 'reserves', icon: <AlertCircle size={14} />, color: '#f59e0b' },
-      'Inapte temporaire': { class: 'temporaire', icon: <AlertTriangle size={14} />, color: '#f97316' },
-      'Inapte définitif': { class: 'definitif', icon: <XCircle size={14} />, color: '#ef4444' }
+      'Apte': { class: 'hv-apte', icon: <CheckCircle size={14} />, color: '#10b981' },
+      'Apte avec réserves': { class: 'hv-reserves', icon: <AlertCircle size={14} />, color: '#f59e0b' },
+      'Inapte temporaire': { class: 'hv-temporaire', icon: <AlertTriangle size={14} />, color: '#f97316' },
+      'Inapte définitif': { class: 'hv-definitif', icon: <XCircle size={14} />, color: '#ef4444' }
     };
     return configs[resultat] || { class: '', icon: <Info size={14} />, color: '#64748b' };
   };
@@ -370,89 +374,89 @@ const HistoriqueVisites = () => {
     const resultatConfig = getResultatConfig(item.resultat);
     
     return (
-      <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
-        <div className="details-modal" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
+      <div className="hv-modal-overlay" onClick={() => setShowDetailsModal(false)}>
+        <div className="hv-details-modal" onClick={e => e.stopPropagation()}>
+          <div className="hv-modal-header">
             <h2>Détails de l'action</h2>
-            <button className="modal-close" onClick={() => setShowDetailsModal(false)}>
+            <button className="hv-modal-close" onClick={() => setShowDetailsModal(false)}>
               <XCircle size={20} />
             </button>
           </div>
           
-          <div className="modal-body">
-            <div className="details-agent">
-              <div className="agent-avatar large">
+          <div className="hv-modal-body">
+            <div className="hv-details-agent">
+              <div className="hv-agent-avatar hv-large">
                 {item.visiteAgent?.nom?.charAt(0)}{item.visiteAgent?.prenom?.charAt(0)}
               </div>
-              <div className="agent-info">
+              <div className="hv-agent-info">
                 <h3>{item.visiteAgent?.nom} {item.visiteAgent?.prenom}</h3>
-                <span className="matricule">Matricule: #{item.matricule_agent}</span>
-                <span className="agence">Agence: {item.visiteAgent?.code_agence || 'N/A'}</span>
+                <span className="hv-matricule">Matricule: #{item.matricule_agent}</span>
+                <span className="hv-agence">Agence: {item.visiteAgent?.code_agence || 'N/A'}</span>
               </div>
             </div>
             
-            <div className="details-section">
+            <div className="hv-details-section">
               <h4>📋 Informations</h4>
-              <div className="details-grid">
-                <div className="detail-item"><Calendar size={16} /><span>Date visite: <strong>{formatDateSimple(item.date_visite)}</strong></span></div>
-                <div className="detail-item"><Clock size={16} /><span>Heure: <strong>{item.heure_visite?.substring(0,5) || '--:--'}</strong></span></div>
-                <div className="detail-item"><FileText size={16} /><span>Type action: <strong>{item.actionLabel}</strong></span></div>
-                <div className="detail-item"><Layers size={16} /><span>Source: <strong>{item.sourceLabel}</strong></span></div>
-                <div className="detail-item"><Briefcase size={16} /><span>Type visite: <strong>{item.type_visite || 'Non spécifié'}</strong></span></div>
-                {item.medecin && (<div className="detail-item"><User size={16} /><span>Médecin: <strong>{item.medecin}</strong></span></div>)}
+              <div className="hv-details-grid">
+                <div className="hv-detail-item"><Calendar size={16} /><span>Date visite: <strong>{formatDateSimple(item.date_visite)}</strong></span></div>
+                <div className="hv-detail-item"><Clock size={16} /><span>Heure: <strong>{item.heure_visite?.substring(0,5) || '--:--'}</strong></span></div>
+                <div className="hv-detail-item"><FileText size={16} /><span>Type action: <strong>{item.actionLabel}</strong></span></div>
+                <div className="hv-detail-item"><Layers size={16} /><span>Source: <strong>{item.sourceLabel}</strong></span></div>
+                <div className="hv-detail-item"><Briefcase size={16} /><span>Type visite: <strong>{item.type_visite || 'Non spécifié'}</strong></span></div>
+                {item.medecin && (<div className="hv-detail-item"><User size={16} /><span>Médecin: <strong>{item.medecin}</strong></span></div>)}
               </div>
             </div>
             
             {item.resultat && (
-              <div className={`details-decision ${resultatConfig.class}`}>
-                <div className="decision-icon">{resultatConfig.icon}</div>
-                <div className="decision-content">
-                  <span className="decision-label">Décision médicale</span>
-                  <span className="decision-value">{item.resultat}</span>
+              <div className={`hv-details-decision ${resultatConfig.class}`}>
+                <div className="hv-decision-icon">{resultatConfig.icon}</div>
+                <div className="hv-decision-content">
+                  <span className="hv-decision-label">Décision médicale</span>
+                  <span className="hv-decision-value">{item.resultat}</span>
                 </div>
               </div>
             )}
             
             {item.observation && (
-              <div className="details-section">
+              <div className="hv-details-section">
                 <h4>📝 Observation</h4>
-                <div className="observation-box"><p>{item.observation}</p></div>
+                <div className="hv-observation-box"><p>{item.observation}</p></div>
               </div>
             )}
             
             {item.motif_action && (
-              <div className="details-section">
+              <div className="hv-details-section">
                 <h4>📌 Motif</h4>
-                <div className="motif-box"><p>{item.motif_action}</p></div>
+                <div className="hv-motif-box"><p>{item.motif_action}</p></div>
               </div>
             )}
             
             {item.ancien_statut && (
-              <div className="details-section">
+              <div className="hv-details-section">
                 <h4>📊 Changement de statut</h4>
-                <div className="status-change">
-                  <span className="old-status">{item.ancien_statut}</span>
-                  <span className="arrow">→</span>
-                  <span className="new-status">{item.nouveau_statut}</span>
+                <div className="hv-status-change">
+                  <span className="hv-old-status">{item.ancien_statut}</span>
+                  <span className="hv-arrow">→</span>
+                  <span className="hv-new-status">{item.nouveau_statut}</span>
                 </div>
               </div>
             )}
             
             {item.details && item.details.prochaine_visite && (
-              <div className="details-section highlight">
+              <div className="hv-details-section hv-highlight">
                 <h4>📅 Prochaine visite</h4>
                 <p>{formatDateSimple(item.details.prochaine_visite)} ({item.details.periodicite_texte || '1 an'})</p>
               </div>
             )}
             
-            <div className="details-footer">
+            <div className="hv-details-footer">
               <Clock size={12} />
               <span>Enregistré le: {formatDate(item.created_at)}</span>
             </div>
           </div>
           
-          <div className="modal-footer">
-            <button className="btn-close" onClick={() => setShowDetailsModal(false)}>Fermer</button>
+          <div className="hv-modal-footer">
+            <button className="hv-btn-close" onClick={() => setShowDetailsModal(false)}>Fermer</button>
           </div>
         </div>
       </div>
@@ -461,49 +465,49 @@ const HistoriqueVisites = () => {
 
   // ========== RENDU PRINCIPAL ==========
   return (
-    <div className="historique-container">
+    <div className="hv-container">
       
       {/* HEADER */}
-      <div className="historique-header">
-        <div className="header-left">
-          <div className="header-icon"><History size={28} /></div>
-          <div className="header-title">
+      <div className="hv-header">
+        <div className="hv-header-left">
+          <div className="hv-header-icon"><History size={28} /></div>
+          <div className="hv-header-title">
             <h1>Historique des actions</h1>
             <p>Suivi complet de toutes les actions (planning automatique + saisies manuelles)</p>
           </div>
         </div>
-        <div className="header-right">
+        <div className="hv-header-right">
           {activeTab === 'planning' ? (
-            <div className="stats-badge planning">
+            <div className="hv-stats-badge hv-planning">
               <Layers size={14} />
               <span>Planning: {stats.PLANNING || 0}</span>
             </div>
           ) : (
-            <div className="stats-badge formulaire">
+            <div className="hv-stats-badge hv-formulaire">
               <PenTool size={14} />
               <span>Formulaire: {stats.FORMULAIRE || 0}</span>
             </div>
           )}
-          <button className="btn-icon" onClick={chargerToutesActions} title="Actualiser">
+          <button className="hv-btn-icon" onClick={chargerToutesActions} title="Actualiser">
             <RefreshCw size={18} />
           </button>
           <button 
-            className={`btn-icon ${showFilters ? 'active' : ''}`} 
+            className={`hv-btn-icon ${showFilters ? 'hv-active' : ''}`} 
             onClick={() => setShowFilters(!showFilters)}
             title="Filtres avancés"
           >
             <Sliders size={18} />
           </button>
-          <div className="view-toggle">
+          <div className="hv-view-toggle">
             <button 
-              className={`view-btn ${viewMode === 'list' ? 'active' : ''}`} 
+              className={`hv-view-btn ${viewMode === 'list' ? 'hv-active' : ''}`} 
               onClick={() => setViewMode('list')}
               title="Vue liste"
             >
               <List size={16} />
             </button>
             <button 
-              className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`} 
+              className={`hv-view-btn ${viewMode === 'grid' ? 'hv-active' : ''}`} 
               onClick={() => setViewMode('grid')}
               title="Vue grille"
             >
@@ -514,91 +518,91 @@ const HistoriqueVisites = () => {
       </div>
 
       {/* STATS CARTES */}
-      <div className="stats-cards">
-        <div className="stat-card total">
-          <div className="stat-icon"><Activity size={20} /></div>
-          <div className="stat-info">
-            <span className="stat-value">{additionalStats.total}</span>
-            <span className="stat-label">Total actions</span>
+      <div className="hv-stats-cards">
+        <div className="hv-stat-card hv-total">
+          <div className="hv-stat-icon"><Activity size={20} /></div>
+          <div className="hv-stat-info">
+            <span className="hv-stat-value">{additionalStats.total}</span>
+            <span className="hv-stat-label">Total actions</span>
           </div>
         </div>
-        <div className="stat-card effectue">
-          <div className="stat-icon"><CheckCircle size={20} /></div>
-          <div className="stat-info">
-            <span className="stat-value">{additionalStats.effectuees}</span>
-            <span className="stat-label">Visites effectuées</span>
+        <div className="hv-stat-card hv-effectue">
+          <div className="hv-stat-icon"><CheckCircle size={20} /></div>
+          <div className="hv-stat-info">
+            <span className="hv-stat-value">{additionalStats.effectuees}</span>
+            <span className="hv-stat-label">Visites effectuées</span>
           </div>
         </div>
-        <div className="stat-card reprogramme">
-          <div className="stat-icon"><Repeat size={20} /></div>
-          <div className="stat-info">
-            <span className="stat-value">{additionalStats.reprogrammations}</span>
-            <span className="stat-label">Reprogrammations</span>
+        <div className="hv-stat-card hv-reprogramme">
+          <div className="hv-stat-icon"><Repeat size={20} /></div>
+          <div className="hv-stat-info">
+            <span className="hv-stat-value">{additionalStats.reprogrammations}</span>
+            <span className="hv-stat-label">Reprogrammations</span>
           </div>
         </div>
-        <div className="stat-card saisie">
-          <div className="stat-icon"><PenTool size={20} /></div>
-          <div className="stat-info">
-            <span className="stat-value">{additionalStats.saisies}</span>
-            <span className="stat-label">Saisies manuelles</span>
+        <div className="hv-stat-card hv-saisie">
+          <div className="hv-stat-icon"><PenTool size={20} /></div>
+          <div className="hv-stat-info">
+            <span className="hv-stat-value">{additionalStats.saisies}</span>
+            <span className="hv-stat-label">Saisies manuelles</span>
           </div>
         </div>
       </div>
 
       {/* STATS PAR TYPE DE VISITE */}
-      <div className="stats-types">
-        <div className="stat-type periodique">
-          <span className="type-icon">🔄</span>
-          <div className="type-info">
-            <span className="type-value">{additionalStats.periodiques}</span>
-            <span className="type-label">Périodiques</span>
+      <div className="hv-stats-types">
+        <div className="hv-stat-type hv-periodique">
+          <span className="hv-type-icon">🔄</span>
+          <div className="hv-type-info">
+            <span className="hv-type-value">{additionalStats.periodiques}</span>
+            <span className="hv-type-label">Périodiques</span>
           </div>
         </div>
-        <div className="stat-type reprise">
-          <span className="type-icon">⚕️</span>
-          <div className="type-info">
-            <span className="type-value">{additionalStats.reprises}</span>
-            <span className="type-label">Reprises</span>
+        <div className="hv-stat-type hv-reprise">
+          <span className="hv-type-icon">⚕️</span>
+          <div className="hv-type-info">
+            <span className="hv-type-value">{additionalStats.reprises}</span>
+            <span className="hv-type-label">Reprises</span>
           </div>
         </div>
-        <div className="stat-type reclassement">
-          <span className="type-icon">📝</span>
-          <div className="type-info">
-            <span className="type-value">{additionalStats.reclassements}</span>
-            <span className="type-label">Reclassements</span>
+        <div className="hv-stat-type hv-reclassement">
+          <span className="hv-type-icon">📝</span>
+          <div className="hv-type-info">
+            <span className="hv-type-value">{additionalStats.reclassements}</span>
+            <span className="hv-type-label">Reclassements</span>
           </div>
         </div>
-        <div className="stat-type embauche">
-          <span className="type-icon">🆕</span>
-          <div className="type-info">
-            <span className="type-value">{additionalStats.embauches}</span>
-            <span className="type-label">Embauches</span>
+        <div className="hv-stat-type hv-embauche">
+          <span className="hv-type-icon">🆕</span>
+          <div className="hv-type-info">
+            <span className="hv-type-value">{additionalStats.embauches}</span>
+            <span className="hv-type-label">Embauches</span>
           </div>
         </div>
       </div>
 
       {/* STATS PAR RÉSULTAT */}
-      <div className="stats-resultats">
-        <div className="stat-resultat apte">
+      <div className="hv-stats-resultats">
+        <div className="hv-stat-resultat hv-apte">
           <CheckCircle size={14} />
-          <span className="resultat-value">{additionalStats.aptes}</span>
-          <span className="resultat-label">Aptes</span>
+          <span className="hv-resultat-value">{additionalStats.aptes}</span>
+          <span className="hv-resultat-label">Aptes</span>
         </div>
-        <div className="stat-resultat temporaire">
+        <div className="hv-stat-resultat hv-temporaire">
           <AlertTriangle size={14} />
-          <span className="resultat-value">{additionalStats.inaptesTemp}</span>
-          <span className="resultat-label">Inaptes temp.</span>
+          <span className="hv-resultat-value">{additionalStats.inaptesTemp}</span>
+          <span className="hv-resultat-label">Inaptes temp.</span>
         </div>
-        <div className="stat-resultat definitif">
+        <div className="hv-stat-resultat hv-definitif">
           <XCircle size={14} />
-          <span className="resultat-value">{additionalStats.inaptesDef}</span>
-          <span className="resultat-label">Inaptes déf.</span>
+          <span className="hv-resultat-value">{additionalStats.inaptesDef}</span>
+          <span className="hv-resultat-label">Inaptes déf.</span>
         </div>
       </div>
 
       {/* RECHERCHE */}
-      <div className="search-bar-container">
-        <div className="search-input-wrapper">
+      <div className="hv-search-bar-container">
+        <div className="hv-search-input-wrapper">
           <Search size={18} />
           <input 
             type="text" 
@@ -606,21 +610,21 @@ const HistoriqueVisites = () => {
             value={searchTerm} 
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} 
           />
-          {searchTerm && <button className="clear-search" onClick={() => setSearchTerm('')}><XCircle size={16} /></button>}
+          {searchTerm && <button className="hv-clear-search" onClick={() => setSearchTerm('')}><XCircle size={16} /></button>}
         </div>
       </div>
 
       {/* FILTRES AVANCÉS */}
       {showFilters && (
-        <div className="filters-panel">
-          <div className="filters-header">
+        <div className="hv-filters-panel">
+          <div className="hv-filters-header">
             <h4><Filter size={16} /> Filtres avancés</h4>
-            <button className="reset-filters" onClick={resetFilters}>
+            <button className="hv-reset-filters" onClick={resetFilters}>
               <RefreshCw size={14} /> Réinitialiser
             </button>
           </div>
-          <div className="filters-grid">
-            <div className="filter-group">
+          <div className="hv-filters-grid">
+            <div className="hv-filter-group">
               <label>Agent</label>
               <select value={selectedAgent} onChange={(e) => setSelectedAgent(e.target.value)}>
                 <option value="">Tous les agents</option>
@@ -632,7 +636,7 @@ const HistoriqueVisites = () => {
               </select>
             </div>
 
-            <div className="filter-group">
+            <div className="hv-filter-group">
               <label>Type de visite</label>
               <select value={filterTypeVisite} onChange={(e) => setFilterTypeVisite(e.target.value)}>
                 <option value="all">📋 Tous les types</option>
@@ -643,7 +647,7 @@ const HistoriqueVisites = () => {
               </select>
             </div>
 
-            <div className="filter-group">
+            <div className="hv-filter-group">
               <label>Source</label>
               <select value={filterSource} onChange={(e) => setFilterSource(e.target.value)}>
                 <option value="all">🔀 Toutes les sources</option>
@@ -652,7 +656,7 @@ const HistoriqueVisites = () => {
               </select>
             </div>
 
-            <div className="filter-group">
+            <div className="hv-filter-group">
               <label>Résultat</label>
               <select value={filterResultat} onChange={(e) => setFilterResultat(e.target.value)}>
                 <option value="all">📊 Tous les résultats</option>
@@ -663,7 +667,7 @@ const HistoriqueVisites = () => {
               </select>
             </div>
 
-            <div className="filter-group">
+            <div className="hv-filter-group">
               <label>Type d'action</label>
               <select value={filterAction} onChange={(e) => setFilterAction(e.target.value)}>
                 <option value="all">🔧 Toutes les actions</option>
@@ -675,19 +679,19 @@ const HistoriqueVisites = () => {
               </select>
             </div>
 
-            <div className="filter-group">
+            <div className="hv-filter-group">
               <label>Date début</label>
               <input type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)} />
             </div>
 
-            <div className="filter-group">
+            <div className="hv-filter-group">
               <label>Date fin</label>
               <input type="date" value={dateFin} onChange={(e) => setDateFin(e.target.value)} />
             </div>
           </div>
           
-          <div className="filters-actions">
-            <button className="btn-apply" onClick={() => chargerToutesActions()}>
+          <div className="hv-filters-actions">
+            <button className="hv-btn-apply" onClick={() => chargerToutesActions()}>
               Appliquer les filtres
             </button>
           </div>
@@ -695,88 +699,88 @@ const HistoriqueVisites = () => {
       )}
 
       {/* ONGLETS */}
-      <div className="historique-tabs">
+      <div className="hv-historique-tabs">
         <button 
-          className={`tab-btn ${activeTab === 'planning' ? 'active' : ''}`} 
+          className={`hv-tab-btn ${activeTab === 'planning' ? 'hv-active' : ''}`} 
           onClick={() => setActiveTab('planning')}
         >
           <Activity size={18} />
           <span>Planning</span>
-          <span className="tab-count">{historiqueActions.filter(a => a.source === 'PLANNING').length}</span>
+          <span className="hv-tab-count">{historiqueActions.filter(a => a.source === 'PLANNING').length}</span>
         </button>
         <button 
-          className={`tab-btn ${activeTab === 'formulaire' ? 'active' : ''}`} 
+          className={`hv-tab-btn ${activeTab === 'formulaire' ? 'hv-active' : ''}`} 
           onClick={() => setActiveTab('formulaire')}
         >
           <PenTool size={18} />
           <span>Formulaire</span>
-          <span className="tab-count">{historiqueActions.filter(a => a.source === 'FORMULAIRE').length}</span>
+          <span className="hv-tab-count">{historiqueActions.filter(a => a.source === 'FORMULAIRE').length}</span>
         </button>
       </div>
 
       {/* ERREUR */}
       {error && (
-        <div className="error-container">
+        <div className="hv-error-container">
           <AlertCircle size={20} />
-          <div className="error-content"><strong>Erreur de chargement</strong><p>{error}</p></div>
+          <div className="hv-error-content"><strong>Erreur de chargement</strong><p>{error}</p></div>
           <button onClick={chargerToutesActions}><RefreshCw size={14} /> Réessayer</button>
         </div>
       )}
 
       {/* CONTENU */}
       {loading ? (
-        <div className="loading-state"><div className="spinner"></div><p>Chargement de l'historique...</p></div>
+        <div className="hv-loading-state"><div className="hv-spinner"></div><p>Chargement de l'historique...</p></div>
       ) : (
-        <div className="historique-content">
+        <div className="hv-historique-content">
           {filteredData.length === 0 ? (
-            <div className="empty-state">
+            <div className="hv-empty-state">
               <History size={48} />
               <h3>Aucune action enregistrée</h3>
               <p>Les actions sur le planning et les saisies manuelles apparaîtront ici</p>
-              <button className="btn-primary" onClick={chargerToutesActions}><RefreshCw size={16} /> Actualiser</button>
+              <button className="hv-btn-primary" onClick={chargerToutesActions}><RefreshCw size={16} /> Actualiser</button>
             </div>
           ) : (
             <>
-              <div className={`timeline ${viewMode === 'grid' ? 'grid-view' : ''}`}>
+              <div className={`hv-timeline ${viewMode === 'grid' ? 'hv-grid-view' : ''}`}>
                 {paginatedData.map((item, index) => {
                   const actionColor = getActionColor(item.type_action);
                   const actionBg = getActionBg(item.type_action);
                   const resultatConfig = getResultatConfig(item.resultat);
                   
                   return (
-                    <div key={item.id || index} className="timeline-item">
-                      <div className="timeline-marker" style={{ background: actionColor }}>
+                    <div key={item.id || index} className="hv-timeline-item">
+                      <div className="hv-timeline-marker" style={{ background: actionColor }}>
                         {item.actionIcon}
                       </div>
-                      <div className="timeline-content">
-                        <div className="timeline-header">
-                          <div className="action-info">
-                            <span className="action-type" style={{ color: actionColor }}>{item.actionLabel}</span>
-                            <span className="source-badge" style={{ background: item.sourceBg, color: item.sourceColor }}>
+                      <div className="hv-timeline-content">
+                        <div className="hv-timeline-header">
+                          <div className="hv-action-info">
+                            <span className="hv-action-type" style={{ color: actionColor }}>{item.actionLabel}</span>
+                            <span className="hv-source-badge" style={{ background: item.sourceBg, color: item.sourceColor }}>
                               {item.sourceIcon} {item.sourceLabel}
                             </span>
                             {item.type_visite && (
-                              <span className="type-badge-small" title={item.type_visite}>
+                              <span className="hv-type-badge-small" title={item.type_visite}>
                                 {getTypeVisiteIcon(item.type_visite)} {item.type_visite}
                               </span>
                             )}
                             {item.resultat && item.type_action === 'EFFECTUEE' && (
-                              <span className={`resultat-badge-small ${resultatConfig.class}`}>
+                              <span className={`hv-resultat-badge-small ${resultatConfig.class}`}>
                                 {resultatConfig.icon} {item.resultat}
                               </span>
                             )}
                           </div>
-                          <span className="action-date">{formatDate(item.created_at)}</span>
+                          <span className="hv-action-date">{formatDate(item.created_at)}</span>
                         </div>
                         
-                        <div className="action-details">
-                          <div className="detail-row">
+                        <div className="hv-action-details">
+                          <div className="hv-detail-row">
                             <User size={14} />
                             <strong>Agent:</strong>
                             <span>{item.visiteAgent?.nom} {item.visiteAgent?.prenom}</span>
-                            <span className="matricule">#{item.matricule_agent}</span>
+                            <span className="hv-matricule">#{item.matricule_agent}</span>
                           </div>
-                          <div className="detail-row">
+                          <div className="hv-detail-row">
                             <CalendarIcon size={14} />
                             <strong>Date visite:</strong>
                             <span>{formatDateSimple(item.date_visite)}</span>
@@ -785,7 +789,7 @@ const HistoriqueVisites = () => {
                           </div>
                           
                           {item.medecin && (
-                            <div className="detail-row">
+                            <div className="hv-detail-row">
                               <User size={14} />
                               <strong>Médecin:</strong>
                               <span>{item.medecin}</span>
@@ -793,31 +797,31 @@ const HistoriqueVisites = () => {
                           )}
                           
                           {item.motif_action && item.type_action !== 'SAISIE_MANUELLE' && (
-                            <div className="detail-row motif">
+                            <div className="hv-detail-row hv-motif">
                               <FileText size={14} />
                               <strong>Motif:</strong>
-                              <span className="motif-text">{item.motif_action.substring(0, 80)}...</span>
+                              <span className="hv-motif-text">{item.motif_action.substring(0, 80)}...</span>
                             </div>
                           )}
                           
                           {item.observation && (
-                            <div className="detail-row motif">
+                            <div className="hv-detail-row hv-motif">
                               <FileText size={14} />
                               <strong>Observation:</strong>
-                              <span className="observation-preview">{item.observation.substring(0, 80)}...</span>
+                              <span className="hv-observation-preview">{item.observation.substring(0, 80)}...</span>
                             </div>
                           )}
                           
                           {item.details && item.details.prochaine_visite && (
-                            <div className="detail-row highlight">
+                            <div className="hv-detail-row hv-highlight">
                               <CalendarIcon size={14} />
                               <strong>Prochaine visite:</strong>
                               <span>{formatDateSimple(item.details.prochaine_visite)} ({item.details.periodicite_texte || '1 an'})</span>
                             </div>
                           )}
                           
-                          <div className="timeline-actions">
-                            <button className="btn-details-small" onClick={() => openDetailsModal(item)}>
+                          <div className="hv-timeline-actions">
+                            <button className="hv-btn-details-small" onClick={() => openDetailsModal(item)}>
                               <Eye size={14} /> Détails
                             </button>
                           </div>
@@ -830,11 +834,11 @@ const HistoriqueVisites = () => {
               
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="pagination">
+                <div className="hv-pagination">
                   <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
                     <ChevronLeft size={16} /> Précédent
                   </button>
-                  <span className="page-info">Page {currentPage} sur {totalPages}</span>
+                  <span className="hv-page-info">Page {currentPage} sur {totalPages}</span>
                   <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
                     Suivant <ChevronRight size={16} />
                   </button>

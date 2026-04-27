@@ -1,6 +1,9 @@
-// frontend/components/NotificationsIntelligentesPage.js
+// frontend/components/NotificationsIntelligentesPage.jsx
 import React, { useState, useEffect } from 'react';
-import { Bell, X, CheckCircle, Info, Clock, Filter, RefreshCw, Eye, ChevronLeft, Zap } from 'lucide-react';
+import { 
+  Bell, X, CheckCircle, Info, Clock, Filter, RefreshCw, Eye, 
+  ChevronLeft, Zap, AlertCircle, AlertTriangle 
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import '../styles/NotificationsIntelligentesPage.css';
 
@@ -13,9 +16,11 @@ const NotificationsIntelligentesPage = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const typeColors = {
-    URGENT: { bg: '#ef444420', color: '#ef4444', icon: '🔴', label: 'Urgent' },
-    IMPORTANT: { bg: '#f59e0b20', color: '#f59e0b', icon: '🟠', label: 'Important' },
-    INFO: { bg: '#3b82f620', color: '#3b82f6', icon: '🔵', label: 'Information' }
+    URGENT: { bg: 'var(--nip-urgent-bg)', color: 'var(--nip-urgent-icon)', label: 'Urgent', className: 'nip-type-URGENT' },
+    IMPORTANT: { bg: 'var(--nip-important-bg)', color: 'var(--nip-important-icon)', label: 'Important', className: 'nip-type-IMPORTANT' },
+    INFO: { bg: 'var(--nip-info-bg)', color: 'var(--nip-info-icon)', label: 'Information', className: 'nip-type-INFO' },
+    RAPPEL: { bg: 'var(--nip-rappel-bg)', color: 'var(--nip-rappel-icon)', label: 'Rappel', className: 'nip-type-RAPPEL' },
+    ALERTE: { bg: 'var(--nip-alerte-bg)', color: 'var(--nip-alerte-icon)', label: 'Alerte', className: 'nip-type-ALERTE' }
   };
 
   useEffect(() => {
@@ -55,7 +60,6 @@ const NotificationsIntelligentesPage = () => {
     }
   };
 
-  // ✅ CORRECTION : Utiliser 'id' comme clé (pas 'id_notification')
   const marquerCommeLue = async (id) => {
     try {
       const token = localStorage.getItem('token');
@@ -67,7 +71,6 @@ const NotificationsIntelligentesPage = () => {
       const data = await response.json();
       
       if (data.success) {
-        // Mettre à jour localement
         setNotifications(prev => prev.map(n => 
           n.id === id ? { ...n, statut: 'lu' } : n
         ));
@@ -101,158 +104,213 @@ const NotificationsIntelligentesPage = () => {
     });
   };
 
+  const getTypeIcon = (type) => {
+    switch(type) {
+      case 'URGENT': return <AlertCircle size={20} />;
+      case 'IMPORTANT': return <Info size={20} />;
+      case 'INFO': return <Bell size={20} />;
+      case 'RAPPEL': return <Clock size={20} />;
+      case 'ALERTE': return <Zap size={20} />;
+      default: return <Bell size={20} />;
+    }
+  };
+
   return (
-    <div className="notifications-page">
+    <div className="nip-page">
       
       {/* HEADER */}
-      <div className="page-header">
-        <button className="back-btn" onClick={() => navigate(-1)}>
-          <ChevronLeft size={20} />
-        </button>
-        <div className="header-title">
-          <Bell size={24} />
-          <h1>Notifications intelligentes</h1>
-        </div>
-        <div className="header-actions">
-          <button className="btn-icon" onClick={() => setShowFilters(!showFilters)}>
-            <Filter size={18} />
+      <div className="nip-header-premium">
+        <div className="nip-header-content">
+          <button className="nip-back-btn" onClick={() => navigate(-1)}>
+            <ChevronLeft size={20} />
           </button>
-          <button className="btn-icon" onClick={chargerNotifications}>
-            <RefreshCw size={18} />
-          </button>
-          {stats.nonLues > 0 && (
-            <button className="btn-primary" onClick={marquerToutLu}>
-              <CheckCircle size={16} /> Tout marquer comme lu
+          
+          <div className="nip-title-section">
+            <div className="nip-icon-wrapper">
+              <div className="nip-icon">
+                <Bell size={24} />
+              </div>
+            </div>
+            <div>
+              <h1>Notifications intelligentes</h1>
+              <p>Centre de notifications · Service HSE</p>
+            </div>
+          </div>
+
+          <div className="nip-header-actions">
+            <button 
+              className={`nip-filter-btn ${showFilters ? 'active' : ''}`}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter size={16} /> Filtres
             </button>
-          )}
+            <button className="nip-refresh-btn" onClick={chargerNotifications}>
+              <RefreshCw size={16} /> Actualiser
+            </button>
+            {stats.nonLues > 0 && (
+              <button className="nip-mark-all-btn" onClick={marquerToutLu}>
+                <CheckCircle size={16} /> <span>Tout marquer comme lu</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* STATS RAPIDES */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#8B5CF620', color: '#8B5CF6' }}>
-            <Bell size={20} />
+      {/* STATISTIQUES */}
+      <div className="nip-stats-premium">
+        <div className="nip-stat-card">
+          <div className="nip-stat-icon blue">
+            <Bell size={22} />
           </div>
-          <div className="stat-content">
-            <span className="stat-label">Total</span>
-            <span className="stat-value">{stats.total}</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#ef444420', color: '#ef4444' }}>
-            <Eye size={20} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Non lues</span>
-            <span className="stat-value">{stats.nonLues}</span>
+          <div className="nip-stat-info">
+            <span className="nip-stat-value">{stats.total}</span>
+            <span className="nip-stat-label">Total notifications</span>
           </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
-            <CheckCircle size={20} />
+        <div className="nip-stat-card">
+          <div className="nip-stat-icon red">
+            <Eye size={22} />
           </div>
-          <div className="stat-content">
-            <span className="stat-label">Lues</span>
-            <span className="stat-value">{stats.total - stats.nonLues}</span>
+          <div className="nip-stat-info">
+            <span className="nip-stat-value">{stats.nonLues}</span>
+            <span className="nip-stat-label">Non lues</span>
+          </div>
+        </div>
+        <div className="nip-stat-card">
+          <div className="nip-stat-icon green">
+            <CheckCircle size={22} />
+          </div>
+          <div className="nip-stat-info">
+            <span className="nip-stat-value">{stats.total - stats.nonLues}</span>
+            <span className="nip-stat-label">Lues</span>
           </div>
         </div>
       </div>
 
       {/* FILTRES */}
       {showFilters && (
-        <div className="filters-panel">
-          <div className="filters-row">
-            <select 
-              value={filters.type} 
-              onChange={(e) => setFilters({...filters, type: e.target.value})}
-            >
-              <option value="all">Tous les types</option>
-              <option value="URGENT">🔴 Urgent</option>
-              <option value="IMPORTANT">🟠 Important</option>
-              <option value="INFO">🔵 Information</option>
-            </select>
+        <div className="nip-filters-premium">
+          <div className="nip-filters-row">
+            <div className="nip-filter-group">
+              <label>Type</label>
+              <select 
+                value={filters.type} 
+                onChange={(e) => setFilters({...filters, type: e.target.value})}
+              >
+                <option value="all">Tous les types</option>
+                <option value="URGENT">Urgent</option>
+                <option value="IMPORTANT">Important</option>
+                <option value="INFO">Information</option>
+                <option value="RAPPEL">Rappel</option>
+                <option value="ALERTE">Alerte</option>
+              </select>
+            </div>
             
-            <select 
-              value={filters.statut} 
-              onChange={(e) => setFilters({...filters, statut: e.target.value})}
-            >
-              <option value="all">Tous les statuts</option>
-              <option value="non_lu">Non lu</option>
-              <option value="lu">Lu</option>
-            </select>
+            <div className="nip-filter-group">
+              <label>Statut</label>
+              <select 
+                value={filters.statut} 
+                onChange={(e) => setFilters({...filters, statut: e.target.value})}
+              >
+                <option value="all">Tous les statuts</option>
+                <option value="non_lu">Non lues</option>
+                <option value="lu">Lues</option>
+              </select>
+            </div>
+
+            {(filters.type !== 'all' || filters.statut !== 'all') && (
+              <button 
+                className="nip-reset-filters"
+                onClick={() => setFilters({ type: 'all', statut: 'all' })}
+              >
+                <X size={14} /> Réinitialiser
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {/* LISTE DES NOTIFICATIONS */}
-      <div className="notifications-list">
+      <div className="nip-list-premium">
         {loading ? (
-          <div className="loading-state">
-            <div className="spinner"></div>
+          <div className="nip-loading-state">
+            <div className="nip-spinner"></div>
             <p>Chargement des notifications...</p>
           </div>
         ) : notifications.length === 0 ? (
-          <div className="empty-state">
-            <Bell size={48} />
+          <div className="nip-empty-state">
+            <div className="nip-empty-icon">
+              <Bell size={48} strokeWidth={1} />
+            </div>
             <h3>Aucune notification</h3>
             <p>Vous n'avez pas de notifications pour le moment</p>
           </div>
         ) : (
           notifications.map(notif => {
-            const typeStyle = typeColors[notif.type] || typeColors.INFO;
+            const type = typeColors[notif.type] || typeColors.INFO;
+            const isUnread = notif.statut === 'non_lu';
             
             return (
               <div 
                 key={notif.id}
-                className={`notification-card ${notif.statut === 'non_lu' ? 'unread' : ''}`}
+                className={`nip-card-premium ${type.className} ${isUnread ? 'unread' : ''}`}
               >
-                <div className="notification-indicator" style={{ background: typeStyle.color }} />
+                <div className="nip-card-indicator"></div>
                 
-                <div className="notification-icon" style={{ background: typeStyle.bg }}>
-                  <span>{typeStyle.icon}</span>
+                <div className="nip-card-icon">
+                  {getTypeIcon(notif.type)}
                 </div>
                 
-                <div className="notification-content">
-                  <div className="notification-header">
-                    <div className="notification-title">
-                      <span className="type-badge" style={{ background: typeStyle.bg, color: typeStyle.color }}>
-                        {typeStyle.label}
-                      </span>
-                      <h3>{notif.titre}</h3>
+                <div className="nip-card-content">
+                  <div className="nip-card-header">
+                    <div className="nip-card-badges">
+                      <span className="nip-type-badge">{type.label}</span>
+                      {notif.action_suggested && (
+                        <span className="nip-action-badge">
+                          <Zap size={10} /> Action suggérée
+                        </span>
+                      )}
                     </div>
-                    <span className="notification-time">
-                      <Clock size={12} /> {formatDate(notif.created_at)}
+                    <span className="nip-card-time">
+                      <Clock size={11} /> {formatDate(notif.created_at)}
                     </span>
                   </div>
                   
-                  <p className="notification-message">{notif.message}</p>
+                  <h4 className="nip-card-title">{notif.titre}</h4>
+                  <p className="nip-card-message">{notif.message}</p>
                   
                   {notif.action_suggested && (
-                    <div className="notification-action">
+                    <div className="nip-card-action">
                       <Zap size={12} />
                       <span>Action : {notif.action_suggested}</span>
                     </div>
                   )}
                 </div>
                 
-                <div className="notification-actions">
-                  {notif.statut === 'non_lu' ? (
+                <div className="nip-card-actions">
+                  {isUnread ? (
                     <button 
-                      className="action-btn mark-read"
+                      className="nip-mark-read-btn"
                       onClick={() => marquerCommeLue(notif.id)}
                       title="Marquer comme lu"
                     >
-                      <Eye size={14} />
+                      <Eye size={15} />
                     </button>
                   ) : (
-                    <span className="read-badge">Lu</span>
+                    <span className="nip-read-badge">
+                      <CheckCircle size={11} /> Lu
+                    </span>
                   )}
                 </div>
               </div>
             );
           })
         )}
+      </div>
+
+      {/* FOOTER */}
+      <div className="nip-footer">
+        SRTB · Service HSE · Dr. Mahmoud Khelifi
       </div>
     </div>
   );
