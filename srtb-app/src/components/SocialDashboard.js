@@ -670,19 +670,24 @@ const SocialDashboard = () => {
             {activeTab === 'accidents' && <SocialAccidents />}
             
             {/* ========== ONGLET 3 : VISITES MÉDICALES ========== */}
-            {activeTab === 'visites' && (
-              <div className="sd-visites-container">
-                <div className="sd-visites-submenu">
-                  <button className={`sd-submenu-btn ${visitesSubTab === 'planning' ? 'sd-active' : ''}`} onClick={() => setVisitesSubTab('planning')}>
-                    <CalendarIcon size={16} /> Planning
-                  </button>
-                  <button className={`sd-submenu-btn ${visitesSubTab === 'gestion' ? 'sd-active' : ''}`} onClick={() => setVisitesSubTab('gestion')}>
-                    <FileText size={16} /> Gestion Visites Manuellement
-                  </button>
-                </div>
-                {visitesSubTab === 'planning' ? <PlanningPage /> : <GestionVisitesPage />}
-              </div>
-            )}
+{activeTab === 'visites' && (
+  <div className="sd-visites-container">
+    <div className="sd-visites-submenu">
+      <button className={`sd-submenu-btn ${visitesSubTab === 'planning' ? 'sd-active' : ''}`} onClick={() => setVisitesSubTab('planning')}>
+        <CalendarIcon size={16} /> Planning
+      </button>
+      <button className={`sd-submenu-btn ${visitesSubTab === 'gestion' ? 'sd-active' : ''}`} onClick={() => setVisitesSubTab('gestion')}>
+        <FileText size={16} /> Gestion manuelle
+      </button>
+    </div>
+    
+    {visitesSubTab === 'planning' && <PlanningPage />}
+    {visitesSubTab === 'gestion' && <GestionVisitesPage />}
+    
+
+  </div>
+)}
+            
             
             {/* ========== ONGLET 4 : CONVOCATIONS ========== */}
             {activeTab === 'convocations' && <ConvocationsPage />}

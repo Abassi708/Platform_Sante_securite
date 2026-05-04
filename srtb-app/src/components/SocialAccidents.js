@@ -105,6 +105,8 @@ import {
   Fingerprint,
   History
 } from 'lucide-react';
+import AgentSearchInput from './common/AgentSearchInput';
+import CnamDeclarationModal from './accidents/CnamDeclarationModal';
 import '../styles/SocialAccidents.css';
 
 const API_URL = 'http://localhost:5000';
@@ -118,7 +120,8 @@ const SocialAccidents = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [agents, setAgents] = useState([]);
-  
+  const [showCnamModal, setShowCnamModal] = useState(false);
+const [cnamAccidentData, setCnamAccidentData] = useState(null);
   // ========== STATISTIQUES ==========
   const [stats, setStats] = useState({
     total: 0,
@@ -238,24 +241,24 @@ const SocialAccidents = () => {
       );
     }
 
-    if (filters.statut !== 'all') {
-      filtered = filtered.filter(a => a.statut === filters.statut);
-    }
+  if (filters.statut !== 'all') {
+    filtered = filtered.filter(a => a.statut === filters.statut);
+  }
 
-    if (filters.gravite !== 'all') {
-      filtered = filtered.filter(a => a.gravite === filters.gravite);
-    }
+  if (filters.gravite !== 'all') {
+    filtered = filtered.filter(a => a.gravite === filters.gravite);
+  }
 
-    if (filters.agent !== 'all') {
-      filtered = filtered.filter(a => a.matricule_agent === parseInt(filters.agent));
-    }
+  if (filters.agent !== 'all') {
+    filtered = filtered.filter(a => a.matricule_agent === parseInt(filters.agent));
+  }
 
     if (filters.dateDebut && filters.dateFin) {
       filtered = filtered.filter(a => {
         const date = new Date(a.date_accident);
         return date >= new Date(filters.dateDebut) && date <= new Date(filters.dateFin);
       });
-    }
+  }
 
     setFilteredAccidents(filtered);
     setCurrentPage(1);
@@ -309,15 +312,15 @@ const SocialAccidents = () => {
         };
         
         const parMois = Array(12).fill(0);
-accidentsAvecAgent.forEach(acc => {
-  if (acc.date_accident) {
+        accidentsAvecAgent.forEach(acc => {
+          if (acc.date_accident) {
     const [year, month, day] = acc.date_accident.split('-');
     const mois = parseInt(month) - 1;
     if (!isNaN(mois) && mois >= 0 && mois < 12) {
       parMois[mois]++;
     }
-  }
-});
+          }
+        });
         
         setStats({ total, declares, brouillons, parGravite, parMois });
       }
@@ -418,54 +421,70 @@ accidentsAvecAgent.forEach(acc => {
   };
 
   // ========== DÉCLARER À LA CNAM ==========
-  const handleDeclarer = async (id) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        showNotification({ 
-          type: 'error', 
-          title: '❌ Erreur', 
-          message: 'Session expirée' 
-        });
-        return;
-      }
-
-      const response = await fetch(`${API_URL}/api/accidents/${id}/statut`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ statut: 'declare' })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
-        showNotification({ 
-          type: 'success', 
-          title: '✅ Succès', 
-          message: 'Accident déclaré à la CNAM' 
-        });
-        await fetchAccidents();
-        if (showDetailsModal) setShowDetailsModal(false);
-      } else {
-        showNotification({ 
-          type: 'error', 
-          title: '❌ Erreur', 
-          message: data.message || 'Erreur inconnue' 
-        });
-      }
-    } catch (err) {
-      console.error('❌ Erreur:', err);
-      showNotification({ 
-        type: 'error', 
-        title: '❌ Erreur', 
-        message: 'Erreur de connexion' 
-      });
-    }
-  };
+ const handleDeclarer = async (accident) => {
+  console.log('🟢 handleDeclarer appelé avec accident:', accident);
   
+  try {
+    const token = localStorage.getItem('token');
+    console.log('🟢 Token:', token ? 'Présent' : 'Manquant');
+    
+    const url = `${API_URL}/api/accidents/${accident.id_accident}/cnam-data`;
+    console.log('🟢 URL appelée:', url);
+    
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    console.log('🟢 Statut réponse:', response.status);
+    const data = await response.json();
+    console.log('🟢 Données reçues:', data);
+  
+    if (data.success) {
+      console.log('🟢 Données OK, ouverture de la modale');
+      console.log('  - Accident:', data.accident);
+      console.log('  - Agent:', data.agent);
+      
+      setCnamAccidentData({ accident: data.accident, agent: data.agent });
+      setShowCnamModal(true);
+      console.log('🟢 setShowCnamModal(true) exécuté');
+    } else {
+      console.log('🔴 Erreur:', data.message);
+      showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
+    }
+  } catch (err) {
+    console.error('🔴 Erreur:', err);
+    showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur de connexion: ' + err.message });
+  }
+};
+
+const confirmCnamDeclaration = async (declarationData) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${API_URL}/api/accidents/${cnamAccidentData.accident.id_accident}/declarer-cnam`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(declarationData)
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showNotification({ type: 'success', title: '✅ Déclaration CNAM', message: data.message });
+      setShowCnamModal(false);
+      setCnamAccidentData(null);
+      await fetchAccidents();
+    } else {
+      showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
+    }
+  } catch (err) {
+    console.error('❌ Erreur:', err);
+    showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur de connexion' });
+  }
+};
+
   // ========== SUPPRIMER UN ACCIDENT ==========
   const handleDelete = async () => {
     if (!accidentToDelete) return;
@@ -504,7 +523,7 @@ accidentsAvecAgent.forEach(acc => {
       });
     }
   };
-  
+
   // ========== FONCTIONS UTILITAIRES ==========
   const showNotification = ({ type, title, message }) => {
     setNotification({ show: true, type, title, message });
@@ -539,36 +558,42 @@ accidentsAvecAgent.forEach(acc => {
 
   const editAccident = (accident) => {
     if (accident.statut === 'declare') {
-      showNotification({ 
-        type: 'error', 
-        title: '❌ Action impossible', 
-        message: 'Un accident déclaré à la CNAM ne peut pas être modifié' 
-      });
+    showNotification({ 
+      type: 'error', 
+      title: '❌ Action impossible', 
+      message: 'Un accident déclaré à la CNAM ne peut pas être modifié' 
+    });
       return;
     }
 
+  console.log('📝 Édition accident:', accident);
+  
+  // Trouver l'agent pour l'afficher dans le champ de recherche
+  const agent = agents.find(a => a.matricule_agent === accident.matricule_agent);
+  
     setSelectedAccident(accident);
     setFormData({
-      matricule_agent: accident.matricule_agent,
-      date_accident: accident.date_accident,
-      heure_accident: accident.heure_accident || '',
-      lieu_accident: accident.lieu_accident || '',
-      condition_accident: accident.condition_accident || '',
-      endroit_blessures: accident.endroit_blessures || '',
-      nature_blessures: accident.nature_blessures || '',
-      facteurs_materiels: accident.facteurs_materiels || '',
-      mode_survenue: accident.mode_survenue || '',
-      temoin1: accident.temoin1 || '',
-      temoin2: accident.temoin2 || '',
-      pv_existe: accident.pv_existe || false,
-      numero_pv: accident.numero_pv || '',
-      date_pv: accident.date_pv || '',
-      tiers_responsable: accident.tiers_responsable || false,
-      nom_tiers: accident.nom_tiers || '',
-      jour_arret: accident.jour_arret || 0,
-      gravite: accident.gravite || 'Faible',
-      statut: accident.statut || 'brouillon'
+    matricule_agent: accident.matricule_agent,
+    date_accident: accident.date_accident,
+    heure_accident: accident.heure_accident || '',
+    lieu_accident: accident.lieu_accident || '',
+    condition_accident: accident.condition_accident || '',
+    endroit_blessures: accident.endroit_blessures || '',
+    nature_blessures: accident.nature_blessures || '',
+    facteurs_materiels: accident.facteurs_materiels || '',
+    mode_survenue: accident.mode_survenue || '',
+    temoin1: accident.temoin1 || '',
+    temoin2: accident.temoin2 || '',
+    pv_existe: accident.pv_existe || false,
+    numero_pv: accident.numero_pv || '',
+    date_pv: accident.date_pv || '',
+    tiers_responsable: accident.tiers_responsable || false,
+    nom_tiers: accident.nom_tiers || '',
+    jour_arret: accident.jour_arret || 0,
+    gravite: accident.gravite || 'Faible',
+    statut: accident.statut || 'brouillon'
     });
+
     setActiveView('form');
   };
 
@@ -601,21 +626,21 @@ accidentsAvecAgent.forEach(acc => {
   };
 
   const formatDate = (dateStr) => {
-  if (!dateStr) return 'Non spécifiée';
-  const [year, month, day] = dateStr.split('-');
-  return `${day}/${month}/${year}`;
-};
+    if (!dateStr) return 'Non spécifiée';
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  };
 
   const formatDateTime = (dateStr, timeStr) => {
-  if (!dateStr) return 'Non spécifiée';
-  const [year, month, day] = dateStr.split('-');
-  const dateFormatted = `${day}/${month}/${year}`;
+    if (!dateStr) return 'Non spécifiée';
+    const [year, month, day] = dateStr.split('-');
+    const dateFormatted = `${day}/${month}/${year}`;
   if (timeStr) {
     const heure = timeStr.substring(0, 5);
     return `${dateFormatted} ${heure}`;
   }
-  return dateFormatted;
-};
+    return dateFormatted;
+  };
 
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -699,7 +724,7 @@ accidentsAvecAgent.forEach(acc => {
             <div className="header-stat-item">
               <FileText size={16} />
               <span><strong>{stats.total}</strong> total</span>
-            </div>
+          </div>
             <div className="header-stat-item">
               <CheckCircle size={16} style={{ color: '#10b981' }} />
               <span><strong>{stats.declares}</strong> déclarés</span>
@@ -784,7 +809,7 @@ accidentsAvecAgent.forEach(acc => {
                       value={filters.search}
                       onChange={(e) => setFilters({...filters, search: e.target.value})}
                     />
-                  </div>
+                </div>
 
                   <div className="filter-group">
                     <label>Statut</label>
@@ -807,7 +832,7 @@ accidentsAvecAgent.forEach(acc => {
                   </div>
 
                   <div className="filter-group">
-                    <label>Agent</label>
+  <label>Agent</label>
                     <select value={filters.agent} onChange={(e) => setFilters({...filters, agent: e.target.value})}>
                       <option value="all">Tous les agents</option>
                       {agents.map(agent => (
@@ -824,17 +849,17 @@ accidentsAvecAgent.forEach(acc => {
                       type="date"
                       value={filters.dateDebut}
                       onChange={(e) => setFilters({...filters, dateDebut: e.target.value})}
-                    />
-                  </div>
+  />
+</div>
 
-                  <div className="filter-group">
+<div className="filter-group">
                     <label>Date fin</label>
-                    <input
-                      type="date"
+  <input
+    type="date"
                       value={filters.dateFin}
                       onChange={(e) => setFilters({...filters, dateFin: e.target.value})}
                     />
-                  </div>
+</div>
                 </div>
               )}
 
@@ -845,10 +870,10 @@ accidentsAvecAgent.forEach(acc => {
                 {Object.values(filters).some(v => v && v !== 'all' && v !== '') && (
                   <button className="clear-filters" onClick={() => setFilters({
                     search: '', statut: 'all', gravite: 'all', dateDebut: '', dateFin: '', agent: 'all'
-                  })}>
-                    <FilterX size={14} />
-                    Effacer les filtres
-                  </button>
+})}>
+  <FilterX size={14} />
+  Effacer les filtres
+</button>
                 )}
               </div>
             </div>
@@ -978,9 +1003,9 @@ accidentsAvecAgent.forEach(acc => {
                                     <button className="action-btn" onClick={() => editAccident(accident)} title="Modifier">
                                       <Edit size={14} />
                                     </button>
-                                    <button className="action-btn" onClick={() => handleDeclarer(accident.id_accident)} title="Déclarer">
-                                      <Send size={14} />
-                                    </button>
+                                   <button className="card-btn" onClick={(e) => { e.stopPropagation(); handleDeclarer(accident); }} title="Déclarer">
+  <Send size={14} />
+</button>
                                     <button className="action-btn delete" onClick={() => confirmDelete(accident)} title="Supprimer">
                                       <Trash2 size={14} />
                                     </button>
@@ -1009,7 +1034,7 @@ accidentsAvecAgent.forEach(acc => {
                         <div className="card-header" style={{ borderLeftColor: getGraviteColor(accident.gravite) }}>
                           <div className="card-number">
                             {accident.numero_accident || `ACC-${accident.id_accident}`}
-                          </div>
+                        </div>
                           <span className={`card-statut ${accident.statut}`}>
                             {accident.statut === 'declare' ? 'Déclaré' : 'Brouillon'}
                           </span>
@@ -1019,7 +1044,7 @@ accidentsAvecAgent.forEach(acc => {
                           <div className="agent-avatar" style={{ background: `linear-gradient(135deg, ${getGraviteColor(accident.gravite)}, ${getGraviteColor(accident.gravite)}dd)` }}>
                             {accident.agent?.nom?.charAt(0) || '?'}
                             {accident.agent?.prenom?.charAt(0) || ''}
-                          </div>
+                        </div>
                           <div className="agent-info">
                             <h4>{accident.agent?.nom} {accident.agent?.prenom}</h4>
                             <p>Matricule: {accident.matricule_agent}</p>
@@ -1030,7 +1055,7 @@ accidentsAvecAgent.forEach(acc => {
                           <div className="detail-item">
                             <Calendar size={14} />
                             <span>{formatDate(accident.date_accident)}</span>
-                          </div>
+                        </div>
                           <div className="detail-item">
                             <Clock size={14} />
                             <span>{accident.heure_accident || 'Heure non spécifiée'}</span>
@@ -1148,28 +1173,34 @@ accidentsAvecAgent.forEach(acc => {
                     Agent concerné
                   </h3>
                   <div className="form-grid">
-                    <div className="form-group full-width">
-                      <label>
-                        <User size={14} />
-                        Agent <span className="required">*</span>
-                      </label>
-                      <select
-                        value={formData.matricule_agent}
-                        onChange={(e) => setFormData({...formData, matricule_agent: e.target.value})}
-                        className={formErrors.matricule_agent ? 'error' : ''}
-                        required
-                      >
-                        <option value="">Sélectionner un agent</option>
-                        {agents.map(agent => (
-                          <option key={agent.matricule_agent} value={agent.matricule_agent}>
-                            {agent.nom} {agent.prenom} - #{agent.matricule_agent} ({agent.code_affectation === 3 ? 'Chauffeur' : 'Autre'})
-                          </option>
-                        ))}
-                      </select>
-                      {formErrors.matricule_agent && (
-                        <div className="error-message">{formErrors.matricule_agent}</div>
-                      )}
-                    </div>
+
+                  <div className="form-group full-width">
+  <label>
+    <User size={14} />
+    Agent <span className="required">*</span>
+  </label>
+                    {selectedAccident ? (
+    // Mode édition : afficher l'agent sélectionné (non modifiable)
+                      <div className="agent-display">
+                        <div className="agent-display-info">
+                          <strong>{agents.find(a => a.matricule_agent === formData.matricule_agent)?.nom} {agents.find(a => a.matricule_agent === formData.matricule_agent)?.prenom}</strong>
+                          <span className="agent-matricule">#{formData.matricule_agent}</span>
+                        </div>
+                        <input type="hidden" name="matricule_agent" value={formData.matricule_agent} />
+                      </div>
+                    ) : (
+    // Mode création : recherche d'agent
+    <AgentSearchInput
+      value={formData.matricule_agent}
+      onChange={(matricule) => setFormData({...formData, matricule_agent: matricule})}
+      onSelect={(agent) => console.log('Agent sélectionné:', agent)}
+      placeholder="Tapez le nom, prénom ou matricule..."
+    />
+                    )}
+  {formErrors.matricule_agent && (
+    <div className="error-message">{formErrors.matricule_agent}</div>
+  )}
+</div>
                   </div>
                 </div>
 
@@ -1191,7 +1222,7 @@ accidentsAvecAgent.forEach(acc => {
                         onChange={(e) => setFormData({...formData, date_accident: e.target.value})}
                         className={formErrors.date_accident ? 'error' : ''}
                       />
-                    </div>
+                  </div>
 
                     <div className="form-group">
                       <label>
@@ -1203,7 +1234,7 @@ accidentsAvecAgent.forEach(acc => {
                         value={formData.heure_accident}
                         onChange={(e) => setFormData({...formData, heure_accident: e.target.value})}
                       />
-                    </div>
+                </div>
 
                     <div className="form-group full-width">
                       <label>
@@ -1264,7 +1295,7 @@ accidentsAvecAgent.forEach(acc => {
                         onChange={(e) => setFormData({...formData, endroit_blessures: e.target.value})}
                         placeholder="Ex: Main droite, Jambe gauche..."
                       />
-                    </div>
+                  </div>
 
                     <div className="form-group">
                       <label>
@@ -1278,7 +1309,7 @@ accidentsAvecAgent.forEach(acc => {
                         placeholder="Ex: Fracture, Entorse, Coupure..."
                         className={formErrors.nature_blessures ? 'error' : ''}
                       />
-                    </div>
+                </div>
 
                     <div className="form-group full-width">
                       <label>
@@ -1374,8 +1405,8 @@ accidentsAvecAgent.forEach(acc => {
                           onChange={(e) => setFormData({...formData, pv_existe: e.target.checked})}
                         />
                         <label htmlFor="pv_existe">Procès-verbal existe</label>
-                      </div>
-                    </div>
+                  </div>
+                </div>
 
                     {formData.pv_existe && (
                       <>
@@ -1480,7 +1511,7 @@ accidentsAvecAgent.forEach(acc => {
                   <div className="kpi-premium-card green">
                     <div className="kpi-premium-icon">
                       <CheckCircle size={24} />
-                    </div>
+                </div>
                     <div className="kpi-premium-content">
                       <span className="kpi-premium-label">Déclarés CNAM</span>
                       <span className="kpi-premium-value">{stats.declares}</span>
@@ -1600,8 +1631,8 @@ accidentsAvecAgent.forEach(acc => {
                         <div className="donut-center">
                           <span className="donut-total">{stats.total}</span>
                           <span className="donut-label">total</span>
-                        </div>
-                      </div>
+                    </div>
+                  </div>
                       
                       <div className="donut-legend">
                         <div className="legend-item">
@@ -1713,7 +1744,7 @@ accidentsAvecAgent.forEach(acc => {
                   <div className="accident-details-agent-avatar" style={{ background: `linear-gradient(135deg, ${getGraviteColor(selectedAccident.gravite)}, ${getGraviteColor(selectedAccident.gravite)}dd)` }}>
                     {selectedAccident.agent?.nom?.charAt(0) || '?'}
                     {selectedAccident.agent?.prenom?.charAt(0) || ''}
-                  </div>
+                </div>
                   <div className="accident-details-agent-info">
                     <h3>{selectedAccident.agent?.nom} {selectedAccident.agent?.prenom}</h3>
                     <p>
@@ -1723,7 +1754,7 @@ accidentsAvecAgent.forEach(acc => {
                         {selectedAccident.gravite || 'Non définie'}
                       </span>
                     </p>
-                  </div>
+              </div>
                 </div>
                 <div className="accident-details-badges">
                   <span className={`statut-badge ${selectedAccident.statut}`}>
@@ -1739,8 +1770,8 @@ accidentsAvecAgent.forEach(acc => {
                   <div className="detail-content">
                     <div className="detail-label">Date & Heure</div>
                     <div className="detail-value">{formatDateTime(selectedAccident.date_accident, selectedAccident.heure_accident)}</div>
-                  </div>
-                </div>
+              </div>
+            </div>
 
                 <div className="detail-card">
                   <div className="detail-icon"><MapPin size={16} /></div>
@@ -1836,7 +1867,7 @@ accidentsAvecAgent.forEach(acc => {
                   <button className="btn-primary" onClick={() => { setShowDetailsModal(false); editAccident(selectedAccident); }}>
                     <Edit size={16} /> Modifier
                   </button>
-                  <button className="btn-primary" onClick={() => { setShowDetailsModal(false); handleDeclarer(selectedAccident.id_accident); }}>
+                  <button className="btn-primary" onClick={() => { setShowDetailsModal(false); handleDeclarer(selectedAccident); }}>
                     <Send size={16} /> Déclarer à la CNAM
                   </button>
                 </>
@@ -1847,6 +1878,19 @@ accidentsAvecAgent.forEach(acc => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ⭐⭐⭐ MODALE CNAM - PLACÉE ICI, EN DEHORS DE LA MODALE DÉTAILS ⭐⭐⭐ */}
+      {showCnamModal && cnamAccidentData && (
+        <CnamDeclarationModal
+          accident={cnamAccidentData.accident}
+          agent={cnamAccidentData.agent}
+          onClose={() => {
+            setShowCnamModal(false);
+            setCnamAccidentData(null);
+          }}
+          onConfirm={confirmCnamDeclaration}
+        />
       )}
 
       {/* MODALE DE CONFIRMATION SUPPRESSION */}
@@ -1876,8 +1920,35 @@ accidentsAvecAgent.forEach(acc => {
           </div>
         </div>
       )}
+
+      {/* Style pour agent-display */}
+      <style>{`
+        .agent-display {
+          background: #f8fafc;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          padding: 12px 15px;
+        }
+        .agent-display-info {
+          display: flex;
+          align-items: baseline;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+        .agent-display-info strong {
+          font-size: 15px;
+          color: #1e293b;
+        }
+        .agent-matricule {
+          font-size: 12px;
+          color: #64748b;
+          background: #f1f5f9;
+          padding: 2px 8px;
+          border-radius: 20px;
+        }
+      `}</style>
     </div>
   );
 };
 
-export default SocialAccidents;             
+export default SocialAccidents;

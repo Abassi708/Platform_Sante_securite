@@ -1,4 +1,3 @@
-
 /* SOCIAL DASHBOARD - DESIGN PROFESSIONNEL ULTIME
 /* VERSION COMPLÈTE AVEC TOUTES LES FONCTIONNALITÉS
 /* ============================================ */
@@ -1797,6 +1796,43 @@
   .social-dashboard .sd-toggle-password-btn {
     width: 100%;
   }
+}
+/* Styles pour les sous-onglets */
+.sd-sub-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 0 16px 0;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 20px;
+}
+
+.sd-sub-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 40px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #64748b;
+  transition: all 0.2s;
+}
+
+.sd-sub-tab:hover {
+  background: #f1f5f9;
+  color: #3b82f6;
+}
+
+.sd-sub-tab.active {
+  background: linear-gradient(135deg, #1e3a8a, #0f2b6d);
+  color: white;
+}
+
+.sd-module-content {
+  min-height: 500px;
 }
 
 /* ============================================ */

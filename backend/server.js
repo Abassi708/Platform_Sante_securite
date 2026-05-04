@@ -26,6 +26,9 @@ const documentRoutes = require('./routes/documentRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const creneauxRoutes = require('./routes/creneauxRoutes');
 const auditRoutes = require('./routes/auditRoutes');
+const initialisationService = require('./services/initialisationService');
+
+const planningService = require('./services/planningService');
 
 // ========== IMPORT DES CRONS ==========
 require('./cron/planningCron');
@@ -71,7 +74,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // ========== ROUTES PUBLIQUES (SANS AUTHENTIFICATION) ==========
 app.use('/api/auth', authRoutes);
 app.use('/api/otp', otpRoutes);
-app.use('/api/password', passwordRoutes);  // ✅ DÉPLACÉ ICI (route publique)
+app.use('/api/password', passwordRoutes);
 app.use('/api/health', (req, res) => {
   res.json({ 
     success: true,
@@ -84,11 +87,9 @@ app.use('/api/health', (req, res) => {
 });
 
 // ========== ROUTES PROTÉGÉES AVEC AUDIT ==========
-// L'ordre est important: protect d'abord, puis auditMiddleware
 app.use('/api/notifications', protect, auditMiddleware, notificationRoutes);
 app.use('/api', protect, auditMiddleware, accidentRoutes);
 app.use('/api', protect, auditMiddleware, visiteRoutes);
-// app.use('/api/password', protect, auditMiddleware, passwordRoutes); // ❌ SUPPRIMÉ (déplacé en public)
 app.use('/api/notifications-intelligentes', protect, auditMiddleware, notificationIntelligenteRoutes);
 app.use('/api/previsions', protect, auditMiddleware, previsionsRoutes);
 app.use('/api', protect, auditMiddleware, planningRoutes);
@@ -96,8 +97,6 @@ app.use('/api/technicien', protect, auditMiddleware, technicienRoutes);
 app.use('/api/creneaux', protect, auditMiddleware, creneauxRoutes);
 app.use('/api/chatbot', protect, auditMiddleware, chatbotRoutes);
 app.use('/api/documents', protect, auditMiddleware, documentRoutes);
-
-// Route d'audit (protégée)
 app.use('/api/audit', protect, auditRoutes);
 
 // ========== LOG DE DÉBOGAGE ==========
@@ -106,10 +105,73 @@ app.use((req, res, next) => {
   next();
 });
 
-// ========== DÉMARRAGE DU SERVEUR ==========
+// ========== FONCTION POUR RÉCUPÉRER L'IP LOCALE ==========
+function getLocalIp() {
+  const { networkInterfaces } = require('os');
+  const nets = networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return 'votre-ip';
+}
+
+// ========== PORT ==========
 const PORT = process.env.PORT || 5000;
 
-testConnections().then(() => {
+const initialiserPlanningFutur = async () => {
+  console.log('\n📅 Initialisation des plannings futurs (4 semaines)...');
+  const aujourdhui = new Date();
+  let totalGenere = 0;
+  let semainesGenerees = [];
+  
+  for (let i = 1; i <= 4; i++) {
+    const semaineCible = planningService.getNumeroSemaine(aujourdhui) + i;
+    let anneeCible = aujourdhui.getFullYear();
+    let semaineTemp = semaineCible;
+    
+    if (semaineTemp > 52) {
+      semaineTemp = 1;
+      anneeCible++;
+    }
+    
+    try {
+      const planningExistant = await planningService.Planning.findOne({
+        where: { semaine: semaineTemp, annee: anneeCible }
+      });
+      
+      if (!planningExistant) {
+        const lundiCible = planningService.getLundiSemaine(semaineTemp, anneeCible);
+        const planning = await planningService.genererPlanningSemaine(new Date(lundiCible), 1);
+        totalGenere += planning.length;
+        semainesGenerees.push(`${semaineTemp}/${anneeCible}`);
+        console.log(`   ✅ Semaine ${semaineTemp}/${anneeCible}: ${planning.length} visite(s) générée(s)`);
+      } else {
+        console.log(`   ⏭️ Semaine ${semaineTemp}/${anneeCible}: déjà existante`);
+      }
+    } catch (err) {
+      console.error(`   ❌ Erreur semaine ${semaineTemp}/${anneeCible}:`, err.message);
+    }
+  }
+  
+  if (semainesGenerees.length > 0) {
+    console.log(`\n📊 ${totalGenere} visite(s) générée(s) pour les semaines: ${semainesGenerees.join(', ')}`);
+  } else {
+    console.log(`\n📊 Aucune nouvelle visite générée (planning déjà à jour)`);
+  }
+};
+
+// ========== DÉMARRAGE UNIQUE DU SERVEUR ==========
+testConnections().then(async () => {
+  // 1. Lancer l'initialisation automatique (planning + alertes)
+  await initialisationService.initialiser();
+  await initialiserPlanningFutur();
+
+  
+  // 2. Démarrer le serveur
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n🚀 Serveur démarré sur http://localhost:${PORT}`);
     console.log(`   Accessible sur le réseau: http://${getLocalIp()}:${PORT}`);
@@ -125,16 +187,3 @@ testConnections().then(() => {
   console.log('   3. Les identifiants sont-ils corrects ?');
   process.exit(1);
 });
-
-function getLocalIp() {
-  const { networkInterfaces } = require('os');
-  const nets = networkInterfaces();
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal) {
-        return net.address;
-      }
-    }
-  }
-  return 'votre-ip';
-}

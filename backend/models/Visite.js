@@ -93,7 +93,13 @@ module.exports = (sequelize) => {
       type: DataTypes.INTEGER,
       allowNull: true,
       field: 'visite_originale_id'
-    }
+    },
+    // backend/models/Visite.js
+source_originale: {
+  type: DataTypes.STRING(50),
+  allowNull: true,
+  field: 'source_originale'
+}
   }, {
     tableName: 'visite',
     timestamps: false

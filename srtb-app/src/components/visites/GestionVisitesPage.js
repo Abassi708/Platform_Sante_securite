@@ -8,6 +8,7 @@ import {
   Trash2, Save, X, Award, AlertTriangle, MapPin, Briefcase,
   Stethoscope, Activity
 } from 'lucide-react';
+import AgentSearchInput from '../common/AgentSearchInput';
 import '../../styles/GestionVisitesPage.css';
 
 const GestionVisitesPage = () => {
@@ -52,6 +53,9 @@ const GestionVisitesPage = () => {
   const [checkingSlot, setCheckingSlot] = useState(false);
   const [visiteHasActions, setVisiteHasActions] = useState({});
 
+  const [nouvelleDate, setNouvelleDate] = useState('');
+const [nouvelleHeure, setNouvelleHeure] = useState('');
+
   // ========== ÉTATS POUR LES FILTRES ==========
   const [filters, setFilters] = useState({
     search: '',
@@ -61,6 +65,8 @@ const GestionVisitesPage = () => {
     dateFin: '',
     agent: 'all'
   });
+    const [moisFiltre, setMoisFiltre] = useState('all');
+  const [anneeFiltre, setAnneeFiltre] = useState(new Date().getFullYear());
   const [showFilters, setShowFilters] = useState(false);
 
   // ========== PAGINATION ==========
@@ -73,8 +79,8 @@ const GestionVisitesPage = () => {
   }, []);
 
   useEffect(() => {
-    fetchVisites();
-  }, [filters]);
+  fetchVisites();
+}, [filters, moisFiltre, anneeFiltre]);
 
   // Effet pour charger les jours disponibles quand l'agent change ou le mois change
   useEffect(() => {
@@ -94,19 +100,18 @@ const GestionVisitesPage = () => {
 
   // ========== FONCTIONS DE CHARGEMENT ==========
   const chargerDonnees = async () => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        fetchAgents(),
-        fetchVisites(),
-        fetchStats()
-      ]);
-    } catch (error) {
-      showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur de chargement' });
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    await Promise.all([
+      fetchAgents(),
+      //fetchVisites()
+    ]);
+  } catch (error) {
+    showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur de chargement' });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const fetchAgents = async () => {
     try {
@@ -135,62 +140,77 @@ const GestionVisitesPage = () => {
     }
   };
 
-  const fetchVisites = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      let url = `${process.env.REACT_APP_API_URL}/api/visites?limit=1000`;
+// ========== FETCH VISITES AVEC CALCUL DES STATS ==========
+// frontend/components/visites/GestionVisitesPage.js
 
-      if (filters.search) url += `&search=${encodeURIComponent(filters.search)}`;
-      if (filters.type !== 'all') url += `&type=${encodeURIComponent(filters.type)}`;
-      if (filters.resultat !== 'all') url += `&resultat=${encodeURIComponent(filters.resultat)}`;
-      if (filters.dateDebut && filters.dateFin) {
-        url += `&dateDebut=${filters.dateDebut}&dateFin=${filters.dateFin}`;
-      }
-      if (filters.agent !== 'all') url += `&agentId=${filters.agent}`;
+const fetchVisites = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    // ✅ Ajouter onlyManual=true pour ne récupérer que les visites manuelles
+    let url = `${process.env.REACT_APP_API_URL}/api/visites?limit=2000&onlyManual=true`;
 
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.success) {
-        const visitesAvecActions = await Promise.all(
-          (data.visites || []).map(async (visite) => {
-            const hasActions = await checkHasActions(visite.matricule_visite);
-            return { ...visite, hasActions };
-          })
-        );
-        setVisites(visitesAvecActions);
-        setCurrentPage(1);
-      }
-    } catch (err) {
-      console.error('Erreur chargement visites:', err);
+    if (filters.search) url += `&search=${encodeURIComponent(filters.search)}`;
+    if (filters.type !== 'all') url += `&type=${encodeURIComponent(filters.type)}`;
+    if (filters.resultat !== 'all') url += `&resultat=${encodeURIComponent(filters.resultat)}`;
+    
+    if (moisFiltre !== 'all' && anneeFiltre) {
+      const dateDebut = `${anneeFiltre}-${String(moisFiltre).padStart(2, '0')}-01`;
+      const dernierJour = new Date(anneeFiltre, moisFiltre, 0).getDate();
+      const dateFin = `${anneeFiltre}-${String(moisFiltre).padStart(2, '0')}-${dernierJour}`;
+      url += `&dateDebut=${dateDebut}&dateFin=${dateFin}`;
     }
-  };
+    
+    if (filters.agent !== 'all') url += `&agentId=${filters.agent}`;
 
-  const fetchStats = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/visites/stats?source=FORMULAIRE`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    
+    if (data.success) {
+      let visitesData = data.visites || [];
       
-      if (data.success && data.stats) {
-        setStats({
-          total: data.stats.total || 0,
-          aptes: data.stats.aptes || 0,
-          reserves: data.stats.reserves || 0,
-          inaptes: data.stats.inaptes || 0,
-          parType: data.stats.parType || [],
-          parResultat: data.stats.parResultat || [],
-          planningSemaine: data.stats.planningSemaine || 0,
-          parMois: data.stats.parMois || Array(12).fill(0)
-        });
+      // ✅ Garder uniquement la dernière version de chaque visite (par id_planning)
+      const visitesMap = new Map();
+      
+      for (const visite of visitesData) {
+        const key = visite.id_planning || visite.matricule_visite;
+        const existing = visitesMap.get(key);
+        
+        // Si la visite n'existe pas ou si celle-ci est plus récente, on garde celle-ci
+        if (!existing || new Date(visite.created_at) > new Date(existing.created_at)) {
+          visitesMap.set(key, visite);
+        }
       }
-    } catch (err) {
-      console.error('Erreur chargement stats:', err);
+      
+      const visitesUniques = Array.from(visitesMap.values());
+      
+      // Trier par date décroissante
+      visitesUniques.sort((a, b) => new Date(b.date_visite) - new Date(a.date_visite));
+      
+      setVisites(visitesUniques);
+      
+      // Calcul des stats
+      const visitesEffectuees = visitesUniques.filter(v => v.type_action === 'EFFECTUEE');
+      const aptes = visitesEffectuees.filter(v => v.resultat === 'Apte').length;
+      const inaptes = visitesEffectuees.filter(v => 
+        v.resultat === 'Inapte temporaire' || v.resultat === 'Inapte définitif'
+      ).length;
+      
+      setStats({
+        total: visitesUniques.length,
+        aptes: aptes,
+        inaptes: inaptes
+      });
+      
+      setCurrentPage(1);
     }
-  };
+  } catch (err) {
+    console.error('Erreur chargement visites:', err);
+  }
+};
+
+
 
   // ========== CALENDRIER INTELLIGENT ==========
   const chargerJoursDisponibles = async (mois, annee) => {
@@ -356,143 +376,189 @@ const GestionVisitesPage = () => {
     return errors;
   };
 
+// ========== MODIFIER UNE VISITE ==========
+const handleEdit = async (visite) => {
+  console.log('📝 Données de la visite à modifier:', visite);
+  
+  // Vérifier si c'est une visite manuelle
+  if (visite.source !== 'FORMULAIRE' && visite.type_action !== 'SAISIE_MANUELLE' && visite.source_originale !== 'manuel') {
+    showNotification({ 
+      type: 'warning', 
+      title: '⚠️ Modification impossible', 
+      message: 'Cette visite provient du planning automatique et ne peut pas être modifiée.' 
+    });
+    return;
+  }
+  
+  setSelectedVisite(visite);
+  setEditMode(true);
+  
+  // Préremplir le formulaire avec les données de la visite
+  setFormData({
+    matricule_agent: visite.matricule_agent,
+    date_visite: visite.date_visite,
+    heure_visite: visite.heure_visite || '09:00:00',
+    type_visite: visite.type_visite || 'Périodique',
+    motif: visite.motif_reprogrammation || visite.motif_action || '',
+    medecin: visite.medecin || 'Dr. Mahmoud Khelifi',
+    observation: visite.observation || ''
+  });
+  
+  setShowForm(true);
+  
+  // Charger les disponibilités pour la date actuelle
+  if (visite.date_visite) {
+    chargerCreneauxDisponibles(visite.date_visite);
+  }
+};
   // ========== SOUMISSION ==========
-  const handleSubmit = async (e) => {
-    e.preventDefault();
 
-    const errors = validateForm();
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      showNotification({ type: 'error', title: '❌ Erreur', message: 'Champs obligatoires manquants' });
-      return;
-    }
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    setCheckingSlot(true);
-    
-    let visiteExistante = false;
-    if (editMode && selectedVisite) {
-      visiteExistante = await verifierVisiteExistante(formData.matricule_agent, formData.date_visite, selectedVisite.id_planning);
-    } else {
-      visiteExistante = await verifierVisiteExistante(formData.matricule_agent, formData.date_visite);
-    }
-    
-    if (visiteExistante) {
-      setCheckingSlot(false);
-      showNotification({ 
-        type: 'warning', 
-        title: '⚠️ Agent déjà programmé', 
-        message: `Cet agent a déjà une visite programmée le ${new Date(formData.date_visite).toLocaleDateString('fr-FR')}.` 
-      });
-      return;
-    }
+  const errors = validateForm();
+  if (Object.keys(errors).length > 0) {
+    setFormErrors(errors);
+    showNotification({ type: 'error', title: '❌ Erreur', message: 'Champs obligatoires manquants' });
+    return;
+  }
 
-    let conflit = false;
-    if (editMode && selectedVisite) {
-      conflit = await verifierConflitCreneauExclu(formData.date_visite, formData.heure_visite, selectedVisite.id_planning);
-    } else {
-      conflit = await verifierConflitCreneau(formData.date_visite, formData.heure_visite);
-    }
-    
+  setCheckingSlot(true);
+  
+  // Vérifier si l'agent n'a pas déjà une visite ce jour
+  let visiteExistante = false;
+  if (editMode && selectedVisite) {
+    visiteExistante = await verifierVisiteExistante(formData.matricule_agent, formData.date_visite, selectedVisite.id_planning);
+  } else {
+    visiteExistante = await verifierVisiteExistante(formData.matricule_agent, formData.date_visite);
+  }
+  
+  if (visiteExistante) {
     setCheckingSlot(false);
-    
-    if (conflit) {
-      showNotification({ 
-        type: 'warning', 
-        title: '⚠️ Créneau indisponible', 
-        message: `Le créneau du ${new Date(formData.date_visite).toLocaleDateString('fr-FR')} à ${formData.heure_visite.substring(0,5)} est déjà occupé.` 
-      });
-      return;
-    }
+    showNotification({ 
+      type: 'warning', 
+      title: '⚠️ Agent déjà programmé', 
+      message: `Cet agent a déjà une visite programmée le ${new Date(formData.date_visite).toLocaleDateString('fr-FR')}.` 
+    });
+    return;
+  }
 
-    setSaving(true);
-    try {
-      const token = localStorage.getItem('token');
-      let url, method, bodyData;
-      
-      if (editMode && selectedVisite) {
-        url = `${process.env.REACT_APP_API_URL}/api/visites/${selectedVisite.matricule_visite}`;
-        method = 'PUT';
+  // Vérifier la disponibilité du créneau
+  let conflit = false;
+  if (editMode && selectedVisite) {
+    conflit = await verifierConflitCreneauExclu(formData.date_visite, formData.heure_visite, selectedVisite.id_planning);
+  } else {
+    conflit = await verifierConflitCreneau(formData.date_visite, formData.heure_visite);
+  }
+  
+  setCheckingSlot(false);
+  
+  if (conflit) {
+    showNotification({ 
+      type: 'warning', 
+      title: '⚠️ Créneau indisponible', 
+      message: `Le créneau du ${new Date(formData.date_visite).toLocaleDateString('fr-FR')} à ${formData.heure_visite.substring(0,5)} est déjà occupé.` 
+    });
+    return;
+  }
+
+  setSaving(true);
+  try {
+    const token = localStorage.getItem('token');
+    let url, method, bodyData;
+    
+    if (editMode && selectedVisite) {
+      // Mode édition
+      url = `${process.env.REACT_APP_API_URL}/api/visites/${selectedVisite.matricule_visite}`;
+      method = 'PUT';
+      bodyData = {
+        date_visite: formData.date_visite,
+        heure_visite: formData.heure_visite,
+        type_visite: formData.type_visite,
+        medecin: formData.medecin
+      };
+    } else {
+      // ✅ Mode création - utiliser la bonne route selon le type
+      if (formData.type_visite === 'Reclassement') {
+        url = `${process.env.REACT_APP_API_URL}/api/planifier-reclassement`;
+        method = 'POST';
         bodyData = {
+          matricule_agent: formData.matricule_agent,
           date_visite: formData.date_visite,
           heure_visite: formData.heure_visite,
-          type_visite: formData.type_visite,
-           medecin: formData.medecin
+          motif: formData.motif,
+          medecin: formData.medecin
+        };
+      } else if (formData.type_visite === 'Embauche') {
+        url = `${process.env.REACT_APP_API_URL}/api/planifier-embauche`;
+        method = 'POST';
+        bodyData = {
+          matricule_agent: formData.matricule_agent,
+          date_visite: formData.date_visite,
+          heure_visite: formData.heure_visite,
+          motif: formData.motif,
+          medecin: formData.medecin
         };
       } else {
-        if (formData.type_visite === 'Reclassement') {
-          url = `${process.env.REACT_APP_API_URL}/api/planifier-reclassement`;
-          method = 'POST';
-          bodyData = {
-            matricule_agent: formData.matricule_agent,
-            date_visite: formData.date_visite,
-            heure_visite: formData.heure_visite,
-            motif: formData.motif,
-             medecin: formData.medecin
-          };
-        } else {
-          url = `${process.env.REACT_APP_API_URL}/api/planifier-embauche`;
-          method = 'POST';
-          bodyData = {
-            matricule_agent: formData.matricule_agent,
-            date_visite: formData.date_visite,
-            heure_visite: formData.heure_visite,
-            motif: formData.motif,
-             medecin: formData.medecin
-          };
-        }
+        
+        url = `${process.env.REACT_APP_API_URL}/api/visites`;
+        method = 'POST';
+        bodyData = {
+          matricule_agent: formData.matricule_agent,
+          date_visite: formData.date_visite,
+          heure_visite: formData.heure_visite,
+          type_visite: formData.type_visite || 'Périodique',
+          motif: formData.motif,
+          medecin: formData.medecin
+        };
       }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(bodyData)
-      });
-
-      const data = await response.json();
-      
-      if (data.success) {
-        showNotification({
-          type: 'success',
-          title: editMode ? '✅ Modifiée' : '✅ Programmée',
-          message: editMode ? 'Visite modifiée avec succès' : 'Visite programmée avec succès'
-        });
-        setShowForm(false);
-        resetForm();
-        await chargerDonnees();
-      } else {
-        showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
-      }
-    } catch (err) {
-      showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur lors de l\'enregistrement' });
-    } finally {
-      setSaving(false);
     }
-  };
 
-  const handleEdit = (visite) => {
-    setSelectedVisite(visite);
-    setEditMode(true);
-    setFormData({
-      matricule_agent: visite.matricule_agent,
-      date_visite: visite.date_visite,
-      heure_visite: visite.heure_visite || '09:00:00',
-      type_visite: visite.type_visite || 'Reclassement',
-      motif: visite.motif_reprogrammation || ''
+    console.log('📤 Envoi requête:', { url, method, bodyData });
+
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(bodyData)
     });
-    setShowForm(true);
-  };
+
+    const data = await response.json();
+    
+    if (data.success) {
+  showNotification({
+    type: 'success',
+    title: selectedVisite ? '✅ Modifiée' : '✅ Programmée',
+    message: selectedVisite ? 'Visite modifiée avec succès' : 'Visite programmée avec succès'
+  });
+  setShowForm(false);
+  resetForm();
+  await chargerDonnees();
+  await fetchVisites();
+      await fetchAgents();
+   window.dispatchEvent(new CustomEvent('refresh-planning'));
+} else {
+  showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
+}
+  } catch (err) {
+    console.error('Erreur:', err);
+    showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur lors de l\'enregistrement' });
+  } finally {
+    setSaving(false);
+  }
+};
 
   const resetForm = () => {
-    setFormData({
-      matricule_agent: '',
-      date_visite: '',
-      heure_visite: '09:00:00',
-      type_visite: 'Reclassement',
-      motif: ''
-    });
+  setFormData({
+    matricule_agent: '',
+    date_visite: '',
+    heure_visite: '09:00:00',
+    type_visite: 'Périodique',
+    motif: '',
+    medecin: 'Dr. Mahmoud Khelifi'
+  });
     setFormErrors({});
     setSelectedVisite(null);
     setEditMode(false);
@@ -508,9 +574,9 @@ const GestionVisitesPage = () => {
   };
 
   const getAgentNom = (matricule) => {
-    const agent = agents.find(a => a.matricule_agent === matricule);
-    return agent ? `${agent.nom} ${agent.prenom}` : 'Inconnu';
-  };
+  const agent = agents.find(a => a.matricule_agent === matricule);
+  return agent ? `${agent.nom} ${agent.prenom}` : `Agent ${matricule}`;
+};
 
   const getResultatClass = (resultat) => {
     switch(resultat) {
@@ -583,7 +649,7 @@ const GestionVisitesPage = () => {
           </div>
           <div className="header-title">
             <h1>Gestion des visites médicales - Reclassement & Embauche</h1>
-            <p>Programmation des visites de reclassement et d'embauche</p>
+            <p>Programmation des visites de reclassement et d'embauche (périodique pour les cas particulières)</p>
           </div>
         </div>
 
@@ -630,107 +696,119 @@ const GestionVisitesPage = () => {
         </div>
 
         {showFilters && (
-          <div className="filters-panel">
-            <div className="filters-grid">
-              <div className="filter-group">
-                <label>Type de visite</label>
-                <select value={filters.type} onChange={(e) => setFilters({...filters, type: e.target.value})}>
-                  <option value="all">Tous</option>
-                  <option value="Reclassement">Reclassement</option>
-                  <option value="Embauche">Embauche</option>
-                </select>
-              </div>
-
-              <div className="filter-group">
-                <label>Résultat</label>
-                <select value={filters.resultat} onChange={(e) => setFilters({...filters, resultat: e.target.value})}>
-                  <option value="all">Tous</option>
-                  <option value="Apte">Apte</option>
-                  <option value="Apte avec réserves">Apte avec réserves</option>
-                  <option value="Inapte temporaire">Inapte temporaire</option>
-                  <option value="Inapte définitif">Inapte définitif</option>
-                </select>
-              </div>
-
-              <div className="filter-group">
-                <label>Date début</label>
-                <input
-                  type="date"
-                  value={filters.dateDebut}
-                  onChange={(e) => setFilters({...filters, dateDebut: e.target.value})}
-                />
-              </div>
-
-              <div className="filter-group">
-                <label>Date fin</label>
-                <input
-                  type="date"
-                  value={filters.dateFin}
-                  onChange={(e) => setFilters({...filters, dateFin: e.target.value})}
-                />
-              </div>
-            </div>
-
-            <div className="filters-actions">
-              <button className="btn-secondary" onClick={() => {
-                setFilters({
-                  search: '', type: 'all', resultat: 'all', dateDebut: '', dateFin: '', agent: 'all'
-                });
-                fetchVisites();
-              }}>
-                Réinitialiser
-              </button>
-              <button className="btn-primary" onClick={fetchVisites}>
-                Appliquer les filtres
-              </button>
-            </div>
-          </div>
-        )}
+  <div className="filters-panel">
+    <div className="filters-grid">
+      <div className="filter-group">
+        <label>Type de visite</label>
+        <select value={filters.type} onChange={(e) => setFilters({...filters, type: e.target.value})}>
+          <option value="all">Tous</option>
+          <option value="Périodique"> Périodique</option>
+          <option value="Reclassement"> Reclassement</option>
+          <option value="Embauche"> Embauche</option>
+        </select>
       </div>
 
-      {/* STATISTIQUES RAPIDES */}
-      <div className="stats-mini-grid">
-        <div className="stat-mini-card">
-          <div className="stat-mini-icon" style={{ background: '#2563eb20', color: '#2563eb' }}>
-            <FileText size={20} />
-          </div>
-          <div className="stat-mini-content">
-            <span className="stat-mini-label">Total visites</span>
-            <span className="stat-mini-value">{stats.total}</span>
-          </div>
-        </div>
-
-        <div className="stat-mini-card">
-          <div className="stat-mini-icon" style={{ background: '#10b98120', color: '#10b981' }}>
-            <CheckCircle size={20} />
-          </div>
-          <div className="stat-mini-content">
-            <span className="stat-mini-label">Aptes</span>
-            <span className="stat-mini-value">{stats.aptes}</span>
-          </div>
-        </div>
-
-        <div className="stat-mini-card">
-          <div className="stat-mini-icon" style={{ background: '#f59e0b20', color: '#f59e0b' }}>
-            <AlertCircle size={20} />
-          </div>
-          <div className="stat-mini-content">
-            <span className="stat-mini-label">Réserves</span>
-            <span className="stat-mini-value">{stats.reserves}</span>
-          </div>
-        </div>
-
-        <div className="stat-mini-card">
-          <div className="stat-mini-icon" style={{ background: '#ef444420', color: '#ef4444' }}>
-            <XCircle size={20} />
-          </div>
-          <div className="stat-mini-content">
-            <span className="stat-mini-label">Inaptes</span>
-            <span className="stat-mini-value">{stats.inaptes}</span>
-          </div>
-        </div>
+      <div className="filter-group">
+        <label>Résultat</label>
+        <select value={filters.resultat} onChange={(e) => setFilters({...filters, resultat: e.target.value})}>
+          <option value="all"> Tous</option>
+          <option value="Apte"> Apte</option>
+          <option value="Inapte temporaire"> Inapte temporaire</option>
+          <option value="Inapte définitif">Inapte définitif</option>
+        </select>
       </div>
 
+      {/* ✅ Remplacer les champs date par ce sélecteur */}
+      <div className="filter-group">
+  <label>Période</label>
+  <div style={{ display: 'flex', gap: '8px' }}>
+    <select 
+      value={moisFiltre} 
+      onChange={(e) => {
+        const value = e.target.value;
+        setMoisFiltre(value === 'all' ? 'all' : parseInt(value));
+      }}
+      style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+    >
+      <option value="all"> Tous les mois</option>
+      <option value={1}>Janvier</option>
+      <option value={2}>Février</option>
+      <option value={3}>Mars</option>
+      <option value={4}>Avril</option>
+      <option value={5}>Mai</option>
+      <option value={6}>Juin</option>
+      <option value={7}>Juillet</option>
+      <option value={8}>Août</option>
+      <option value={9}>Septembre</option>
+      <option value={10}>Octobre</option>
+      <option value={11}>Novembre</option>
+      <option value={12}>Décembre</option>
+    </select>
+    <input 
+      type="number" 
+      value={anneeFiltre} 
+      onChange={(e) => setAnneeFiltre(parseInt(e.target.value))}
+      style={{ width: '80px', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+      min="2020"
+      max="2030"
+    />
+  </div>
+</div>
+    </div>
+
+    <div className="filters-actions">
+      <button className="btn-secondary" onClick={() => {
+  setFilters({
+    search: '', 
+    type: 'all', 
+    resultat: 'all', 
+    agent: 'all'
+  });
+  setMoisFiltre('all');      
+  setAnneeFiltre(new Date().getFullYear());  
+  fetchVisites(); 
+}}>
+  Réinitialiser
+</button>
+      <button className="btn-primary" onClick={fetchVisites}>
+        Appliquer les filtres
+      </button>
+    </div>
+  </div>
+)}
+      </div>
+
+<div className="stats-mini-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+  <div className="stat-mini-card">
+    <div className="stat-mini-icon" style={{ background: '#2563eb20', color: '#2563eb' }}>
+      <FileText size={20} />
+    </div>
+    <div className="stat-mini-content">
+      <span className="stat-mini-label">Total visites manuelles</span>
+      <span className="stat-mini-value">{stats.total || 0}</span>
+    </div>
+  </div>
+
+  <div className="stat-mini-card">
+    <div className="stat-mini-icon" style={{ background: '#10b98120', color: '#10b981' }}>
+      <CheckCircle size={20} />
+    </div>
+    <div className="stat-mini-content">
+      <span className="stat-mini-label">Aptes</span>
+      <span className="stat-mini-value">{stats.aptes || 0}</span>
+    </div>
+  </div>
+
+  <div className="stat-mini-card">
+    <div className="stat-mini-icon" style={{ background: '#ef444420', color: '#ef4444' }}>
+      <XCircle size={20} />
+    </div>
+    <div className="stat-mini-content">
+      <span className="stat-mini-label">Inaptes</span>
+      <span className="stat-mini-value">{stats.inaptes || 0}</span>
+    </div>
+  </div>
+</div>
       {/* TABLEAU DES VISITES */}
       {loading ? (
         <div className="loading-state">
@@ -753,76 +831,95 @@ const GestionVisitesPage = () => {
         <>
           <div className="table-container">
             <table className="visites-table">
-              <thead>
-                <tr>
-                  <th>Date & Heure</th>
-                  <th>Agent</th>
-                  <th>Type</th>
-                  <th>Médecin</th>
-                  <th>Résultat</th>
-                  <th>Observations</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentVisites.map(visite => (
-                  <tr key={visite.matricule_visite}>
-                    <td>
-                      <div className="date-cell">
-                        <Calendar size={12} />
-                        {formatDateTime(visite.date_visite, visite.heure_visite)}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="agent-cell">
-                        <div className="agent-avatar-small">
-                          {visite.visiteAgent?.nom?.charAt(0)}{visite.visiteAgent?.prenom?.charAt(0)}
-                        </div>
-                        <div className="agent-info">
-                          <span>{visite.visiteAgent?.nom} {visite.visiteAgent?.prenom}</span>
-                          <small>#{visite.matricule_agent}</small>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`type-badge ${visite.type_visite === 'Reclassement' ? 'reclassement' : 'embauche'}`}>
-                        {visite.type_visite === 'Reclassement' ? ' Reclassement' : 'Embauche'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="medecin-cell">
-                        <User size={12} />
-                        {visite.medecin || '-'}
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`resultat-badge ${getResultatClass(visite.resultat)}`}>
-                        {getResultatIcon(visite.resultat)}
-                        {visite.resultat || 'Non défini'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="observation-cell" title={visite.observation}>
-                        {visite.observation?.substring(0, 50) || '-'}
-                        {visite.observation?.length > 50 && '...'}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className={`action-btn edit ${visite.hasActions ? 'disabled' : ''}`}
-                          onClick={() => !visite.hasActions && handleEdit(visite)}
-                          title={visite.hasActions ? 'Modification impossible - Une action a déjà été effectuée' : 'Modifier la programmation'}
-                          disabled={visite.hasActions}
-                        >
-                          <Edit size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+  <thead>
+    <tr>
+      <th>Date & Heure</th>
+      <th>Agent</th>
+      <th>Type</th>
+      <th>Médecin</th>
+      <th>Résultat</th>
+      <th>Observations</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {currentVisites.map(visite => (
+    <tr key={visite.matricule_visite}>
+      <td>
+        <div className="date-cell">
+          <Calendar size={12} />
+          {visite.date_visite ? formatDateTime(visite.date_visite, visite.heure_visite) : 'Date non définie'}
+        </div>
+      </td>
+    <td>
+      <div className="agent-cell">
+        <div className="agent-avatar-small">
+          {/* Utiliser visite.visiteAgent s'il existe, sinon chercher dans agents */}
+          {(visite.visiteAgent?.nom?.charAt(0) || visite.agent_nom?.charAt(0) || '?')}
+          {(visite.visiteAgent?.prenom?.charAt(0) || visite.agent_prenom?.charAt(0) || '')}
+        </div>
+        <div className="agent-info">
+          <span>{visite.visiteAgent?.nom || visite.agent_nom} {visite.visiteAgent?.prenom || visite.agent_prenom}</span>
+          <small>#{visite.matricule_agent}</small>
+        </div>
+      </div>
+    </td>
+        <td>
+          {/* ✅ Affichage correct du type */}
+          {visite.type_visite === 'Périodique' && (
+            <span className="type-badge periodique">📋 Périodique</span>
+          )}
+          {visite.type_visite === 'Reclassement' && (
+            <span className="type-badge reclassement">📝 Reclassement</span>
+          )}
+          {visite.type_visite === 'Embauche' && (
+            <span className="type-badge embauche">👔 Embauche</span>
+          )}
+          {!visite.type_visite && (
+            <span className="type-badge periodique">📋 Périodique</span>
+          )}
+        </td>
+        <td>
+          <div className="medecin-cell">
+            <User size={12} />
+            {visite.medecin || 'Dr. Mahmoud Khelifi'}
+          </div>
+        </td>
+        <td>
+          {/* ✅ Affichage du résultat uniquement si la visite a été effectuée */}
+          {visite.type_action === 'EFFECTUEE' ? (
+            <span className={`resultat-badge ${getResultatClass(visite.resultat)}`}>
+              {getResultatIcon(visite.resultat)}
+              {visite.resultat || 'Non défini'}
+            </span>
+          ) : (
+            <span className="resultat-badge non-effectue">
+              <Clock size={12} /> En attente
+            </span>
+          )}
+        </td>
+        <td>
+          <div className="observation-cell" title={visite.observation}>
+            {visite.observation?.substring(0, 50) || '-'}
+            {visite.observation?.length > 50 && '...'}
+          </div>
+        </td>
+        <td>
+          <div className="row-actions">
+            <button
+              className={`action-btn edit ${visite.hasActions ? 'disabled' : ''}`}
+              onClick={() => !visite.hasActions && handleEdit(visite)}
+              title={visite.hasActions ? 'Modification impossible - Une action a déjà été effectuée' : 'Modifier la programmation'}
+              disabled={visite.hasActions}
+            >
+              <Edit size={14} />
+            </button>
+          </div>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
           </div>
 
           {/* PAGINATION */}
@@ -901,45 +998,61 @@ const GestionVisitesPage = () => {
     </div>
 
     <div className="form-grid two-columns">
-      {/* Sélection de l'agent */}
-      <div className="form-group full-width">
-        <label>
-          <User size={14} />
-          Agent <span className="required">*</span>
-        </label>
-        <select
-          value={formData.matricule_agent}
-          onChange={(e) => {
-            setFormData({...formData, matricule_agent: e.target.value, date_visite: '', heure_visite: ''});
-            setJoursDisponibles([]);
-            setCreneauxDisponibles([]);
-          }}
-          required
-        >
-          <option value="">Sélectionner un agent</option>
-          {agents.map(agent => (
-            <option key={agent.matricule_agent} value={agent.matricule_agent}>
-              {agent.nom} {agent.prenom} - #{agent.matricule_agent}
-            </option>
-          ))}
-        </select>
-      </div>
+    {/* Sélection de l'agent - en mode édition, afficher mais désactiver */}
+<div className="form-group full-width">
+  <label>
+    <User size={14} />
+    Agent <span className="required">*</span>
+  </label>
+  
+  {editMode ? (
+    // Mode édition : afficher l'agent sans possibilité de modification
+    <div style={{
+      background: '#f1f5f9',
+      padding: '12px 15px',
+      borderRadius: '10px',
+      border: '1px solid #e2e8f0'
+    }}>
+      <strong>{getAgentNom(formData.matricule_agent)}</strong>
+      <span style={{ marginLeft: '10px', fontSize: '12px', color: '#64748b' }}>
+        #{formData.matricule_agent}
+      </span>
+      <input type="hidden" name="matricule_agent" value={formData.matricule_agent} />
+    </div>
+  ) : (
+    <AgentSearchInput
+      value={formData.matricule_agent}
+      onChange={(matricule) => {
+        setFormData({...formData, matricule_agent: matricule, date_visite: '', heure_visite: ''});
+        setJoursDisponibles([]);
+        setCreneauxDisponibles([]);
+      }}
+      onSelect={(agent) => console.log('Agent sélectionné:', agent)}
+      placeholder="Tapez le nom, prénom ou matricule..."
+    />
+  )}
+  {formErrors.matricule_agent && (
+    <div className="error-message">{formErrors.matricule_agent}</div>
+  )}
+</div>
 
       {/* Type de visite */}
-      <div className="form-group">
-        <label>
-          <FileText size={14} />
-          Type de visite <span className="required">*</span>
-        </label>
-        <select
-          value={formData.type_visite}
-          onChange={(e) => setFormData({...formData, type_visite: e.target.value})}
-          required
-        >
-          <option value="Reclassement"> Reclassement</option>
-          <option value="Embauche"> Embauche</option>
-        </select>
-      </div>
+     
+<div className="form-group">
+  <label>
+    <FileText size={14} />
+    Type de visite <span className="required">*</span>
+  </label>
+  <select
+    value={formData.type_visite}
+    onChange={(e) => setFormData({...formData, type_visite: e.target.value})}
+    required
+  >
+    <option value="Périodique"> Périodique</option>
+    <option value="Reclassement"> Reclassement</option>
+    <option value="Embauche"> Embauche</option>
+  </select>
+</div>
 
 <div className="form-group">
   <label>
@@ -1099,4 +1212,4 @@ const GestionVisitesPage = () => {
   );
 };
 
-export default GestionVisitesPage;
+export default GestionVisitesPage; 

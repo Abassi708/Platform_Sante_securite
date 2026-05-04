@@ -5,6 +5,7 @@ const { Op } = require('sequelize');
 const db = require('../models');
 const joursFeriesService = require('./joursFeriesService');
 const moment = require('moment');
+const tracabiliteService = require('./tracabiliteVisiteService');
 
 console.log('🟢 PLANNING SERVICE CHARGÉ');
 
@@ -59,13 +60,17 @@ class PlanningService {
 
   // ========== JOURS ET DATES ==========
   getNumeroSemaine(date) {
-    return moment.utc(date).isoWeek();
-  }
+  const num = moment.utc(date).isoWeek();
+  console.log(`📅 getNumeroSemaine: ${date} -> semaine ${num}`);
+  return num;
+}
 
   getLundiSemaine(numeroSemaine, annee) {
-    const lundi = moment.utc().year(annee).isoWeek(numeroSemaine).day(1);
-    return lundi.format('YYYY-MM-DD');
-  }
+  const lundi = moment.utc().year(annee).isoWeek(numeroSemaine).day(1);
+  const result = lundi.format('YYYY-MM-DD');
+  console.log(`📅 getLundiSemaine: semaine ${numeroSemaine}/${annee} -> ${result}`);
+  return result;
+}
 
   _getNomJour(jourSemaine) {
     const jours = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
@@ -299,30 +304,43 @@ class PlanningService {
     return priorite;
   }
 
-// ========== GÉNÉRATION PLANNING ==========
+// backend/services/planningService.js
 
 async genererPlanningSemaine(dateDebut, userId) {
   try {
     const semaine = this.getNumeroSemaine(dateDebut);
     const annee = dateDebut.getFullYear();
 
-    // Vérifier si un planning périodique auto existe déjà
-    const planningPeriodiqueExistant = await this.Planning.findOne({ 
+    // ✅ Calculer la plage de dates de la semaine (Lundi à Vendredi)
+    const lundi = new Date(dateDebut);
+    const vendredi = new Date(dateDebut);
+    vendredi.setDate(dateDebut.getDate() + 4); // Lundi + 4 jours = Vendredi
+    
+    const dateDebutStr = lundi.toISOString().split('T')[0];
+    const dateFinStr = vendredi.toISOString().split('T')[0];
+    
+    console.log(`\n📅 GÉNÉRATION PLANNING SEMAINE ${semaine}/${annee}`);
+    console.log(`   Période: du ${dateDebutStr} au ${dateFinStr}`);
+
+    // ========== ÉTAPE 1: Récupérer TOUTES les visites pour la période ==========
+    // ✅ Utiliser une plage de dates pour être sûr de tout prendre
+    const toutesVisitesExistantes = await this.Planning.findAll({
       where: { 
-        semaine, 
-        annee, 
-        type_visite: 'Périodique',
-        source_planification: 'auto',
-        reprogrammee: false
-      } 
+        date_visite: {
+          [Op.between]: [dateDebutStr, dateFinStr]
+        }
+      },
+      attributes: ['id_planning', 'matricule_agent', 'date_visite', 'heure_visite', 'type_visite', 'statut', 'visite_effectuee', 'source_planification']
     });
     
-    if (planningPeriodiqueExistant) {
-      console.log(`ℹ️ Planning périodique semaine ${semaine}/${annee} existe déjà`);
-      return [];
+    console.log(`   📊 ${toutesVisitesExistantes.length} visite(s) existante(s) pour cette période`);
+    
+    // ✅ Afficher les visites trouvées pour déboguer
+    for (const v of toutesVisitesExistantes) {
+      console.log(`      - ${v.date_visite} ${v.heure_visite} | Agent: ${v.matricule_agent} | Type: ${v.type_visite} | Source: ${v.source_planification}`);
     }
 
-    // Générer les jours de la semaine
+    // ========== ÉTAPE 2: Générer les jours de la semaine ==========
     const joursSemaine = [];
     for (let i = 1; i <= 4; i++) {
       const jourDate = new Date(dateDebut);
@@ -337,32 +355,38 @@ async genererPlanningSemaine(dateDebut, userId) {
       return [];
     }
 
-    // ✅ Pour chaque jour, récupérer les créneaux déjà occupés (par TOUTES les visites)
+    // ========== ÉTAPE 3: Construire la map des créneaux OCCUPÉS ==========
     const creneauxOccupesParJour = new Map();
-    for (const jourDate of joursSemaine) {
-      const dateStr = moment.utc(jourDate).format('YYYY-MM-DD');
-      const creneauxOccupes = await this.getCreneauxOccupesParDate(dateStr);
-      creneauxOccupesParJour.set(dateStr, creneauxOccupes);
+    const agentsDejaPlanifies = new Set();
+    
+    for (const visite of toutesVisitesExistantes) {
+      const dateStr = moment.utc(visite.date_visite).format('YYYY-MM-DD');
+      if (!creneauxOccupesParJour.has(dateStr)) {
+        creneauxOccupesParJour.set(dateStr, new Set());
+      }
+      // ✅ Ajouter le créneau comme occupé (quel que soit le statut ou la source)
+      creneauxOccupesParJour.get(dateStr).add(visite.heure_visite);
+      
+      // ✅ L'agent est considéré comme occupé ce jour
+      agentsDejaPlanifies.add(visite.matricule_agent);
+    }
+    
+    // ✅ Afficher les créneaux occupés pour déboguer
+    for (const [date, creneauxSet] of creneauxOccupesParJour) {
+      console.log(`   📍 ${date} - Créneaux occupés: ${Array.from(creneauxSet).join(', ')}`);
     }
 
-    // Récupérer les agents ayant besoin d'une visite
+    // ========== ÉTAPE 4: Récupérer les agents ayant besoin d'une visite ==========
     const tousAgents = await this.Agent.findAll({ where: { statut: 'actif' } });
     const besoinsReprise = [];
     const besoinsPeriodique = [];
 
     for (const agent of tousAgents) {
-      // Vérifier si l'agent a déjà une visite planifiée (quel que soit le type)
-      const dejaPlanifie = await this.Planning.findOne({
-        where: {
-          matricule_agent: agent.matricule_agent,
-          statut: 'Programmé',
-          visite_effectuee: false,
-          date_visite: { [Op.gte]: new Date() }
-        }
-      });
+      // ✅ Vérifier si l'agent a déjà une visite dans la période
+      const dejaPlanifie = toutesVisitesExistantes.some(v => v.matricule_agent === agent.matricule_agent);
       
       if (dejaPlanifie) {
-        console.log(`⏭️ Agent ${agent.matricule_agent} déjà planifié le ${dejaPlanifie.date_visite} - ignoré`);
+        console.log(`⏭️ Agent ${agent.matricule_agent} (${agent.nom}) a déjà une visite - ignoré`);
         continue;
       }
       
@@ -394,29 +418,32 @@ async genererPlanningSemaine(dateDebut, userId) {
     const tousBesoins = [...besoinsReprise, ...besoinsPeriodique];
 
     if (tousBesoins.length === 0) {
-      console.log('ℹ️ Aucun agent nécessitant une visite');
+      console.log('ℹ️ Aucun agent nécessitant une visite supplémentaire');
+      console.log(`   ✅ ${toutesVisitesExistantes.length} visite(s) déjà existante(s) pour cette période`);
       return [];
     }
 
-    // Planifier les visites
-    const planning = [];
-    const agentsPlanifies = new Set();
-    const agencesPlanifiees = new Set();
-    const postesPlanifies = new Set();
+    console.log(`   📋 ${tousBesoins.length} agent(s) nécessitent une visite`);
 
+    // ========== ÉTAPE 5: Planifier les nouvelles visites ==========
+    const planning = [];
+    const agentsPlanifiesGlobal = new Set();
+    
     for (const jourDate of joursSemaine) {
       const dateStr = moment.utc(jourDate).format('YYYY-MM-DD');
-      const agentsJour = [];
-      const agencesJour = [];
-      const postesJour = [];
       
-      // ✅ Récupérer les créneaux déjà occupés pour ce jour
+      const agentsPlanifiesJour = [];
+      const agencesPlanifieesJour = [];
+      const postesPlanifieesJour = [];
+      
       const creneauxOccupes = creneauxOccupesParJour.get(dateStr) || new Set();
+      
+      console.log(`\n   📅 ${dateStr} - Créneaux libres à trouver parmi: ${this.creneaux.join(', ')}`);
+      console.log(`      Créneaux occupés: ${Array.from(creneauxOccupes).join(', ') || 'aucun'}`);
 
       for (const creneau of this.creneaux) {
-        // ✅ Ignorer les créneaux déjà occupés (par n'importe quelle visite)
         if (creneauxOccupes.has(creneau)) {
-          console.log(`⏭️ Créneau ${dateStr} ${creneau} déjà occupé - ignoré`);
+          console.log(`      ⏭️ ${creneau} déjà occupé - ignoré`);
           continue;
         }
         
@@ -425,25 +452,10 @@ async genererPlanningSemaine(dateDebut, userId) {
         for (let i = 0; i < tousBesoins.length; i++) {
           const agent = tousBesoins[i];
 
-          if (agentsPlanifies.has(agent.matricule_agent)) continue;
-          if (agentsJour.includes(agent.matricule_agent)) continue;
-          if (agencesJour.includes(agent.code_agence)) continue;
-          if (postesJour.includes(agent.code_affectation)) continue;
-
-          // Vérifier si l'agent a déjà une visite le même jour (programmation manuelle)
-          const visiteLeMemeJour = await this.Planning.findOne({
-            where: {
-              matricule_agent: agent.matricule_agent,
-              date_visite: dateStr,
-              statut: 'Programmé',
-              visite_effectuee: false
-            }
-          });
-          
-          if (visiteLeMemeJour) {
-            console.log(`⏭️ Agent ${agent.matricule_agent} a déjà une visite le ${dateStr} - ignoré pour ce jour`);
-            continue;
-          }
+          if (agentsPlanifiesGlobal.has(agent.matricule_agent)) continue;
+          if (agentsPlanifiesJour.includes(agent.matricule_agent)) continue;
+          if (agencesPlanifieesJour.includes(agent.code_agence)) continue;
+          if (postesPlanifieesJour.includes(agent.code_affectation)) continue;
 
           if (agent.type_visite_calcule === 'Reprise' && agent.date_optimal) {
             const dateOptStr = moment.utc(agent.date_optimal).format('YYYY-MM-DD');
@@ -466,23 +478,38 @@ async genererPlanningSemaine(dateDebut, userId) {
             annee: annee,
             created_by: userId,
             convocation_envoyee: false,
-            source_planification: 'auto'
+            source_planification: 'auto',
+            source_originale: 'auto'
           });
 
-          agentsPlanifies.add(agentChoisi.matricule_agent);
-          agentsJour.push(agentChoisi.matricule_agent);
-          agencesJour.push(agentChoisi.code_agence);
-          postesJour.push(agentChoisi.code_affectation);
+          agentsPlanifiesGlobal.add(agentChoisi.matricule_agent);
+          agentsPlanifiesJour.push(agentChoisi.matricule_agent);
+          agencesPlanifieesJour.push(agentChoisi.code_agence);
+          postesPlanifieesJour.push(agentChoisi.code_affectation);
+          
+          console.log(`      ✅ ${creneau} → ${agentChoisi.nom} ${agentChoisi.prenom} (${agentChoisi.type_visite_calcule})`);
+        } else {
+          console.log(`      ❌ Aucun agent disponible pour ${creneau}`);
         }
       }
     }
 
     if (planning.length > 0) {
       await this.Planning.bulkCreate(planning);
-      console.log(`✅ ${planning.length} visite(s) générée(s) pour semaine ${semaine}/${annee}`);
+      const tracabiliteService = require('./tracabiliteVisiteService');
+      for (const p of planning) {
+        await tracabiliteService.enregistrerProgrammation(p, { id: userId }, 'auto');
+      }
+
+      console.log(`\n✅ ${planning.length} nouvelle(s) visite(s) générée(s) pour semaine ${semaine}/${annee}`);
+      console.log(`   Total visites dans la semaine: ${toutesVisitesExistantes.length + planning.length}`);
+    } else {
+      console.log(`\nℹ️ Aucune nouvelle visite générée pour semaine ${semaine}/${annee}`);
+      console.log(`   ${toutesVisitesExistantes.length} visite(s) déjà existante(s)`);
     }
 
     return planning;
+    
   } catch (error) {
     console.error('❌ Erreur génération planning:', error);
     throw error;
@@ -508,8 +535,8 @@ async genererPlanningSemaine(dateDebut, userId) {
       type_visite: typeVisite,
       statut: 'Programmé',
       priorite: 200,
-      semaine: this.getNumeroSemaine(dateObj),
-      annee: dateObj.getFullYear(),
+      semaine: this.getNumeroSemaine(resultat.date),  
+  annee: resultat.date.getFullYear(),
       created_by: userId,
       convocation_envoyee: false,
       motif_reprogrammation: motif || `Visite de ${typeVisite} manuelle`,

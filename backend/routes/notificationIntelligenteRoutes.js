@@ -40,7 +40,6 @@ router.put('/:id/lire', protect, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // ✅ CORRECTION : Utiliser 'id' comme clé primaire (pas id_notification)
     const notification = await NotificationIntelligente.findOne({
       where: { id: id, id_utilisateur: req.user.id }
     });
@@ -127,6 +126,68 @@ router.get('/mes-stats', protect, async (req, res) => {
     res.json({ success: true, stats: { total, nonLues } });
   } catch (error) {
     console.error('❌ Erreur stats:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== CRÉER UNE NOTIFICATION MANUELLEMENT ==========
+
+// ========== CRÉER UNE NOTIFICATION MANUELLEMENT ==========
+router.post('/creer', protect, async (req, res) => {
+  try {
+    const { type, titre, message, action_suggested, priorite, source, details } = req.body;
+    
+    // Récupérer l'email de l'utilisateur depuis req.user
+    const userEmail = req.user.Login || req.user.email;
+    const userRole = req.user.role || 'user';
+    
+    if (!userEmail) {
+      return res.status(400).json({ success: false, message: 'Email utilisateur non trouvé' });
+    }
+    
+    const notification = await NotificationIntelligente.create({
+      type: type || 'INFO',
+      titre: titre,
+      message: message,
+      action_suggested: action_suggested || null,
+      priorite: priorite || 3,
+      id_utilisateur: req.user.id,
+      email_utilisateur: userEmail,
+      role_utilisateur: userRole,
+      details: details || null,
+      source: source || 'manuel',
+      statut: 'non_lu',
+      created_at: new Date()
+    });
+    
+    res.json({ success: true, notification });
+  } catch (error) {
+    console.error('❌ Erreur création notification:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ========== TEST MANUEL - FORCER L'ENVOI DES NOTIFICATIONS ==========
+router.post('/test/forcer-notifications', protect, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' && req.user.role !== 'social') {
+      return res.status(403).json({ success: false, message: 'Accès non autorisé' });
+    }
+    
+    console.log('🧪 TEST MANUEL - Forçage des notifications...');
+    
+    const notificationService = require('../services/notificationIntelligenteService');
+    const nbEnvoyees = await notificationService.envoyerNotifications();
+    
+    console.log(`✅ ${nbEnvoyees} notifications créées`);
+    
+    res.json({ 
+      success: true, 
+      message: `Test exécuté - ${nbEnvoyees} notifications créées`,
+      nb_notifications: nbEnvoyees
+    });
+  } catch (error) {
+    console.error('❌ Erreur test:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

@@ -1,13 +1,14 @@
 // frontend/components/visites/PlanningPage.jsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect , useRef, useCallback, useMemo } from 'react';
 import { 
   Calendar, Clock, User, FileText, CheckCircle, XCircle, AlertCircle, Info, 
   RefreshCw, ChevronLeft, ChevronRight, X, Filter, TrendingUp, Mail, Lock, 
   History, Eye, Zap, Shield, Briefcase, Building, Search, Sliders, 
   ChevronDown, ChevronUp, Edit2, Award, ArrowLeftRight, Send, Users, Stethoscope,
-  CalendarPlus, CalendarX, CalendarSync
+  CalendarPlus, CalendarX, CalendarSync, UserPlus
 } from 'lucide-react';
 import moment from 'moment';
+import AgentSearchInput from '../common/AgentSearchInput';
 import '../../styles/PlanningPage.css';
 
 // ========== CONSTANTES ==========
@@ -17,7 +18,6 @@ const cx = (...classes) => classes.filter(Boolean).map(c => `${PREFIX}${c}`).joi
 // ========== FONCTIONS UTILITAIRES ==========
 const getNumeroSemaine = (date) => moment(date).isoWeek();
 
-// ✅ FONCTION CORRIGÉE - Calcul correct du lundi d'une semaine ISO
 const getLundiSemaine = (numeroSemaine, annee) => {
   const date = new Date(annee, 0, 4);
   const jour = date.getDay();
@@ -104,11 +104,6 @@ const PlanningPage = () => {
   const [expandedCards, setExpandedCards] = useState(new Set());
   const [showHistorique, setShowHistorique] = useState(null);
   
-  // Historique agent
-  const [showAgentHistoryModal, setShowAgentHistoryModal] = useState(false);
-  const [selectedAgentForHistory, setSelectedAgentForHistory] = useState('');
-  const [selectedAgentNameForHistory, setSelectedAgentNameForHistory] = useState('');
-  
   // Génération planning
   const [generationLoading, setGenerationLoading] = useState(false);
   const [showGenererPlanningModal, setShowGenererPlanningModal] = useState(false);
@@ -122,7 +117,7 @@ const PlanningPage = () => {
   const [reprogramMotif, setReprogramMotif] = useState('');
   const [reprogramLoading, setReprogramLoading] = useState(false);
   const [reprogramSource, setReprogramSource] = useState('manuel');
-  
+
   // Reprogrammation auto
   const [showAutoReprogramModal, setShowAutoReprogramModal] = useState(false);
   const [autoReprogramItem, setAutoReprogramItem] = useState(null);
@@ -133,6 +128,14 @@ const PlanningPage = () => {
   const [planningToAnnuler, setPlanningToAnnuler] = useState(null);
   const [annulationMotif, setAnnulationMotif] = useState('');
   const [annulationLoading, setAnnulationLoading] = useState(false);
+
+  // États pour le calendrier intelligent
+  const [moisActuelReprog, setMoisActuelReprog] = useState(new Date().getMonth());
+  const [anneeActuelleReprog, setAnneeActuelleReprog] = useState(new Date().getFullYear());
+  const [joursDisponiblesReprog, setJoursDisponiblesReprog] = useState([]);
+  const [creneauxDisponiblesReprog, setCreneauxDisponiblesReprog] = useState([]);
+  const [loadingReprogJours, setLoadingReprogJours] = useState(false);
+  const [loadingReprogCreneaux, setLoadingReprogCreneaux] = useState(false);
   
   // Convocation simple
   const [showConvocationModal, setShowConvocationModal] = useState(false);
@@ -153,6 +156,140 @@ const PlanningPage = () => {
   const [visiteToComplete, setVisiteToComplete] = useState(null);
   const [visiteFormData, setVisiteFormData] = useState({ medecin: 'Dr. Mahmoud Khelifi', resultat: 'Apte', observation: '', duree_inaptitude: 30 });
 
+  // Indisponibilité
+  const [showIndisponibleModal, setShowIndisponibleModal] = useState(false);
+  const [planningIndisponible, setPlanningIndisponible] = useState(null);
+  const [indisponibleMode, setIndisponibleMode] = useState('manuel');
+  const [indisponibleLoading, setIndisponibleLoading] = useState(false);
+  const [reaffectationInfo, setReaffectationInfo] = useState(null);
+
+  // ========== RÉAFFECTATION D'UN CRÉNEAU LIBÉRÉ ==========
+const [showReaffectModal, setShowReaffectModal] = useState(false);
+const [reaffectCreneau, setReaffectCreneau] = useState(null);
+const [reaffectAgents, setReaffectAgents] = useState([]);
+const [reaffectLoading, setReaffectLoading] = useState(false);
+const [reaffectMotif, setReaffectMotif] = useState('');
+
+
+const [agentsPrioritaires, setAgentsPrioritaires] = useState([]);
+const [loadingAgents, setLoadingAgents] = useState(false);
+const [selectedAgentReaffect, setSelectedAgentReaffect] = useState(null);
+
+ const typesAutorisesIndisponible = ['Périodique', 'Reprise'];
+
+useEffect(() => {
+  console.log('📊 [DEBUG] showReaffectModal =', showReaffectModal);
+  console.log('📊 [DEBUG] reaffectCreneau =', reaffectCreneau);
+  console.log('📊 [DEBUG] agentsPrioritaires.length =', agentsPrioritaires.length);
+  console.log('📊 [DEBUG] loadingAgents =', loadingAgents);
+}, [showReaffectModal, reaffectCreneau, agentsPrioritaires, loadingAgents]);
+
+
+const handleReaffecterCreneau = async (date, heure, id_planning) => {
+  console.log('🔴 [DEBUG] handleReaffecterCreneau - date:', date, 'heure:', heure);
+  setReaffectCreneau({ date, heure, id_planning });
+  setSelectedAgentReaffect(null);
+  console.log('🟡 [DEBUG] Appel de chargerAgentsPrioritaires...');
+  await chargerAgentsPrioritaires();
+  console.log('🟢 [DEBUG] setShowReaffectModal(true)');
+  setShowReaffectModal(true);
+};
+
+const confirmerReaffectation = async () => {
+  if (!selectedAgentReaffect) {
+    showNotification({ type: 'error', title: '❌', message: 'Veuillez sélectionner un agent' });
+    return;
+  }
+  
+  setReaffectLoading(true);
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/confirmer-reaffectation`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date_visite: reaffectCreneau.date,
+        heure_visite: reaffectCreneau.heure,
+        matricule_agent: selectedAgentReaffect.matricule,
+        type_visite: 'Périodique',
+        motif: reaffectMotif || 'Réaffectation manuelle'
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showNotification({ type: 'success', title: '✅', message: data.message });
+      setShowReaffectModal(false);
+      
+      // ✅ AJOUTER LA NOUVELLE CARTE DIRECTEMENT
+      if (data.planning) {
+        setPlanning(prevPlanning => {
+          // Supprimer l'ancienne carte "libérée" si elle existe (matricule_agent === 0)
+          const withoutOld = prevPlanning.filter(p => 
+            !(p.date_visite === reaffectCreneau.date && 
+              p.heure_visite === reaffectCreneau.heure && 
+              p.matricule_agent === 0)
+          );
+          // Ajouter la nouvelle
+          return [...withoutOld, data.planning];
+        });
+      }
+      
+      // Rafraîchir
+      await fetchPlanningSemaine();
+      
+    } else {
+      showNotification({ type: 'error', title: '❌', message: data.message });
+    }
+  } catch (err) {
+    showNotification({ type: 'error', title: '❌', message: 'Erreur de connexion' });
+  } finally {
+    setReaffectLoading(false);
+  }
+};
+
+const confirmerReaffectationAvecAgent = async (agent) => {
+  setReaffectLoading(true);
+  try {
+    const token = localStorage.getItem('token');
+    
+    // ✅ Ajouter l'ID du planning original (le créneau libéré)
+    const body = {
+      date_visite: reaffectCreneau.date,
+      heure_visite: reaffectCreneau.heure,
+      matricule_agent: agent.matricule,
+      type_visite: 'Périodique',
+      motif: reaffectMotif || `Réaffectation - Agent prioritaire`,
+      id_planning_original: reaffectCreneau.id_planning  // ← AJOUTER
+    };
+    
+    console.log('📤 Envoi réaffectation:', body);
+    
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/confirmer-reaffectation`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      showNotification({ type: 'success', title: '✅', message: data.message });
+      setShowReaffectModal(false);
+      setSelectedAgentReaffect(null);
+      setReaffectMotif('');
+      await fetchPlanningSemaine();
+    } else {
+      showNotification({ type: 'error', title: '❌', message: data.message });
+    }
+  } catch (err) {
+    showNotification({ type: 'error', title: '❌', message: 'Erreur de connexion' });
+  } finally {
+    setReaffectLoading(false);
+  }
+};
+
   // ========== CONSTANTES ==========
   const joursSemaine = ['Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
   const creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
@@ -163,51 +300,75 @@ const PlanningPage = () => {
     return date.toISOString().split('T')[0];
   });
 
-  // ========== CHARGEMENT ==========
+  // ========== FONCTIONS DE CHARGEMENT ==========
   const fetchAgents = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`, { 
-        headers: { 'Authorization': `Bearer ${token}` } 
-      });
-      const data = await res.json();
-      if (data.success) {
-        const normalizedAgents = data.agents.map(agent => ({
-          ...agent,
-          code_affectation_normalized: agent.code_affectation === 3 ? 3 : 1,
-          periodicite_text: agent.periodicite_jours === 180 ? '6 mois' : '1 an'
-        }));
-        setAgents(normalizedAgents);
-      }
-    } catch (err) { console.error(err); }
-  };
+  try {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`, { 
+      headers: { 'Authorization': `Bearer ${token}` } 
+    });
+    const data = await res.json();
+    console.log('📋 Agents chargés:', data.agents?.length);
+    if (data.success) {
+      setAgents(data.agents);
+    }
+  } catch (err) { 
+    console.error(err); 
+  }
+};
 
   const fetchPlanningSemaine = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const semaine = parseInt(semaineCourante.numero);
-      const annee = parseInt(semaineCourante.annee);
+  try {
+    const token = localStorage.getItem('token');
+    const semaine = parseInt(semaineCourante.numero);
+    const annee = parseInt(semaineCourante.annee);
+    
+    console.log(`📡 Chargement planning semaine ${semaine}/${annee}`);
+    
+    const url = `${process.env.REACT_APP_API_URL}/api/planning/${semaine}/${annee}`;
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+    const data = await res.json();
+    
+    if (data.success) {
+      console.log(`📊 ${data.planning?.length || 0} visites reçues:`);
+      data.planning?.forEach(p => {
+        console.log(`   - ${p.date_visite} ${p.heure_visite} | ${p.type_visite} | Agent: ${p.matricule_agent}`);
+      });
       
-      if (isNaN(semaine) || isNaN(annee)) {
-        console.error('Semaine ou année invalide:', semaine, annee);
-        return;
-      }
-      
-      const url = `${process.env.REACT_APP_API_URL}/api/planning/${semaine}/${annee}`;
-      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-      const data = await res.json();
-      if (data.success) {
-        const planningWithData = (data.planning || []).map(p => ({
-          ...p,
-          a_des_actions: p.historique?.length > 0 || false
-        }));
-        setPlanning(planningWithData);
-      }
-    } catch (err) { 
-      console.error('Erreur fetch planning:', err);
-      setPlanning([]); 
+      const planningWithData = (data.planning || []).map(p => ({
+        ...p,
+        a_des_actions: p.historique?.length > 0 || false
+      }));
+      setPlanning(planningWithData);
     }
-  };
+  } catch (err) { 
+    console.error('Erreur fetch planning:', err);
+    setPlanning([]); 
+  }
+};
+
+
+// ========== CHARGER LES AGENTS PRIORITAIRES ==========
+const chargerAgentsPrioritaires = async () => {
+  console.log('🟢 chargerAgentsPrioritaires appelé');
+  setLoadingAgents(true);
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agents-prioritaires?limit=30`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    console.log('🟢 Réponse reçue:', data);
+    if (data.success) {
+      console.log('🟢 Agents chargés:', data.agents.length);
+      setAgentsPrioritaires(data.agents);
+    }
+  } catch (err) {
+    console.error('🔴 Erreur:', err);
+  } finally {
+    setLoadingAgents(false);
+  }
+};
 
   const fetchVisiteDetails = async (idPlanning) => {
     try {
@@ -233,6 +394,39 @@ const PlanningPage = () => {
     }
   };
 
+  // ========== FONCTIONS CALENDRIER INTELLIGENT (UNE SEULE FOIS) ==========
+  const chargerJoursDisponiblesReprog = async (mois, annee, matricule) => {
+    if (!matricule) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const url = `${process.env.REACT_APP_API_URL}/api/creneaux/jours-disponibles?mois=${mois + 1}&annee=${annee}&matricule_agent=${matricule}`;
+      const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await response.json();
+      if (data.success) {
+        setJoursDisponiblesReprog(data.jours.filter(j => j.creneauxDisponibles > 0));
+      }
+    } catch (err) {
+      console.error('Erreur chargement jours:', err);
+    }
+  };
+
+  const chargerCreneauxDisponiblesReprog = async (date, matricule, idExclu) => {
+    if (!matricule || !date) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      const url = `${process.env.REACT_APP_API_URL}/api/creneaux/creneaux-disponibles?date=${date}&matricule_agent=${matricule}&id_planning_exclu=${idExclu}`;
+      const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await response.json();
+      if (data.success) {
+        setCreneauxDisponiblesReprog(data.creneaux);
+      }
+    } catch (err) {
+      console.error('Erreur chargement créneaux:', err);
+    }
+  };
+
   const chargerDonnees = async () => {
     setLoading(true);
     try { 
@@ -243,20 +437,31 @@ const PlanningPage = () => {
       setLoading(false); 
     }
   };
-
+  
   useEffect(() => { chargerDonnees(); }, [semaineCourante]);
+  useEffect(() => {
+  const handleRefresh = () => {
+    console.log('🔄 Rafraîchissement du planning après modification');
+    fetchPlanningSemaine();
+  };
+  
+  window.addEventListener('refresh-planning', handleRefresh);
+  return () => window.removeEventListener('refresh-planning', handleRefresh);
+}, []);
+
 
   // ========== NOTIFICATIONS ==========
-  const showNotification = ({ type, title, message }) => {
-    setNotification({ show: true, type, title, message });
-    setTimeout(() => setNotification({ show: false, type: '', title: '', message: '' }), 5000);
-  };
+  const showNotification = ({ type, title, message, duration = 5000 }) => {
+  setNotification({ show: true, type, title, message });
+  setTimeout(() => setNotification({ show: false, type: '', title: '', message: '' }), duration);
+};
 
-  // ========== GESTION AGENTS ==========
-  const getAgentNom = useCallback((matricule) => {
-    const agent = agents.find(a => a.matricule_agent === matricule);
-    return agent ? `${agent.nom} ${agent.prenom}` : `Agent ${matricule}`;
-  }, [agents]);
+  // ========== FONCTIONS UTILITAIRES ==========
+const getAgentNom = useCallback((matricule) => {
+  if (!matricule || matricule === 0 || matricule === '0') return '?';
+  const agent = agents.find(a => a.matricule_agent === matricule);
+  return agent ? `${agent.nom} ${agent.prenom}` : '?';
+}, [agents]);
 
   const getAgentDetails = useCallback((matricule) => agents.find(a => a.matricule_agent === matricule), [agents]);
 
@@ -267,14 +472,7 @@ const PlanningPage = () => {
     return `${new Date(agent.date_derniere_visite).toLocaleDateString('fr-FR')} (${periodicite})`;
   }, [agents]);
 
-  // ========== FONCTION POUR OUVRIR L'HISTORIQUE AGENT ==========
-  const handleOpenAgentHistory = () => {
-    if (!selectedAgentForHistory) {
-      showNotification({ type: 'warning', title: '⚠️ Attention', message: 'Veuillez sélectionner un agent' });
-      return;
-    }
-    setShowAgentHistoryModal(true);
-  };
+
 
   // ========== FONCTIONS DE CLASSE ==========
   const getCardStatusClass = (visite) => {
@@ -813,6 +1011,7 @@ const PlanningPage = () => {
       if (data.success) {
         showNotification({ type: 'success', title: '✅ Visite reprogrammée', message: `Reprogrammée au ${nouvelleDate} à ${nouvelleHeure}` });
         setShowReprogramModal(false);
+        await fetchPlanningSemaine();
         setPlanningToReprogram(null);
         fetchPlanningSemaine();
       } else {
@@ -975,6 +1174,125 @@ const PlanningPage = () => {
     }
   };
 
+  // ========== GESTION INDISPONIBILITÉ ==========
+  // ========== GESTION INDISPONIBILITÉ (AVEC VÉRIFICATION DU DÉLAI) ==========
+const handleIndisponible = (item) => {
+  // Vérifier si l'agent a déclaré son indisponibilité en avance (>= J-2)
+  const dateVisite = new Date(item.date_visite);
+  const aujourdhui = new Date();
+  aujourdhui.setHours(0, 0, 0, 0);
+  
+  // Calculer la différence en jours (sans tenir compte des heures)
+  const diffTime = dateVisite.getTime() - aujourdhui.getTime();
+  const diffJours = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  console.log('📅 Vérification délai indisponibilité:');
+  console.log(`   Date visite: ${item.date_visite}`);
+  console.log(`   Aujourd'hui: ${aujourdhui.toISOString().split('T')[0]}`);
+  console.log(`   Différence: ${diffJours} jours`);
+  
+  // Si la visite est aujourd'hui (J0) ou demain (J1) ou déjà passée (J-1, J-2...)
+  if (diffJours < 2) {
+    let message = '';
+    let titre = '❌ Action impossible';
+    
+    if (diffJours === 1) {
+      message = `⚠️ Impossible de déclarer l'indisponibilité pour une visite prévue DEMAIN (J-1).\n\n` +
+                `📋 Règle: La déclaration d'indisponibilité doit être faite au moins 2 jours ouvrables avant la visite.\n\n` +
+                `🔄 Pour gérer une absence pour demain, utilisez les boutons:\n` +
+                `   • "Reprogrammer" (choisir manuellement une nouvelle date)\n` +
+                `   • "Auto" (reprogrammation automatique)`;
+    } else if (diffJours === 0) {
+      message = `⚠️ Impossible de déclarer l'indisponibilité pour une visite prévue AUJOURD'HUI (J-0).\n\n` +
+                `📋 Règle: La déclaration d'indisponibilité doit être faite au moins 2 jours avant la visite.\n\n` +
+                `🔄 Pour gérer une absence aujourd'hui, utilisez les boutons:\n` +
+                `   • "Reprogrammer" (choisir manuellement une nouvelle date)\n` +
+                `   • "Auto" (reprogrammation automatique)`;
+    } else if (diffJours < 0) {
+      const joursPasses = Math.abs(diffJours);
+      message = `⚠️ Impossible de déclarer l'indisponibilité pour une visite qui a eu lieu il y a ${joursPasses} jour(s).\n\n` +
+                `📋 Cette visite est déjà passée.\n\n` +
+                `🔄 Si la visite n'a pas été effectuée, utilisez le bouton "Reprogrammer" ou "Auto" pour la reporter.`;
+    }
+    
+    showNotification({ 
+      type: 'error', 
+      title: titre, 
+      message: message,
+      duration: 8000
+    });
+    return;
+  }
+  
+  // Si délai OK (>= J-2), ouvrir le modal
+  console.log('✅ Délai respecté (>= J-2) - Ouverture du modal');
+  setPlanningIndisponible(item);
+  setNouvelleDate('');
+  setNouvelleHeure('');
+  setReprogramMotif('');
+  setIndisponibleMode('manuel');
+  setReaffectationInfo(null);
+  setShowIndisponibleModal(true);
+  setMoisActuelReprog(new Date().getMonth());
+  setAnneeActuelleReprog(new Date().getFullYear());
+  setJoursDisponiblesReprog([]);
+  setCreneauxDisponiblesReprog([]);
+  chargerJoursDisponiblesReprog(new Date().getMonth(), new Date().getFullYear(), item.matricule_agent);
+};
+
+  const confirmerIndisponible = async () => {
+    if (!planningIndisponible) return;
+    
+    if (indisponibleMode === 'manuel' && (!nouvelleDate || !nouvelleHeure)) {
+      showNotification({ type: 'error', title: '❌', message: 'Date et heure requises pour le mode manuel' });
+      return;
+    }
+    
+    if (!reprogramMotif?.trim()) {
+      showNotification({ type: 'error', title: '❌', message: 'Motif requis' });
+      return;
+    }
+
+    setIndisponibleLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const body = {
+        motif: reprogramMotif,
+        mode: indisponibleMode
+      };
+      
+      if (indisponibleMode === 'manuel') {
+        body.nouvelle_date = nouvelleDate;
+        body.nouvelle_heure = nouvelleHeure;
+      }
+      
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/${planningIndisponible.id_planning}/reprogrammer-indisponible`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        let message = data.message;
+        if (data.data?.reaffectation) {
+          message += ` → Remplaçant: ${data.data.reaffectation.agent.nom} ${data.data.reaffectation.agent.prenom}`;
+        }
+        showNotification({ type: 'success', title: '✅', message: message });
+        setShowIndisponibleModal(false);
+        setPlanningIndisponible(null);
+        fetchPlanningSemaine();
+      } else {
+        showNotification({ type: 'error', title: '❌', message: data.message });
+      }
+    } catch (err) {
+      showNotification({ type: 'error', title: '❌', message: 'Erreur de connexion' });
+    } finally {
+      setIndisponibleLoading(false);
+    }
+  };
+
   // ========== NAVIGATION ==========
   const changerSemaine = (direction) => {
     let nouveauNumero = semaineCourante.numero + direction;
@@ -1125,382 +1443,7 @@ const PlanningPage = () => {
     );
   };
 
-  // ========== COMPOSANT MODAL HISTORIQUE AGENT ==========
-  const AgentHistoryModal = ({ matricule, onClose }) => {
-    const [loadingHisto, setLoadingHisto] = useState(true);
-    const [historiqueAgent, setHistoriqueAgent] = useState([]);
-    const [visitesProgrammees, setVisitesProgrammees] = useState([]);
-    const [statsAgent, setStatsAgent] = useState({});
-    const [agentInfo, setAgentInfo] = useState(null);
-    const [filterType, setFilterType] = useState('all');
-    const [filterResultat, setFilterResultat] = useState('all');
-    const [expandedItems, setExpandedItems] = useState(new Set());
-    const [expandedProgrammees, setExpandedProgrammees] = useState(new Set());
-    const [hasLoaded, setHasLoaded] = useState(false);
-
-    useEffect(() => {
-      if (hasLoaded) return;
-      setHasLoaded(true);
-      
-      const chargerDonnees = async () => {
-        setLoadingHisto(true);
-        try {
-          const token = localStorage.getItem('token');
-          
-          const resHistorique = await fetch(`${process.env.REACT_APP_API_URL}/api/historique/agent/${matricule}?limit=100`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const dataHistorique = await resHistorique.json();
-          
-          const resPlanning = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/agent/${matricule}`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          const dataPlanning = await resPlanning.json();
-          
-          if (dataHistorique.success) {
-            setHistoriqueAgent(dataHistorique.historique || []);
-            setStatsAgent(dataHistorique.stats || {});
-            setAgentInfo(dataHistorique.agent);
-          }
-          
-          if (dataPlanning.success) {
-            setVisitesProgrammees(dataPlanning.planning || []);
-          }
-        } catch (err) {
-          console.error('Erreur:', err);
-        } finally {
-          setLoadingHisto(false);
-        }
-      };
-      chargerDonnees();
-    }, [matricule, hasLoaded]);
-
-    const toggleExpand = (id) => {
-      const newExpanded = new Set(expandedItems);
-      newExpanded.has(id) ? newExpanded.delete(id) : newExpanded.add(id);
-      setExpandedItems(newExpanded);
-    };
-
-    const toggleExpandProgrammee = (id) => {
-      const newExpanded = new Set(expandedProgrammees);
-      newExpanded.has(id) ? newExpanded.delete(id) : newExpanded.add(id);
-      setExpandedProgrammees(newExpanded);
-    };
-
-    const filteredHistorique = historiqueAgent.filter(item => {
-      if (filterType !== 'all' && item.type_visite !== filterType) return false;
-      if (filterResultat !== 'all' && item.resultat !== filterResultat) return false;
-      return true;
-    });
-
-    const filteredProgrammees = visitesProgrammees.filter(item => {
-      if (filterType !== 'all' && item.type_visite !== filterType) return false;
-      return true;
-    });
-
-    return (
-      <div className="ha-modal-overlay" onClick={onClose}>
-        <div className="ha-modal-content">
-          <div className="ha-header">
-            <div className="ha-header-left">
-              <History size={24} />
-              <div>
-                <h2>Historique complet des visites</h2>
-                <p>{agentInfo?.nom} {agentInfo?.prenom} • Matricule: {matricule}</p>
-              </div>
-            </div>
-            <button className="ha-close-btn" onClick={onClose}>✕</button>
-          </div>
-
-          <div className="ha-stats-grid">
-            <div className="ha-stat-card">
-              <div className="ha-stat-value">{statsAgent.total || 0}</div>
-              <div className="ha-stat-label">Visites effectuées</div>
-            </div>
-            <div className="ha-stat-card">
-              <div className="ha-stat-value">{filteredProgrammees.length}</div>
-              <div className="ha-stat-label">Visites programmées</div>
-            </div>
-            <div className="ha-stat-card success">
-              <div className="ha-stat-value">{statsAgent.aptes || 0}</div>
-              <div className="ha-stat-label">Apte</div>
-            </div>
-            <div className="ha-stat-card warning">
-              <div className="ha-stat-value">{statsAgent.inaptesTemp || 0}</div>
-              <div className="ha-stat-label">Inapte temporaire</div>
-            </div>
-            <div className="ha-stat-card danger">
-              <div className="ha-stat-value">{statsAgent.inaptesDef || 0}</div>
-              <div className="ha-stat-label">Inapte définitif</div>
-            </div>
-          </div>
-
-          <div className="ha-filters">
-            <select value={filterType} onChange={(e) => setFilterType(e.target.value)}>
-              <option value="all">📋 Tous les types</option>
-              <option value="Périodique">🔄 Périodique</option>
-              <option value="Reprise">⚕️ Reprise</option>
-              <option value="Reclassement">📝 Reclassement</option>
-              <option value="Embauche">🆕 Embauche</option>
-            </select>
-            <select value={filterResultat} onChange={(e) => setFilterResultat(e.target.value)}>
-              <option value="all">📊 Tous les résultats</option>
-              <option value="Apte">✅ Apte</option>
-              <option value="Inapte temporaire">⚠️ Inapte temporaire</option>
-              <option value="Inapte définitif">❌ Inapte définitif</option>
-            </select>
-            <button className="ha-reset-btn" onClick={() => { setFilterType('all'); setFilterResultat('all'); }}>
-              <X size={14} /> Réinitialiser
-            </button>
-          </div>
-
-          {filteredProgrammees.length > 0 && (
-            <>
-              <div className="ha-section-title">
-                <Calendar size={16} />
-                <span>Visites programmées (à venir)</span>
-              </div>
-              <div className="ha-list">
-                {filteredProgrammees.map((item, idx) => (
-                  <div key={`prog-${item.id_planning || idx}`} className="ha-item programme">
-                    <div className="ha-item-header" onClick={() => toggleExpandProgrammee(item.id_planning)}>
-                      <div className="ha-item-left">
-                        <span className="ha-action-badge info">📅 Programmé</span>
-                        <span className="ha-type-badge">{item.type_visite}</span>
-                      </div>
-                      <div className="ha-item-right">
-                        <span className="ha-date">{formatDate(item.date_visite)}</span>
-                        <span className="ha-heure">{item.heure_visite?.substring(0,5)}</span>
-                        <button className="ha-expand-btn">
-                          {expandedProgrammees.has(item.id_planning) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {expandedProgrammees.has(item.id_planning) && (
-                      <div className="ha-item-details">
-                        <div className="ha-detail-row">
-                          <User size={14} />
-                          <span><strong>Agent:</strong> {getAgentNom(item.matricule_agent)}</span>
-                        </div>
-                        <div className="ha-detail-row">
-                          <Calendar size={14} />
-                          <span><strong>Date:</strong> {formatDate(item.date_visite)} à {item.heure_visite?.substring(0,5)}</span>
-                        </div>
-                        <div className="ha-detail-row">
-                          <Briefcase size={14} />
-                          <span><strong>Type:</strong> {item.type_visite}</span>
-                        </div>
-                        {item.motif_reprogrammation && (
-                          <div className="ha-detail-row">
-                            <FileText size={14} />
-                            <span><strong>Motif:</strong> {item.motif_reprogrammation}</span>
-                          </div>
-                        )}
-                        <div className="ha-detail-row meta">
-                          <Clock size={12} />
-                          <span>Statut: {item.statut}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          <div className="ha-section-title">
-            <History size={16} />
-            <span>Historique des visites effectuées</span>
-          </div>
-          <div className="ha-list">
-            {loadingHisto ? (
-              <div className="ha-loading">Chargement de l'historique...</div>
-            ) : filteredHistorique.length === 0 ? (
-              <div className="ha-empty">
-                <History size={48} strokeWidth={1} />
-                <p>Aucune visite trouvée pour cet agent</p>
-              </div>
-            ) : (
-              filteredHistorique.map((item, idx) => (
-                <div key={item.id || idx} className={`ha-item ${item.action_couleur || ''}`}>
-                  <div className="ha-item-header" onClick={() => toggleExpand(item.id)}>
-                    <div className="ha-item-left">
-                      <span className={`ha-action-badge ${item.action_couleur || 'default'}`}>
-                        {item.action_libelle || item.type_action}
-                      </span>
-                      <span className="ha-type-badge">{item.type_visite}</span>
-                      {item.resultat && (
-                        <span className="ha-resultat-badge" style={{ 
-                          background: item.resultat === 'Apte' ? '#10b981' : 
-                                     item.resultat === 'Inapte temporaire' ? '#f59e0b' : '#ef4444' 
-                        }}>
-                          {item.resultat}
-                        </span>
-                      )}
-                    </div>
-                    <div className="ha-item-right">
-                      <span className="ha-date">{formatDate(item.date_visite)}</span>
-                      <span className="ha-heure">{item.heure_visite}</span>
-                      <button className="ha-expand-btn">
-                        {expandedItems.has(item.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                      </button>
-                    </div>
-                  </div>
-                  
-                  {expandedItems.has(item.id) && (
-                    <div className="ha-item-details">
-                      <div className="ha-detail-row">
-                        <User size={14} />
-                        <span><strong>Médecin:</strong> {item.medecin || 'Non spécifié'}</span>
-                      </div>
-                      {item.observation && (
-                        <div className="ha-detail-row">
-                          <FileText size={14} />
-                          <span><strong>Observations:</strong> {item.observation}</span>
-                        </div>
-                      )}
-                      {item.motif_action && (
-                        <div className="ha-detail-row">
-                          <AlertCircle size={14} />
-                          <span><strong>Motif:</strong> {item.motif_action}</span>
-                        </div>
-                      )}
-                      
-                      {item.details?.prochaine_visite && (
-                        <div className="ha-detail-row highlight">
-                          <Calendar size={14} />
-                          <span><strong>Prochaine visite périodique:</strong> {formatDate(item.details.prochaine_visite)} ({item.details.periodicite_texte || '1 an'})</span>
-                        </div>
-                      )}
-                      {item.details?.date_prochaine_reprise && (
-                        <div className="ha-detail-row warning">
-                          <Calendar size={14} />
-                          <span><strong>Prochaine visite de reprise:</strong> {formatDate(item.details.date_prochaine_reprise)}</span>
-                        </div>
-                      )}
-                      {item.details?.date_visite_controle && (
-                        <div className="ha-detail-row info">
-                          <Calendar size={14} />
-                          <span><strong>Visite de contrôle:</strong> {formatDate(item.details.date_visite_controle)}</span>
-                        </div>
-                      )}
-                      {item.details?.duree_inaptitude && (
-                        <div className="ha-detail-row warning">
-                          <AlertCircle size={14} />
-                          <span><strong>Durée d'inaptitude:</strong> {item.details.duree_inaptitude} jours</span>
-                        </div>
-                      )}
-                      {item.details?.duree_supplementaire && (
-                        <div className="ha-detail-row warning">
-                          <AlertCircle size={14} />
-                          <span><strong>Prolongation:</strong> {item.details.duree_supplementaire} jours supplémentaires</span>
-                        </div>
-                      )}
-                      {item.details?.date_fin_inaptitude && (
-                        <div className="ha-detail-row warning">
-                          <Calendar size={14} />
-                          <span><strong>Fin d'inaptitude:</strong> {formatDate(item.details.date_fin_inaptitude)}</span>
-                        </div>
-                      )}
-                      
-                      <div className="ha-detail-row meta">
-                        <Clock size={12} />
-                        <span>Enregistré le: {new Date(item.date_creation).toLocaleString('fr-FR')}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="ha-footer">
-            <Button variant="ghost" size="sm" onClick={onClose}>Fermer</Button>
-          </div>
-        </div>
-
-        <style>{`
-          .ha-modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0,0,0,0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-          }
-          .ha-modal-content {
-            width: 950px;
-            max-width: 90vw;
-            max-height: 85vh;
-            background: white;
-            border-radius: 16px;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-          }
-          .ha-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 24px;
-            background: linear-gradient(135deg, #1e293b, #0f172a);
-            color: white;
-          }
-          .ha-header-left { display: flex; align-items: center; gap: 12px; }
-          .ha-header-left h2 { margin: 0; font-size: 18px; }
-          .ha-header-left p { margin: 4px 0 0; font-size: 12px; opacity: 0.8; }
-          .ha-close-btn { background: none; border: none; color: white; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 8px; }
-          .ha-close-btn:hover { background: rgba(255,255,255,0.1); }
-          .ha-stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding: 16px 24px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
-          .ha-stat-card { text-align: center; padding: 12px; background: white; border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-          .ha-stat-card.success { border-left: 3px solid #10b981; }
-          .ha-stat-card.warning { border-left: 3px solid #f59e0b; }
-          .ha-stat-card.danger { border-left: 3px solid #ef4444; }
-          .ha-stat-value { font-size: 24px; font-weight: bold; color: #1e293b; }
-          .ha-stat-label { font-size: 12px; color: #64748b; margin-top: 4px; }
-          .ha-filters { display: flex; gap: 12px; padding: 16px 24px; background: white; border-bottom: 1px solid #e2e8f0; }
-          .ha-filters select { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; background: white; cursor: pointer; }
-          .ha-reset-btn { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #f1f5f9; border: none; border-radius: 8px; cursor: pointer; font-size: 12px; }
-          .ha-section-title { display: flex; align-items: center; gap: 8px; padding: 12px 24px; background: #f1f5f9; font-weight: 600; color: #1e293b; border-bottom: 1px solid #e2e8f0; }
-          .ha-list { flex: 1; overflow-y: auto; padding: 16px 24px; background: #f8fafc; max-height: 400px; }
-          .ha-item { background: white; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
-          .ha-item.programme { border-left: 3px solid #3b82f6; }
-          .ha-item.success { border-left: 3px solid #10b981; }
-          .ha-item.warning { border-left: 3px solid #f59e0b; }
-          .ha-item.danger { border-left: 3px solid #ef4444; }
-          .ha-item-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; cursor: pointer; }
-          .ha-item-header:hover { background: #f8fafc; }
-          .ha-item-left { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-          .ha-action-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; }
-          .ha-action-badge.success { background: #d1fae5; color: #065f46; }
-          .ha-action-badge.warning { background: #fed7aa; color: #92400e; }
-          .ha-action-badge.danger { background: #fee2e2; color: #991b1b; }
-          .ha-action-badge.info { background: #dbeafe; color: #1e40af; }
-          .ha-action-badge.purple { background: #f3e8ff; color: #6b21a5; }
-          .ha-type-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; background: #f1f5f9; color: #475569; }
-          .ha-resultat-badge { padding: 4px 10px; border-radius: 20px; font-size: 11px; color: white; }
-          .ha-item-right { display: flex; align-items: center; gap: 12px; }
-          .ha-date, .ha-heure { font-size: 13px; color: #475569; }
-          .ha-expand-btn { background: none; border: none; cursor: pointer; padding: 4px; border-radius: 4px; }
-          .ha-expand-btn:hover { background: #e2e8f0; }
-          .ha-item-details { padding: 12px 16px; background: #f8fafc; border-top: 1px solid #e2e8f0; }
-          .ha-detail-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #334155; margin-bottom: 8px; }
-          .ha-detail-row.highlight { color: #d97706; }
-          .ha-detail-row.warning { color: #dc2626; }
-          .ha-detail-row.info { color: #2563eb; }
-          .ha-detail-row.meta { font-size: 11px; color: #94a3b8; margin-top: 8px; }
-          .ha-loading, .ha-empty { text-align: center; padding: 40px; color: #94a3b8; display: flex; flex-direction: column; align-items: center; gap: 12px; }
-          .ha-footer { padding: 12px 16px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; background: white; }
-        `}</style>
-      </div>
-    );
-  };
-
+  // ========== COMPOSANT VISIT CARD ==========
   const VisitCard = ({ visite }) => {
     const isExpanded = expandedCards.has(visite.id_planning);
     const agent = getAgentDetails(visite.matricule_agent);
@@ -1582,17 +1525,40 @@ const PlanningPage = () => {
               <span>Motif: {visite.motif_annulation}</span>
             </div>
           )}
+          {visite.info_suppression && (
+          <div className={cx('info-suppression')}>
+            <AlertCircle size={14} style={{ color: '#f59e0b' }} />
+            <span>{visite.info_suppression.message}</span>
+          </div>
+        )}
         </div>
         
         <div className={cx('visit-card-actions')}>
-          {!visite.visite_effectuee && visite.statut === 'Programmé' && !visite.creneau_bloque && (
-            <>
-              <Button variant="success" size="sm" icon={CheckCircle} onClick={() => handleEnregistrerVisite(visite)}>Effectuer</Button>
-              <Button variant="warning" size="sm" icon={Calendar} onClick={() => handleReprogrammerManuel(visite)}>Reprogrammer</Button>
-              <Button variant="info" size="sm" icon={Zap} onClick={() => handleReprogrammerAuto(visite)}>Auto</Button>
-              {visite.type_visite === 'Reprise' && <Button variant="danger" size="sm" icon={XCircle} onClick={() => handleAnnulerVisite(visite)}>Annuler</Button>}
-            </>
-          )}
+  {!visite.visite_effectuee && visite.statut === 'Programmé' && !visite.creneau_bloque && (
+    <>
+      <Button variant="success" size="sm" icon={CheckCircle} onClick={() => handleEnregistrerVisite(visite)}>Effectuer</Button>
+      <Button variant="warning" size="sm" icon={Calendar} onClick={() => handleReprogrammerManuel(visite)}>Reprogrammer</Button>
+      <Button variant="info" size="sm" icon={Zap} onClick={() => handleReprogrammerAuto(visite)}>Auto</Button>
+      
+      {/* ✅ MODIFIER ICI - Ajouter la condition */}
+      {typesAutorisesIndisponible.includes(visite.type_visite) && (
+        <Button 
+          variant="warning" 
+          size="sm" 
+          icon={AlertCircle} 
+          onClick={() => handleIndisponible(visite)}
+          title="Déclaration d'indisponibilité (uniquement si déclarée au moins 2 jours avant la visite)"
+        >
+          Indisponible
+        </Button>
+      )}
+      
+      {visite.type_visite === 'Reprise' && (
+        <Button variant="danger" size="sm" icon={XCircle} onClick={() => handleAnnulerVisite(visite)}>Annuler</Button>
+      )}
+    </>
+  )}
+
           
           {!visite.visite_effectuee && visite.statut === 'Programmé' && !visite.convocation_envoyee && !visite.creneau_bloque && 
            (visite.type_visite === 'Périodique' || visite.type_visite === 'Reprise') && (
@@ -1602,16 +1568,7 @@ const PlanningPage = () => {
             </>
           )}
           
-          {(visite.historique?.length > 0 || visite.a_des_actions === true) && (
-            <Button variant="ghost" size="sm" icon={History} onClick={() => {
-              if (!visite.historique) {
-                fetchVisiteDetails(visite.id_planning);
-              }
-              setShowHistorique(visite.id_planning);
-            }}>
-              Historique ({visite.historique?.length || 0})
-            </Button>
-          )}
+          
         </div>
         
         {visite.visite_effectuee && (
@@ -1623,9 +1580,10 @@ const PlanningPage = () => {
     );
   };
 
-  // ========== RENDU ==========
+  // ========== RENDU PRINCIPAL ==========
   return (
     <div className={cx('planning-page')}>
+      {/* NOTIFICATION */}
       {notification.show && (
         <div className={`${cx('notification-container')} ${notification.type}`}>
           <div className={cx('notification-content')}>
@@ -1644,6 +1602,7 @@ const PlanningPage = () => {
         </div>
       )}
 
+      {/* HEADER */}
       <div className={cx('planning-header')}>
         <div className={cx('header-left')}>
           <div className={cx('header-icon-wrapper')}>
@@ -1658,74 +1617,30 @@ const PlanningPage = () => {
           </div>
         </div>
         <div className={cx('header-right')}>
-          <div className={cx('week-navigation')}>
-            <button className={cx('week-nav-btn')} onClick={() => changerSemaine(-1)}>
-              <ChevronLeft size={18} />
-            </button>
-            <div className={cx('week-display')}>
-              <span className={cx('week-label')}>Semaine</span>
-              <span className={cx('week-number')}>{semaineCourante.numero}</span>
-            </div>
-            <button className={cx('week-nav-btn')} onClick={() => changerSemaine(1)}>
-              <ChevronRight size={18} />
-            </button>
-          </div>
-          <div className={cx('search-bar')}>
-            <Search size={16} />
-            <input 
-              type="text" 
-              placeholder="Rechercher un agent..." 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
-            />
-            {searchTerm && <button onClick={() => setSearchTerm('')}><X size={14} /></button>}
-          </div>
-          
-          <select 
-            className={cx('agent-history-select')}
-            value={selectedAgentForHistory} 
-            onChange={(e) => {
-              const agent = agents.find(a => a.matricule_agent === e.target.value);
-              setSelectedAgentForHistory(e.target.value);
-              setSelectedAgentNameForHistory(agent ? `${agent.nom} ${agent.prenom}` : '');
-            }}
-            style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', background: 'white' }}
-          >
-            <option value="">Sélectionner un agent</option>
-            {agents.map(a => (
-              <option key={a.matricule_agent} value={a.matricule_agent}>
-                {a.nom} {a.prenom} (#{a.matricule_agent})
-              </option>
-            ))}
-          </select>
-          
-          <Button 
-            variant="info" 
-            icon={History} 
-            onClick={handleOpenAgentHistory}
-            style={{ 
-              background: '#0f5b63',
-              backgroundImage: 'linear-gradient(135deg, #0f5b63 0%, #0a4a50 100%)',
-              color: 'white',
-              border: 'none',
-              boxShadow: '0 2px 8px rgba(15, 91, 99, 0.3)'
-            }}
-          >
-            Historique agent
-          </Button>
-          
-          <Button variant={showFilters ? 'primary' : 'outline'} icon={Filter} onClick={() => setShowFilters(!showFilters)}>Filtres</Button>
-          {stats.convocationsRestantes > 0 && (
-            <Button variant="success" icon={Mail} onClick={handleEnvoyerToutesConvocations}>
-              Envoyer {stats.convocationsRestantes} convoc.
-            </Button>
-          )}
-          <Button variant="primary" icon={RefreshCw} loading={generationLoading} onClick={handleGenererPlanning}>
-            Générer semaine suivante
-          </Button>
-        </div>
+  <div className={cx('week-navigation')}>
+    <button className={cx('week-nav-btn')} onClick={() => changerSemaine(-1)}><ChevronLeft size={18} /></button>
+    <div className={cx('week-display')}>
+      <span className={cx('week-label')}>Semaine</span>
+      <span className={cx('week-number')}>{semaineCourante.numero}</span>
+    </div>
+    <button className={cx('week-nav-btn')} onClick={() => changerSemaine(1)}><ChevronRight size={18} /></button>
+  </div>
+  
+  <div className={cx('search-bar')}>
+    <Search size={16} />
+    <input type="text" placeholder="Rechercher un agent..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+    {searchTerm && <button onClick={() => setSearchTerm('')}><X size={14} /></button>}
+  </div>
+  
+  <Button variant={showFilters ? 'primary' : 'outline'} icon={Filter} onClick={() => setShowFilters(!showFilters)}>Filtres</Button>
+  {stats.convocationsRestantes > 0 && (
+    <Button variant="success" icon={Mail} onClick={handleEnvoyerToutesConvocations}>Envoyer {stats.convocationsRestantes} convoc.</Button>
+  )}
+  <Button variant="primary" icon={RefreshCw} loading={generationLoading} onClick={handleGenererPlanning}>Générer semaine suivante</Button>
+</div>
       </div>
 
+      {/* FILTRES */}
       {showFilters && (
         <div className={cx('filters-panel')}>
           <div className={cx('filters-header')}>
@@ -1735,28 +1650,37 @@ const PlanningPage = () => {
             </button>
           </div>
           <div className={cx('filters-body')}>
-            <select value={selectedAgentFilter} onChange={(e) => setSelectedAgentFilter(e.target.value)}>
-              <option value="">Tous les agents</option>
-              {agents.map(a => <option key={a.matricule_agent} value={a.matricule_agent}>{a.nom} {a.prenom} (#{a.matricule_agent})</option>)}
-            </select>
-            <select value={selectedTypeFilter} onChange={(e) => setSelectedTypeFilter(e.target.value)}>
-              <option value="">Tous les types</option>
-              <option value="Périodique">Périodique</option>
-              <option value="Reprise">Reprise</option>
-              <option value="Reclassement">Reclassement</option>
-              <option value="Embauche">Embauche</option>
-            </select>
-            <select value={selectedStatusFilter} onChange={(e) => setSelectedStatusFilter(e.target.value)}>
-              <option value="">Tous les statuts</option>
-              <option value="programme">Programmé</option>
-              <option value="effectue">Effectué</option>
-              <option value="reporte">Reporté</option>
-              <option value="annule">Annulé</option>
-            </select>
-          </div>
+  <div className={cx('filter-agent')}>
+  <label>Agent</label>
+  <div style={{ position: 'relative' }}>
+    <AgentSearchInput
+      value={selectedAgentFilter}
+      onChange={(matricule) => setSelectedAgentFilter(matricule)}
+      onSelect={(agent) => setSelectedAgentFilter(agent?.matricule_agent || '')}
+      placeholder="Rechercher un agent..."
+    />
+  </div>
+</div>
+
+  <select value={selectedTypeFilter} onChange={(e) => setSelectedTypeFilter(e.target.value)}>
+    <option value="">Tous les types</option>
+    <option value="Périodique">Périodique</option>
+    <option value="Reprise">Reprise</option>
+    <option value="Reclassement">Reclassement</option>
+    <option value="Embauche">Embauche</option>
+  </select>
+  <select value={selectedStatusFilter} onChange={(e) => setSelectedStatusFilter(e.target.value)}>
+    <option value="">Tous les statuts</option>
+    <option value="programme">Programmé</option>
+    <option value="effectue">Effectué</option>
+    <option value="reporte">Reporté</option>
+    <option value="annule">Annulé</option>
+  </select>
+</div>
         </div>
       )}
 
+      {/* STATS */}
       <div className={cx('stats-grid')}>
         <StatCard title="Total visites" value={stats.total} icon={Calendar} variant="primary" />
         <StatCard title="Programmées" value={stats.programme} icon={Clock} variant="warning" />
@@ -1766,6 +1690,7 @@ const PlanningPage = () => {
         <StatCard title="Convocations" value={stats.convocationsEnvoyees} icon={Mail} variant="info" />
       </div>
 
+      {/* LÉGENDE */}
       <div className={cx('legend-bar')}>
         <div className={cx('legend-item')}><span className={`${cx('legend-dot')} programme`}></span><span>Programmé</span></div>
         <div className={cx('legend-item')}><span className={`${cx('legend-dot')} effectue`}></span><span>Effectué</span></div>
@@ -1780,6 +1705,7 @@ const PlanningPage = () => {
         <div className={cx('legend-item')}><Badge variant="info" size="sm">Contrôle auto</Badge><span>Contrôle auto</span></div>
       </div>
 
+      {/* PLANNING GRID */}
       {loading ? (
         <div className={cx('loading-state')}>
           <div className={cx('spinner')}></div>
@@ -1811,21 +1737,34 @@ const PlanningPage = () => {
               {datesSemaine.map((dateStr, dIdx) => {
                 const visite = filteredPlanning.find(v => v.date_visite === dateStr && v.heure_visite === creneau);
                 const bloque = planning.find(v => v.date_visite === dateStr && v.heure_visite === creneau && v.creneau_bloque);
+                const vide = planning.find(v => v.date_visite === dateStr && v.heure_visite === creneau && v.matricule_agent === 0);
+                
                 return (
                   <div key={dIdx} className={cx('planning-cell')}>
-                    {visite ? (
+                    {visite && visite.matricule_agent !== 0 ? (
                       <VisitCard visite={visite} />
                     ) : bloque ? (
-                      <div className={cx('blocked-slot')}>
-                        <Lock size={20} />
-                        <span>Créneau bloqué</span>
-                      </div>
-                    ) : (
-                      <div className={cx('empty-slot')}>
-                        <Clock size={20} />
-                        <span>Disponible</span>
-                      </div>
-                    )}
+                      <div className={cx('blocked-slot')}><Lock size={20} /><span>Bloqué</span></div>
+                    ) : vide ? (
+  <div className={cx('empty-slot', 'libre')}>
+    <Clock size={20} />
+    <span>Libéré</span>
+    <Button 
+      variant="success" 
+      size="sm" 
+      icon={UserPlus} 
+      onClick={() => handleReaffecterCreneau(dateStr, creneau, vide.id_planning)} 
+      style={{ marginTop: 8 }}
+    >
+      Réaffecter
+    </Button>
+  </div>
+) : (
+  <div className={cx('empty-slot')}>
+    <Clock size={20} />
+    <span>Disponible</span>
+  </div>
+)}
                   </div>
                 );
               })}
@@ -1834,7 +1773,7 @@ const PlanningPage = () => {
         </div>
       )}
 
-      {/* MODALES */}
+      {/* MODALES - À conserver telles quelles */}
       {showGenererPlanningModal && (
         <div className={cx('modal-overlay')} onClick={() => setShowGenererPlanningModal(false)}>
           <div className={`${cx('modal-content')} small`} onClick={e => e.stopPropagation()}>
@@ -1863,48 +1802,110 @@ const PlanningPage = () => {
       )}
 
       {showReprogramModal && planningToReprogram && (
-        <div className={cx('modal-overlay')} onClick={() => setShowReprogramModal(false)}>
-          <div className={cx('modal-content')} onClick={e => e.stopPropagation()}>
-            <div className={`${cx('modal-header')} warning`}>
-              <Calendar size={24} />
-              <h2>Reprogrammer la visite</h2>
-              <button className={cx('modal-close')} onClick={() => setShowReprogramModal(false)}><X size={18} /></button>
-            </div>
-            <div className={cx('modal-body')}>
-              <div className={cx('current-visite-info')}>
-                <p><strong>Agent:</strong> {getAgentNom(planningToReprogram.matricule_agent)}</p>
-                <p><strong>Type:</strong> {planningToReprogram.type_visite}</p>
-                <p><strong>Actuelle:</strong> {formatDate(planningToReprogram.date_visite)} à {planningToReprogram.heure_visite?.substring(0,5)}</p>
-                <div className={cx('warning-box')}>
-                  <AlertCircle size={14} /> Le créneau actuel sera BLOQUÉ
-                </div>
-              </div>
-              <div className={cx('form-group')}>
-                <label>Nouvelle date *</label>
-                <input type="date" value={nouvelleDate} onChange={(e) => setNouvelleDate(e.target.value)} min={new Date().toISOString().split('T')[0]} />
-              </div>
-              <div className={cx('form-group')}>
-                <label>Nouvelle heure *</label>
-                <select value={nouvelleHeure} onChange={(e) => setNouvelleHeure(e.target.value)}>
-                  <option value="">Sélectionner</option>
-                  <option value="08:00:00">08:00</option>
-                  <option value="08:30:00">08:30</option>
-                  <option value="09:00:00">09:00</option>
-                  <option value="09:30:00">09:30</option>
-                </select>
-              </div>
-              <div className={cx('form-group')}>
-                <label>Motif *</label>
-                <textarea rows="3" value={reprogramMotif} onChange={(e) => setReprogramMotif(e.target.value)} placeholder="Congé maladie, absence..." />
-              </div>
-            </div>
-            <div className={cx('modal-footer')}>
-              <Button variant="secondary" onClick={() => setShowReprogramModal(false)}>Annuler</Button>
-              <Button variant="primary" icon={Calendar} loading={reprogramLoading} onClick={confirmerReprogrammation}>Confirmer</Button>
-            </div>
-          </div>
+  <div className={cx('modal-overlay')} onClick={() => setShowReprogramModal(false)}>
+    <div className={cx('modal-content')} onClick={e => e.stopPropagation()}>
+      <div className={`${cx('modal-header')} warning`}>
+        <Calendar size={24} />
+        <h2>Reprogrammer la visite</h2>
+        <button className={cx('modal-close')} onClick={() => setShowReprogramModal(false)}><X size={18} /></button>
+      </div>
+      <div className={cx('modal-body')}>
+        <div className={cx('current-visite-info')}>
+          <p><strong>Agent:</strong> {getAgentNom(planningToReprogram.matricule_agent)}</p>
+          <p><strong>Type:</strong> {planningToReprogram.type_visite}</p>
+          <p><strong>Actuelle:</strong> {formatDate(planningToReprogram.date_visite)} à {planningToReprogram.heure_visite?.substring(0,5)}</p>
         </div>
-      )}
+        
+        <div className={cx('form-group', 'full-width')}>
+          <label><Calendar size={14} /> Nouvelle date *</label>
+          <div className={cx('mois-navigation')}>
+            <button type="button" onClick={() => {
+              let newMois = moisActuelReprog - 1;
+              let newAnnee = anneeActuelleReprog;
+              if (newMois < 0) { newMois = 11; newAnnee--; }
+              setMoisActuelReprog(newMois);
+              setAnneeActuelleReprog(newAnnee);
+              chargerJoursDisponiblesReprog(newMois, newAnnee, planningToReprogram.matricule_agent);
+            }}>◀</button>
+            <span>{new Date(anneeActuelleReprog, moisActuelReprog).toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+            <button type="button" onClick={() => {
+              let newMois = moisActuelReprog + 1;
+              let newAnnee = anneeActuelleReprog;
+              if (newMois > 11) { newMois = 0; newAnnee++; }
+              setMoisActuelReprog(newMois);
+              setAnneeActuelleReprog(newAnnee);
+              chargerJoursDisponiblesReprog(newMois, newAnnee, planningToReprogram.matricule_agent);
+            }}>▶</button>
+          </div>
+          
+          {loadingReprogJours ? (
+            <div className={cx('loading-creneaux')}>Chargement des jours disponibles...</div>
+          ) : (
+            <div className={cx('calendrier-jours')}>
+              {joursDisponiblesReprog.map(jour => {
+                const [year, month, day] = jour.date.split('-');
+                const jourNum = parseInt(day);
+                const dateObj = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+                const jourSemaine = dateObj.getUTCDay();
+                const joursSemaine = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+                if (jourSemaine === 0 || jourSemaine === 1 || jourSemaine === 6) return null;
+                return (
+                  <button
+                    key={jour.date}
+                    type="button"
+                    className={`${cx('jour-cell')} ${nouvelleDate === jour.date ? 'selected' : ''}`}
+                    onClick={() => {
+                      setNouvelleDate(jour.date);
+                      setNouvelleHeure('');
+                      chargerCreneauxDisponiblesReprog(jour.date, planningToReprogram.matricule_agent, planningToReprogram.id_planning);
+                    }}
+                  >
+                    <span className={cx('jour-num')}>{jourNum}</span>
+                    <span className={cx('jour-semaine')}>{joursSemaine[jourSemaine]}</span>
+                    <span className={cx('creneaux-count')}>{jour.creneauxDisponibles} créneau(x)</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        
+        {nouvelleDate && (
+          <div className={cx('form-group')}>
+            <label><Clock size={14} /> Nouvelle heure *</label>
+            {loadingReprogCreneaux ? (
+              <div className={cx('loading-creneaux')}>Chargement des créneaux...</div>
+            ) : (
+              <div className={cx('creneaux-grid')}>
+                {creneauxDisponiblesReprog.map(creneau => (
+                  <button
+                    key={creneau.heure}
+                    type="button"
+                    className={`${cx('creneau-cell')} ${creneau.disponible ? 'disponible' : 'indisponible'} ${nouvelleHeure === creneau.heure ? 'selected' : ''}`}
+                    onClick={() => creneau.disponible && setNouvelleHeure(creneau.heure)}
+                    disabled={!creneau.disponible}
+                    title={creneau.message}
+                  >
+                    {creneau.heure_affichage}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        
+        <div className={cx('form-group')}>
+          <label>Motif de reprogrammation *</label>
+          <textarea rows="3" value={reprogramMotif} onChange={(e) => setReprogramMotif(e.target.value)} placeholder="Congé maladie, absence, formation, etc." />
+        </div>
+      </div>
+      <div className={cx('modal-footer')}>
+        <Button variant="secondary" onClick={() => setShowReprogramModal(false)}>Annuler</Button>
+        <Button variant="primary" icon={Calendar} loading={reprogramLoading} onClick={confirmerReprogrammation}>Confirmer</Button>
+      </div>
+    </div>
+  </div>
+)}
 
       {showAutoReprogramModal && autoReprogramItem && (
         <div className={cx('modal-overlay')} onClick={() => setShowAutoReprogramModal(false)}>
@@ -2079,20 +2080,14 @@ const PlanningPage = () => {
         </div>
       )}
 
-      {showHistorique && (
-        <div className={cx('modal-overlay')} onClick={() => setShowHistorique(null)}>
-          <div className={`${cx('modal-content')} small`} onClick={e => e.stopPropagation()}>
-            <HistoriquePopup visite={planning.find(p => p.id_planning === showHistorique)} onClose={() => setShowHistorique(null)} />
-          </div>
-        </div>
-      )}
-
-      {showAgentHistoryModal && selectedAgentForHistory && (
-        <AgentHistoryModal 
-          matricule={selectedAgentForHistory} 
-          onClose={() => setShowAgentHistoryModal(false)} 
-        />
-      )}
+      {/* MODALE HISTORIQUE POUR UNE CARTE (visite spécifique) */}
+{showHistorique && (
+  <div className={cx('modal-overlay')} onClick={() => setShowHistorique(null)}>
+    <div className={`${cx('modal-content')} small`} onClick={e => e.stopPropagation()}>
+      <HistoriquePopup visite={planning.find(p => p.id_planning === showHistorique)} onClose={() => setShowHistorique(null)} />
+    </div>
+  </div>
+)}    
 
       {showConvocationPreview && convocationToPreview && (
         <div className={cx('modal-overlay')} onClick={() => setShowConvocationPreview(false)}>
@@ -2129,6 +2124,256 @@ const PlanningPage = () => {
           </div>
         </div>
       )}
+
+      {/* MODALE INDISPONIBILITÉ */}
+      {showIndisponibleModal && planningIndisponible && (
+  <div className={cx('modal-overlay')} onClick={() => setShowIndisponibleModal(false)}>
+    <div className={`${cx('modal-content')} indisponible-modal`} onClick={e => e.stopPropagation()}>
+      <div className={`${cx('modal-header')} warning`}>
+        <AlertCircle size={24} />
+        <h2>Déclaration d'indisponibilité</h2>
+        <button className={cx('modal-close')} onClick={() => setShowIndisponibleModal(false)}><X size={18} /></button>
+      </div>
+      
+      <div className={cx('modal-body')}>
+        <div className={cx('current-visite-info')}>
+          <p><strong>👤 Agent:</strong> {getAgentNom(planningIndisponible.matricule_agent)}</p>
+          <p><strong>📅 Date actuelle:</strong> {formatDate(planningIndisponible.date_visite)} à {planningIndisponible.heure_visite?.substring(0,5)}</p>
+          <p><strong>📋 Type:</strong> {planningIndisponible.type_visite}</p>
+        </div>
+        
+        <div className={cx('info-message', 'warning')}>
+          <AlertCircle size={16} />
+          <span>⚠️ Le créneau actuel sera <strong>libéré</strong> et proposé à d'autres agents.</span>
+        </div>
+        
+        <div className={cx('form-group')}>
+          <label>Mode de traitement</label>
+          <div className={cx('mode-selector')}>
+            <button 
+              type="button"
+              className={`${cx('mode-btn')} ${indisponibleMode === 'manuel' ? 'active' : ''}`}
+              onClick={() => setIndisponibleMode('manuel')}
+            >
+               Choisir une nouvelle date
+            </button>
+            <button 
+              type="button"
+              className={`${cx('mode-btn')} ${indisponibleMode === 'auto' ? 'active' : ''}`}
+              onClick={() => setIndisponibleMode('auto')}
+            >
+               Reprogrammation automatique
+            </button>
+          </div>
+        </div>
+        
+        {indisponibleMode === 'manuel' ? (
+          <>
+            <div className={cx('form-group', 'full-width')}>
+              <label><Calendar size={14} /> Nouvelle date</label>
+              <div className={cx('mois-navigation')}>
+                <button type="button" onClick={() => {
+                  let newMois = moisActuelReprog - 1;
+                  let newAnnee = anneeActuelleReprog;
+                  if (newMois < 0) { newMois = 11; newAnnee--; }
+                  setMoisActuelReprog(newMois);
+                  setAnneeActuelleReprog(newAnnee);
+                  chargerJoursDisponiblesReprog(newMois, newAnnee, planningIndisponible.matricule_agent);
+                }}>◀</button>
+                <span>{new Date(anneeActuelleReprog, moisActuelReprog).toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+                <button type="button" onClick={() => {
+                  let newMois = moisActuelReprog + 1;
+                  let newAnnee = anneeActuelleReprog;
+                  if (newMois > 11) { newMois = 0; newAnnee++; }
+                  setMoisActuelReprog(newMois);
+                  setAnneeActuelleReprog(newAnnee);
+                  chargerJoursDisponiblesReprog(newMois, newAnnee, planningIndisponible.matricule_agent);
+                }}>▶</button>
+              </div>
+              
+              {loadingReprogJours ? (
+                <div className={cx('loading-creneaux')}>Chargement...</div>
+              ) : (
+                <div className={cx('calendrier-jours')}>
+                  {joursDisponiblesReprog.map(jour => {
+                    const [year, month, day] = jour.date.split('-');
+                    const jourNum = parseInt(day);
+                    const dateObj = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+                    const jourSemaine = dateObj.getUTCDay();
+                    const joursSemaine = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+                    if (jourSemaine === 0 || jourSemaine === 1 || jourSemaine === 6) return null;
+                    return (
+                      <button
+                        key={jour.date}
+                        type="button"
+                        className={`${cx('jour-cell')} ${nouvelleDate === jour.date ? 'selected' : ''}`}
+                        onClick={() => {
+                          setNouvelleDate(jour.date);
+                          setNouvelleHeure('');
+                          chargerCreneauxDisponiblesReprog(jour.date, planningIndisponible.matricule_agent, planningIndisponible.id_planning);
+                        }}
+                      >
+                        <span className={cx('jour-num')}>{jourNum}</span>
+                        <span className={cx('jour-semaine')}>{joursSemaine[jourSemaine]}</span>
+                        <span className={cx('creneaux-count')}>{jour.creneauxDisponibles} créneau(x)</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            
+            {nouvelleDate && (
+              <div className={cx('form-group')}>
+                <label><Clock size={14} /> Nouvelle heure</label>
+                {loadingReprogCreneaux ? (
+                  <div className={cx('loading-creneaux')}>Chargement...</div>
+                ) : (
+                  <div className={cx('creneaux-grid')}>
+                    {creneauxDisponiblesReprog.map(creneau => (
+                      <button
+                        key={creneau.heure}
+                        type="button"
+                        className={`${cx('creneau-cell')} ${creneau.disponible ? 'disponible' : 'indisponible'} ${nouvelleHeure === creneau.heure ? 'selected' : ''}`}
+                        onClick={() => creneau.disponible && setNouvelleHeure(creneau.heure)}
+                        disabled={!creneau.disponible}
+                      >
+                        {creneau.heure_affichage}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className={cx('info-message', 'info')}>
+            <Zap size={16} />
+            <div>
+              <strong>Mode automatique</strong>
+              <p>Le système va :</p>
+              <ul>
+                <li>Libérer le créneau actuel</li>
+                <li>Chercher le prochain créneau disponible</li>
+                <li>Reprogrammer l'agent automatiquement</li>
+              </ul>
+            </div>
+          </div>
+        )}
+        
+        <div className={cx('form-group')}>
+          <label>Motif de l'indisponibilité</label>
+          <textarea rows={3} value={reprogramMotif} onChange={(e) => setReprogramMotif(e.target.value)} placeholder="Ex: Congé maladie, Formation, Mission, etc." />
+        </div>
+      </div>
+      
+      <div className={cx('modal-footer')}>
+        <Button variant="secondary" onClick={() => setShowIndisponibleModal(false)}>Annuler</Button>
+        <Button variant="warning" icon={indisponibleMode === 'auto' ? Zap : Calendar} loading={indisponibleLoading} onClick={confirmerIndisponible}>
+          {indisponibleMode === 'auto' ? 'Reprogrammer automatiquement' : 'Confirmer'}
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
+
+{showReaffectModal && reaffectCreneau && (
+  <div className={cx('modal-overlay')} onClick={() => setShowReaffectModal(false)}>
+    <div className={`${cx('modal-content')} reaffect-modal`} onClick={e => e.stopPropagation()}>
+      <div className={`${cx('modal-header')} success`}>
+        <UserPlus size={24} />
+        <h2>Réaffectation du créneau</h2>
+        <button className={cx('modal-close')} onClick={() => setShowReaffectModal(false)}>
+          <X size={18} />
+        </button>
+      </div>
+      
+      <div className={cx('modal-body')}>
+        <div className={cx('creneau-info')}>
+          <p><strong>📅 Date:</strong> {formatDate(reaffectCreneau.date)}</p>
+          <p><strong>⏰ Heure:</strong> {reaffectCreneau.heure.substring(0,5)}</p>
+        </div>
+        
+        <div className={cx('info-message', 'info')}>
+          <Info size={16} />
+          <span>Sélectionnez un agent parmi la liste des prioritaires</span>
+        </div>
+        
+        {loadingAgents ? (
+          <div className={cx('loading-state')}>
+            <div className={cx('spinner')}></div>
+            <p>Chargement des agents prioritaires...</p>
+          </div>
+        ) : agentsPrioritaires.length === 0 ? (
+          <div className={cx('empty-state')}>
+            <p>❌ Aucun agent prioritaire trouvé</p>
+            <button className={cx('btn-secondary')} onClick={() => chargerAgentsPrioritaires()}>
+              <RefreshCw size={14} /> Recharger
+            </button>
+          </div>
+        ) : (
+          <div className={cx('agents-list')}>
+            <h4>Agents prioritaires ({agentsPrioritaires.length})</h4>
+            {agentsPrioritaires.map((agent, idx) => (
+              <div 
+                key={agent.matricule}
+                className={`${cx('agent-item')} ${selectedAgentReaffect?.matricule === agent.matricule ? 'selected' : ''}`}
+                onClick={() => setSelectedAgentReaffect(agent)}
+              >
+                <div className={cx('agent-avatar')}>
+                  {agent.nom?.charAt(0)}{agent.prenom?.charAt(0)}
+                </div>
+                <div className={cx('agent-info')}>
+                  <div className={cx('agent-name')}>{agent.nom} {agent.prenom}</div>
+                  <div className={cx('agent-details')}>
+                    <Badge variant={agent.poste === 'Chauffeur' ? 'purple' : 'primary'} size="sm">
+                      {agent.poste}
+                    </Badge>
+                    <span>Agence {agent.agence}</span>
+                    <span>Dernière visite: {agent.derniere_visite}</span>
+                    <span>Périodicité: {agent.periodicite}</span>
+                  </div>
+                  <div className={cx('agent-priorite')}>
+                    <span className={`priority-${agent.priorite >= 500 ? 'high' : agent.priorite >= 200 ? 'medium' : 'low'}`}>
+                      {agent.raisons?.join(' • ')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div className={cx('form-group')}>
+          <label>Motif de la réaffectation (optionnel)</label>
+          <textarea 
+            rows={2} 
+            value={reaffectMotif} 
+            onChange={(e) => setReaffectMotif(e.target.value)}
+            placeholder="Ex: Réaffectation suite à indisponibilité"
+          />
+        </div>
+      </div>
+      
+      <div className={cx('modal-footer')}>
+        <Button variant="secondary" onClick={() => setShowReaffectModal(false)}>Annuler</Button>
+        <Button 
+          variant="success" 
+          icon={UserPlus} 
+          loading={reaffectLoading}
+          disabled={!selectedAgentReaffect || reaffectLoading}
+          onClick={() => {
+            if (selectedAgentReaffect) {
+              confirmerReaffectationAvecAgent(selectedAgentReaffect);
+            }
+          }}
+        >
+          Réaffecter à {selectedAgentReaffect?.nom || 'cet agent'}
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

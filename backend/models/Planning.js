@@ -109,6 +109,23 @@ module.exports = (sequelize) => {
       defaultValue: false,
       field: 'convocation_envoyee'
     },
+
+    date_convocation: {
+  type: DataTypes.DATE,
+  allowNull: true,
+  field: 'date_convocation'
+},
+convocation_envoyee_par: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+  field: 'convocation_envoyee_par'
+},
+convocation_envoyee_nom: {
+  type: DataTypes.STRING(100),
+  allowNull: true,
+  field: 'convocation_envoyee_nom'
+},
+
     motif_annulation: {
       type: DataTypes.STRING(255),
       allowNull: true,
@@ -118,7 +135,17 @@ module.exports = (sequelize) => {
       type: DataTypes.ENUM('auto', 'manuel'),
       defaultValue: 'auto',
       field: 'source_planification'
-    }
+    },
+    accident_lie_id: {
+  type: DataTypes.INTEGER,
+  allowNull: true,
+  field: 'accident_lie_id'
+},
+source_originale: {
+  type: DataTypes.ENUM('auto', 'manuel'),
+  defaultValue: 'auto',
+  field: 'source_originale'
+}
   }, {
     tableName: 'planning',
     timestamps: false

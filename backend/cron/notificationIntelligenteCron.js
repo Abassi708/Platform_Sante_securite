@@ -1,49 +1,19 @@
 // backend/cron/notificationIntelligenteCron.js
 const cron = require('node-cron');
-const notificationService = require('../services/notificationIntelligenteService');
+const notificationIntelligenteService = require('../services/notificationIntelligenteService');
 
-// CRON PRINCIPAL : 7h, 12h, 18h
-cron.schedule('0 7,12,18 * * *', async () => {
-  console.log('\n⏰ ===== CRON NOTIFICATIONS INTELLIGENTES =====');
-  console.log(`📅 ${new Date().toLocaleString('fr-FR')}`);
-
+// Exécution tous les jours à 8h00, 12h00 et 16h00
+cron.schedule('0 8,12,16 * * *', async () => {
+  console.log('\n' + '='.repeat(70));
+  console.log(`🕐 [CRON] Exécution du système d'alertes intelligentes - ${new Date().toLocaleString()}`);
+  console.log('='.repeat(70));
+  
   try {
-    const nb = await notificationService.envoyerNotifications();
-    console.log(`✅ ${nb} notification(s) créée(s)`);
+    const nbEnvoyees = await notificationIntelligenteService.envoyerNotifications();
+    console.log(`✅ [CRON] ${nbEnvoyees} notifications envoyées`);
   } catch (error) {
-    console.error('❌ Erreur cron notifications intelligentes:', error);
+    console.error('❌ [CRON] Erreur:', error);
   }
 });
 
-// CRON CONVOCATIONS : 9h, Lundi–Vendredi
-cron.schedule('0 9 * * 1-5', async () => {
-  console.log('\n📧 [CRON] Vérification convocations...');
-
-  try {
-    const situations = await notificationService.detecterConvocationsAVenir();
-    if (situations.length > 0) {
-      const users = await notificationService.getUsersCibles(['social']);
-      for (const situation of situations) {
-        for (const user of users) {
-          await notificationService.creerNotification({
-            id_utilisateur: user.id,
-            type: 'IMPORTANT',
-            titre: situation.titre,
-            message: situation.message,
-            action_suggested: situation.action_suggested,
-            priorite: situation.priorite,
-            source: situation.type,
-            email_utilisateur: user.email,
-            role_utilisateur: user.role,
-            details: situation.details
-          });
-        }
-      }
-      console.log(`✅ ${situations.length} notification(s) convocation créée(s)`);
-    }
-  } catch (error) {
-    console.error('❌ Erreur cron convocations:', error);
-  }
-});
-
-console.log('⏰ Cron notifications intelligentes chargé (7h/12h/18h + 9h Lun-Ven)');
+console.log('✅ Cron notification intelligente planifié (tous les jours à 8h, 12h, 16h)');

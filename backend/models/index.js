@@ -32,7 +32,7 @@ globalModels.forEach(modelName => {
 // ✅ AJOUTER 'ActivityLog' DANS LA LISTE
 const localModels = ['Accident', 'Planning', 'Visite', 'User', 'Historique', 
                      'Notification', 'NotificationIntelligente', 'CodeOTP', 
-                     'ChatHistory', 'ActivityLog'];  // ← ActivityLog ajouté
+                     'ChatHistory', 'ActivityLog','ConvocationLog'];  // ← ActivityLog ajouté
 
 localModels.forEach(modelName => {
   try {

@@ -1,6 +1,7 @@
 // backend/services/notificationIntelligenteService.js
 const { Op } = require('sequelize');
 const db = require('../models');
+const { sequelizeLocal, sequelizeGlobal } = require('../config/database');
 
 // Récupération des modèles
 const Agent = db.global.Agent;
@@ -16,23 +17,7 @@ class NotificationIntelligenteService {
   //  UTILITAIRES
   // ============================================================
 
-  _joursRestants(dateCible) {
-    const aujourdhui = new Date();
-    aujourdhui.setHours(0, 0, 0, 0);
-    const cible = new Date(dateCible);
-    cible.setHours(0, 0, 0, 0);
-    return Math.round((cible - aujourdhui) / (1000 * 60 * 60 * 24));
-  }
-
-  calculerPeriodicite(agent) {
-    if (agent.periodicite_jours && agent.periodicite_jours > 0) {
-      return agent.periodicite_jours;
-    }
-    const estChauffeur = agent.code_affectation === 3;
-    return estChauffeur ? 180 : 365;
-  }
-
-  async getUsersCibles(roles = ['social', 'admin']) {
+  async getUsersCibles(roles = ['social']) {
     try {
       const users = await User.findAll({
         where: { Role: { [Op.in]: roles } },
@@ -41,7 +26,7 @@ class NotificationIntelligenteService {
       return users.map(user => ({
         id: user.id_utilisateur,
         email: user.Login,
-        role: user.Role
+        role: user.Role,
       }));
     } catch (error) {
       console.error('❌ Erreur getUsersCibles:', error);
@@ -59,22 +44,9 @@ class NotificationIntelligenteService {
     return map[niveau] || 'INFO';
   }
 
-  // ============================================================
-  //  CRÉATION DE NOTIFICATIONS
-  // ============================================================
-
   async creerNotification(data) {
     try {
-      if (!data.id_utilisateur) {
-        console.error('❌ Notification sans id_utilisateur');
-        return null;
-      }
-      if (!data.email_utilisateur) {
-        console.error('❌ Notification sans email_utilisateur');
-        return null;
-      }
-      if (!data.role_utilisateur) {
-        console.error('❌ Notification sans role_utilisateur');
+      if (!data.id_utilisateur || !data.email_utilisateur || !data.role_utilisateur) {
         return null;
       }
 
@@ -93,7 +65,7 @@ class NotificationIntelligenteService {
         created_at: new Date()
       });
 
-      console.log(`🔔 Notification créée [${data.type}] pour ${data.email_utilisateur}: ${data.titre}`);
+      console.log(`🔔 Notification créée: ${data.titre}`);
       return notification;
 
     } catch (error) {
@@ -102,355 +74,331 @@ class NotificationIntelligenteService {
     }
   }
 
-  async creerNotificationsMultiples(donneesUtilisateurs, notificationBase) {
-    const promises = donneesUtilisateurs.map(async (userData) => {
-      const email = userData.email || userData.Login;
-      const role = userData.role || userData.Role;
-      const userId = userData.id || userData.id_utilisateur;
-
-      if (!userId || !email || !role) {
-        console.log('⚠️ Utilisateur sans données:', userData);
-        return null;
-      }
-
-      return this.creerNotification({
-        ...notificationBase,
-        id_utilisateur: userId,
-        email_utilisateur: email,
-        role_utilisateur: role,
-        details: userData.details || notificationBase.details
-      });
-    });
-
-    const results = await Promise.all(promises);
-    return results.filter(r => r !== null);
-  }
-
   // ============================================================
-  //  DÉTECTION DES SITUATIONS
+  //  ALERTE 1: VISITES PASSÉES SANS ACTION
   // ============================================================
-
-  // 1. Détection des visites périodiques bientôt dues ou en retard
-  async detecterVisitesPeriodiquesBientotDues() {
-    const situations = [];
-    const aujourdhui = new Date();
-    aujourdhui.setHours(0, 0, 0, 0);
+async detecterVisitesPasseesSansAction() {
+  const situations = [];
+  
+  try {
+    // Requête SQL corrigée selon VOS données
+    const [visitesPassees] = await sequelizeLocal.query(`
+      SELECT 
+        p.id_planning,
+        p.matricule_agent,
+        p.date_visite,
+        p.heure_visite,
+        p.type_visite,
+        DATEDIFF(CURDATE(), p.date_visite) as jours_retard
+      FROM planning p
+      WHERE p.date_visite <= '2026-04-30'
+        AND p.date_visite >= '2026-04-28'
+        AND p.visite_effectuee = 0
+        AND p.statut = 'Programmé'
+        AND p.type_visite IN ('Périodique', 'Reprise')
+      ORDER BY p.date_visite DESC
+    `);
     
-    const agents = await Agent.findAll({ where: { statut: 'actif' } });
-
-    for (const agent of agents) {
-      // Ignorer les agents en inaptitude
-      if (agent.date_fin_inaptitude && new Date(agent.date_fin_inaptitude) > aujourdhui) {
-        continue;
-      }
-
-      const periodicite = this.calculerPeriodicite(agent);
-      const estChauffeur = agent.code_affectation === 3;
-      const poste = estChauffeur ? 'Chauffeur' : 'Contrôleur';
-      const periodiciteTexte = estChauffeur ? '6 mois' : '1 an';
-
-      // Cas 1: Jamais de visite
-      if (!agent.date_derniere_visite) {
-        situations.push({
-          type: 'PERIODIQUE_JAMAIS_VISITE',
-          niveau: 'URGENT',
-          titre: `🔴 Agent jamais visité — ${agent.nom} ${agent.prenom}`,
-          message: `L'agent ${agent.nom} ${agent.prenom} (mat. ${agent.matricule_agent}, ${poste}) n'a jamais passé de visite médicale périodique (périodicité : ${periodiciteTexte}).`,
-          action_suggested: 'Planifier une visite périodique en urgence',
-          priorite: 5,
-          details: { matricule_agent: agent.matricule_agent, poste, periodicite_jours: periodicite }
-        });
-        continue;
-      }
-
-      const dateDerniere = new Date(agent.date_derniere_visite);
-      const joursDepuis = Math.floor((aujourdhui - dateDerniere) / (1000 * 60 * 60 * 24));
-      const joursRestants = periodicite - joursDepuis;
-
-      // Cas 2: En retard
-      if (joursRestants < 0) {
-        const joursRetard = Math.abs(joursRestants);
-        situations.push({
-          type: 'PERIODIQUE_EN_RETARD',
-          niveau: joursRetard > 30 ? 'CRITIQUE' : 'IMPORTANT',
-          titre: `⚠️ Visite périodique en retard — ${agent.nom} ${agent.prenom}`,
-          message: `L'agent ${agent.nom} ${agent.prenom} (mat. ${agent.matricule_agent}, ${poste}) est en retard de ${joursRetard} jour(s) pour sa visite périodique (dernière visite : ${dateDerniere.toLocaleDateString('fr-FR')}, périodicité : ${periodiciteTexte}).`,
-          action_suggested: 'Planifier une visite périodique dès que possible',
-          priorite: joursRetard > 30 ? 5 : 4,
-          details: { matricule_agent: agent.matricule_agent, poste, jours_retard: joursRetard, date_derniere_visite: agent.date_derniere_visite, periodicite_jours: periodicite }
-        });
-      } 
-      // Cas 3: Bientôt due (dans les 30 jours)
-      else if (joursRestants <= 30) {
-        const niveauAlerte = joursRestants <= 7 ? 'URGENT' : joursRestants <= 15 ? 'IMPORTANT' : 'INFO';
-        situations.push({
-          type: 'PERIODIQUE_BIENTOT_DUE',
-          niveau: niveauAlerte,
-          titre: `📅 Visite périodique bientôt due — ${agent.nom} ${agent.prenom}`,
-          message: `L'agent ${agent.nom} ${agent.prenom} (mat. ${agent.matricule_agent}, ${poste}) doit passer sa visite médicale périodique dans ${joursRestants} jour(s) (périodicité : ${periodiciteTexte}).`,
-          action_suggested: joursRestants <= 7 ? 'Planifier la visite périodique en urgence' : 'Planifier la visite périodique prochainement',
-          priorite: joursRestants <= 7 ? 4 : 3,
-          details: { matricule_agent: agent.matricule_agent, poste, jours_restants: joursRestants, date_derniere_visite: agent.date_derniere_visite, periodicite_jours: periodicite }
-        });
-      }
-    }
-
-    return situations;
-  }
-
-  // 2. Détection des visites de reprise à planifier
-  async detecterVisitesReprise() {
-    const situations = [];
-    const aujourdhui = new Date();
-    aujourdhui.setHours(0, 0, 0, 0);
+    console.log(`📊 Requête SQL visites: ${visitesPassees?.length || 0} visite(s) trouvée(s)`);
     
-    const agents = await Agent.findAll({ 
-      where: { 
-        date_fin_inaptitude: { [Op.not]: null }
-      } 
-    });
-
-    for (const agent of agents) {
-      const dateFin = new Date(agent.date_fin_inaptitude);
-      
-      if (dateFin < aujourdhui) continue;
-      
-      const dateRepriseIdeale = new Date(dateFin);
-      dateRepriseIdeale.setDate(dateFin.getDate() - 3);
-      
-      const reprisePlanifiee = await Planning.findOne({
-        where: {
-          matricule_agent: agent.matricule_agent,
-          type_visite: 'Reprise',
-          statut: 'Programmé',
-          date_visite: { [Op.gte]: aujourdhui }
-        }
-      });
-      
-      if (reprisePlanifiee) continue;
-      
-      const joursAvantRepriseIdeale = Math.floor((dateRepriseIdeale - aujourdhui) / (1000 * 60 * 60 * 24));
-      
-      if (joursAvantRepriseIdeale <= 7 && joursAvantRepriseIdeale >= 0) {
-        const niveauAlerte = joursAvantRepriseIdeale <= 3 ? 'URGENT' : 'IMPORTANT';
-        situations.push({
-          type: 'REPRISE_A_PLANIFIER',
-          niveau: niveauAlerte,
-          titre: `🔄 Visite de reprise à planifier — ${agent.nom} ${agent.prenom}`,
-          message: `L'agent ${agent.nom} ${agent.prenom} (mat. ${agent.matricule_agent}) termine son inaptitude le ${dateFin.toLocaleDateString('fr-FR')}. La visite de reprise doit être planifiée pour le ${dateRepriseIdeale.toLocaleDateString('fr-FR')} (dans ${joursAvantRepriseIdeale} jour(s)).`,
-          action_suggested: 'Planifier la visite de reprise immédiatement',
-          priorite: joursAvantRepriseIdeale <= 3 ? 5 : 4,
-          details: { 
-            matricule_agent: agent.matricule_agent, 
-            date_fin_inaptitude: agent.date_fin_inaptitude,
-            date_reprise_souhaitee: dateRepriseIdeale.toISOString().split('T')[0],
-            jours_restants: joursAvantRepriseIdeale
-          }
-        });
-      }
+    // Afficher les IDs trouvés pour debug
+    if (visitesPassees && visitesPassees.length > 0) {
+      console.log('IDs des visites trouvées:', visitesPassees.map(v => v.id_planning));
     }
     
-    return situations;
-  }
-
-  // 3. Détection des visites programmées NON EFFECTUÉES (en retard)
-  async detecterVisitesEnRetard() {
-    const situations = [];
-    const aujourdhui = new Date();
-    aujourdhui.setHours(0, 0, 0, 0);
+    if (!visitesPassees || visitesPassees.length === 0) {
+      // Deuxième tentative avec CURDATE() - 1
+      const [autresVisites] = await sequelizeLocal.query(`
+        SELECT 
+          p.id_planning,
+          p.matricule_agent,
+          p.date_visite,
+          p.heure_visite,
+          p.type_visite,
+          DATEDIFF(CURDATE(), p.date_visite) as jours_retard
+        FROM planning p
+        WHERE p.date_visite < CURDATE()
+          AND p.visite_effectuee = 0
+          AND p.statut = 'Programmé'
+          AND p.type_visite IN ('Périodique', 'Reprise')
+        ORDER BY p.date_visite DESC
+        LIMIT 20
+      `);
+      
+      if (!autresVisites || autresVisites.length === 0) {
+        console.log('📊 Aucune visite passée sans action');
+        return [];
+      }
+      
+      visitesPassees.push(...autresVisites);
+      console.log(`📊 ${visitesPassees.length} visite(s) trouvée(s) avec CURDATE()`);
+    }
     
-    const visitesEnRetard = await Planning.findAll({
-      where: {
-        date_visite: { [Op.lt]: aujourdhui },
-        visite_effectuee: false,
-        statut: 'Programmé',
-        type_visite: { [Op.in]: ['Périodique', 'Reprise', 'Reclassement', 'Embauche'] }
-      },
-      include: [{
-        model: Agent,
-        as: 'planningAgent',
-        attributes: ['nom', 'prenom', 'matricule_agent']
-      }]
+    // Récupérer les noms des agents
+    const matricules = [...new Set(visitesPassees.map(v => v.matricule_agent))].join(',');
+    
+    const [agents] = await sequelizeGlobal.query(`
+      SELECT matricule_agent, nom, prenom
+      FROM agent
+      WHERE matricule_agent IN (${matricules})
+    `);
+    
+    const agentsMap = new Map();
+    agents.forEach(agent => {
+      agentsMap.set(agent.matricule_agent, agent);
     });
     
-    for (const visite of visitesEnRetard) {
-      const dateVisite = new Date(visite.date_visite);
-      const joursRetard = Math.floor((aujourdhui - dateVisite) / (1000 * 60 * 60 * 24));
-      const agent = visite.planningAgent;
+    // Compter par type
+    const periodiques = visitesPassees.filter(v => v.type_visite === 'Périodique');
+    
+    if (periodiques.length > 0) {
+      const maxRetard = Math.max(...periodiques.map(v => parseInt(v.jours_retard) || 1));
+      const jours = maxRetard > 0 ? maxRetard : 1;
       
-      let niveau = 'IMPORTANT';
-      let priorite = 4;
-      
-      if (joursRetard > 15) {
-        niveau = 'CRITIQUE';
-        priorite = 5;
-      } else if (joursRetard > 7) {
-        niveau = 'URGENT';
-        priorite = 4;
-      }
+      const agentsListe = periodiques.slice(0, 5).map(v => {
+        const a = agentsMap.get(v.matricule_agent);
+        return `${a?.nom || 'Agent'} ${a?.prenom || ''}`;
+      }).join(', ');
       
       situations.push({
-        type: 'VISITE_EN_RETARD',
-        niveau: niveau,
-        titre: `⚠️ Visite ${visite.type_visite} en retard — ${agent?.nom} ${agent?.prenom}`,
-        message: `La visite ${visite.type_visite} prévue le ${new Date(visite.date_visite).toLocaleDateString('fr-FR')} pour ${agent?.nom} ${agent?.prenom} (mat. ${agent?.matricule_agent}) n'a pas été effectuée. Retard de ${joursRetard} jour(s).`,
-        action_suggested: `Effectuer ou reprogrammer la visite ${visite.type_visite} en urgence`,
-        priorite: priorite,
-        details: {
-          id_planning: visite.id_planning,
-          matricule_agent: agent?.matricule_agent,
-          agent_nom: agent?.nom,
-          agent_prenom: agent?.prenom,
-          type_visite: visite.type_visite,
-          date_prevue: visite.date_visite,
-          jours_retard: joursRetard
-        }
+        type: 'VISITES_PERIODIQUES_EN_RETARD',
+        niveau: jours > 15 ? 'URGENT' : 'IMPORTANT',
+        priorite: jours > 15 ? 4 : 3,
+        titre: `⚠️ ${periodiques.length} visite(s) périodique(s) en retard`,
+        message: `${periodiques.length} visite(s) périodique(s) prévues entre le 28/04 et le 30/04 n'ont pas été effectuées. Retard: ${jours} jours. Agents: ${agentsListe}`,
+        action_suggested: 'Consulter le planning et effectuer ces visites immédiatement',
+        details: { visites: periodiques, date_detection: new Date().toISOString() }
       });
     }
     
     return situations;
+    
+  } catch (error) {
+    console.error('❌ Erreur detecterVisitesPasseesSansAction:', error);
+    return [];
   }
+}
 
-  // 4. Détection des accidents NON DÉCLARÉS à la CNAM
+
+  // ============================================================
+  //  ALERTE 2: ACCIDENTS NON DÉCLARÉS
+  // ============================================================
+
   async detecterAccidentsNonDeclares() {
     const situations = [];
-    const aujourdhui = new Date();
-    aujourdhui.setHours(0, 0, 0, 0);
     
-    if (!Accident) {
-      console.log('⚠️ Modèle Accident non disponible');
-      return [];
-    }
-    
-    const accidentsNonDeclares = await Accident.findAll({
-      where: {
-        statut: { [Op.ne]: 'declare' },
-        date_accident: { [Op.not]: null }
-      },
-      include: [{
-        model: Agent,
-        as: 'accidentAgent',
-        attributes: ['nom', 'prenom', 'matricule_agent']
-      }],
-      order: [['date_accident', 'DESC']]
-    });
-    
-    for (const accident of accidentsNonDeclares) {
-      const dateAccident = new Date(accident.date_accident);
-      const joursDepuisAccident = Math.floor((aujourdhui - dateAccident) / (1000 * 60 * 60 * 24));
-      const agent = accident.accidentAgent;
+    try {
+      const [accidents] = await sequelizeLocal.query(`
+        SELECT 
+          a.id_accident,
+          a.numero_accident,
+          a.matricule_agent,
+          a.date_accident,
+          a.gravite,
+          a.jour_arret,
+          a.statut,
+          DATEDIFF(CURDATE(), a.date_accident) as jours_depuis
+        FROM accident a
+        WHERE a.statut != 'declare'
+          AND a.date_accident IS NOT NULL
+        ORDER BY a.date_accident DESC
+      `);
       
-      const delaiLegal = 2;
-      const estEnRetard = joursDepuisAccident > delaiLegal;
-      
-      let niveau = 'IMPORTANT';
-      let priorite = 4;
-      
-      if (joursDepuisAccident > 15) {
-        niveau = 'CRITIQUE';
-        priorite = 5;
-      } else if (joursDepuisAccident > 7) {
-        niveau = 'URGENT';
-        priorite = 4;
-      } else if (estEnRetard) {
-        niveau = 'URGENT';
-        priorite = 4;
+      if (!accidents || accidents.length === 0) {
+        console.log('📊 Aucun accident non déclaré');
+        return [];
       }
       
-      situations.push({
-        type: 'ACCIDENT_NON_DECLARE',
-        niveau: niveau,
-        titre: `🚨 Accident non déclaré — ${agent?.nom} ${agent?.prenom}`,
-        message: `L'accident de travail du ${new Date(accident.date_accident).toLocaleDateString('fr-FR')} concernant ${agent?.nom} ${agent?.prenom} (mat. ${agent?.matricule_agent}) n'a pas encore été déclaré à la CNAM. ${estEnRetard ? `Délai légal dépassé de ${joursDepuisAccident - delaiLegal} jour(s).` : ''}`,
-        action_suggested: 'Déclarer l\'accident à la CNAM immédiatement',
-        priorite: priorite,
-        details: {
-          id_accident: accident.id_accident,
-          numero_accident: accident.numero_accident,
-          matricule_agent: agent?.matricule_agent,
-          agent_nom: agent?.nom,
-          agent_prenom: agent?.prenom,
-          date_accident: accident.date_accident,
-          jours_depuis_accident: joursDepuisAccident,
-          jours_retard: estEnRetard ? joursDepuisAccident - delaiLegal : 0,
-          gravite: accident.gravite,
-          jour_arret: accident.jour_arret
+      console.log(`📊 ${accidents.length} accident(s) non déclaré(s)`);
+      
+      // Récupérer les agents
+      const matricules = accidents.map(a => a.matricule_agent).join(',');
+      
+      const [agents] = await sequelizeGlobal.query(`
+        SELECT matricule_agent, nom, prenom
+        FROM agent
+        WHERE matricule_agent IN (${matricules})
+      `);
+      
+      const agentsMap = new Map();
+      agents.forEach(agent => {
+        agentsMap.set(agent.matricule_agent, agent);
+      });
+      
+      for (const accident of accidents) {
+        const agent = agentsMap.get(accident.matricule_agent);
+        const jours = parseInt(accident.jours_depuis);
+        const delaiLegal = 48;
+        const estEnRetard = jours > delaiLegal;
+        
+        let niveau = 'IMPORTANT';
+        let priorite = 3;
+        
+        if (jours > 30) {
+          niveau = 'CRITIQUE';
+          priorite = 5;
+        } else if (jours > 15) {
+          niveau = 'URGENT';
+          priorite = 4;
+        } else if (estEnRetard) {
+          niveau = 'URGENT';
+          priorite = 4;
         }
-      });
+        
+        situations.push({
+          type: 'ACCIDENT_NON_DECLARE',
+          niveau: niveau,
+          priorite: priorite,
+          titre: `🚨 Accident non déclaré - ${agent?.nom || 'Agent'} ${agent?.prenom || ''}`,
+          message: `L'accident du ${new Date(accident.date_accident).toLocaleDateString('fr-FR')} concernant ${agent?.nom || 'Agent'} ${agent?.prenom || ''} (${accident.matricule_agent}) n'a pas été déclaré à la CNAM. ${estEnRetard ? `DÉLAI DÉPASSÉ de ${jours - delaiLegal} jour(s).` : `Retard: ${jours} jours.`}`,
+          action_suggested: 'Déclarer l\'accident à la CNAM immédiatement',
+          details: { accident }
+        });
+      }
+      
+      return situations;
+      
+    } catch (error) {
+      console.error('❌ Erreur detecterAccidentsNonDeclares:', error);
+      return [];
     }
-    
-    return situations;
   }
 
-  // 5. Détection des convocations à envoyer
-  async detecterConvocationsAVenir() {
+  // ============================================================
+  //  ALERTE 3: AGENTS PRIORITAIRES SANS VISITE
+  // ============================================================
+
+  async detecterAgentsPrioritairesSansVisite() {
     const situations = [];
-    const aujourdhui = new Date();
-    aujourdhui.setHours(0, 0, 0, 0);
     
-    const dateLimite = new Date(aujourdhui);
-    dateLimite.setDate(aujourdhui.getDate() + 7);
-    
-    const visitesSansConvocation = await Planning.findAll({
-      where: {
-        date_visite: { [Op.between]: [aujourdhui, dateLimite] },
-        convocation_envoyee: false,
-        statut: 'Programmé',
-        type_visite: { [Op.in]: ['Périodique', 'Reprise'] }
-      },
-      include: [{
-        model: Agent,
-        as: 'planningAgent',
-        attributes: ['nom', 'prenom', 'matricule_agent']
-      }]
-    });
-    
-    if (visitesSansConvocation.length > 0) {
-      const visitesParJour = {};
-      visitesSansConvocation.forEach(v => {
-        const jour = v.date_visite;
-        if (!visitesParJour[jour]) visitesParJour[jour] = [];
-        visitesParJour[jour].push(v);
-      });
+    try {
+      const [agents] = await sequelizeGlobal.query(`
+        SELECT 
+          a.matricule_agent,
+          a.nom,
+          a.prenom,
+          a.code_affectation,
+          a.date_derniere_visite,
+          a.periodicite_jours,
+          DATEDIFF(CURDATE(), a.date_derniere_visite) as jours_depuis
+        FROM agent a
+        WHERE a.statut = 'actif'
+        ORDER BY 
+          CASE WHEN a.date_derniere_visite IS NULL THEN 0 ELSE 1 END,
+          jours_depuis DESC
+        LIMIT 20
+      `);
       
-      const detailsVisites = Object.entries(visitesParJour).map(([date, visites]) => ({
-        date,
-        nombre: visites.length,
-        agents: visites.map(v => `${v.planningAgent?.nom} ${v.planningAgent?.prenom}`).join(', ')
-      }));
+      const prioritaires = [];
       
-      situations.push({
-        type: 'CONVOCATIONS_A_ENVOYER',
-        niveau: 'IMPORTANT',
-        titre: `📧 ${visitesSansConvocation.length} convocation(s) à envoyer`,
-        message: `${visitesSansConvocation.length} visite(s) médicale(s) (Périodique/Reprise) dans les 7 prochains jours n'ont pas encore reçu de convocation.`,
-        action_suggested: 'Envoyer les convocations au GRH',
-        priorite: 4,
-        details: { visites: detailsVisites }
-      });
+      for (const agent of agents) {
+        // Agent jamais visité
+        if (!agent.date_derniere_visite) {
+          const [planifie] = await sequelizeLocal.query(`
+            SELECT id_planning FROM planning 
+            WHERE matricule_agent = ? AND type_visite = 'Périodique' AND statut = 'Programmé' AND date_visite >= CURDATE()
+            LIMIT 1
+          `, { replacements: [agent.matricule_agent] });
+          
+          if (!planifie || planifie.length === 0) {
+            prioritaires.push({
+              ...agent,
+              raison: 'Aucune visite médicale enregistrée',
+              priorite: 100
+            });
+          }
+          continue;
+        }
+        
+        const periodicite = agent.periodicite_jours || (agent.code_affectation === 3 ? 180 : 365);
+        const joursDepuis = parseInt(agent.jours_depuis) || 0;
+        const joursRestants = periodicite - joursDepuis;
+        
+        if (joursRestants < 0) {
+          const [planifie] = await sequelizeLocal.query(`
+            SELECT id_planning FROM planning 
+            WHERE matricule_agent = ? AND type_visite = 'Périodique' AND statut = 'Programmé' AND date_visite >= CURDATE()
+            LIMIT 1
+          `, { replacements: [agent.matricule_agent] });
+          
+          if (!planifie || planifie.length === 0) {
+            prioritaires.push({
+              ...agent,
+              jours_retard: Math.abs(joursRestants),
+              raison: `Visite en retard de ${Math.abs(joursRestants)} jours`,
+              priorite: Math.min(Math.abs(joursRestants) * 2, 100)
+            });
+          }
+        }
+      }
+      
+      if (prioritaires.length === 0) {
+        console.log('📊 Aucun agent prioritaire');
+        return [];
+      }
+      
+      console.log(`📊 ${prioritaires.length} agent(s) prioritaire(s)`);
+      
+      const critiques = prioritaires.filter(a => a.priorite >= 80);
+      const urgents = prioritaires.filter(a => a.priorite >= 40 && a.priorite < 80);
+      
+      if (critiques.length > 0) {
+        const liste = critiques.slice(0, 5).map(a => `${a.nom} ${a.prenom} (${a.raison})`).join(', ');
+        situations.push({
+          type: 'AGENTS_PRIORITAIRES_CRITIQUES',
+          niveau: 'CRITIQUE',
+          priorite: 5,
+          titre: `🔴 ${critiques.length} agent(s) nécessitent une visite URGENTE`,
+          message: `Agents: ${liste}${critiques.length > 5 ? '...' : ''}`,
+          action_suggested: 'Planifier des visites médicales IMMÉDIATEMENT',
+          details: { agents: critiques }
+        });
+      }
+      
+      if (urgents.length > 0) {
+        situations.push({
+          type: 'AGENTS_PRIORITAIRES_URGENTS',
+          niveau: 'URGENT',
+          priorite: 4,
+          titre: `🟠 ${urgents.length} agent(s) avec visite en retard`,
+          message: `${urgents.length} agent(s) sont en retard sur leur visite médicale.`,
+          action_suggested: 'Planifier les visites dans les plus brefs délais',
+          details: { agents: urgents }
+        });
+      }
+      
+      return situations;
+      
+    } catch (error) {
+      console.error('❌ Erreur detecterAgentsPrioritairesSansVisite:', error);
+      return [];
     }
-    
-    return situations;
   }
 
-  // 6. Détection de TOUTES les situations
+  // ============================================================
+  //  DÉTECTION DE TOUTES LES SITUATIONS
+  // ============================================================
+
   async detecterToutesSituations() {
     const toutes = [];
 
-    const [periodiques, reprises, visitesRetard, accidentsNonDeclares, convocations] = await Promise.all([
-      this.detecterVisitesPeriodiquesBientotDues(),
-      this.detecterVisitesReprise(),
-      this.detecterVisitesEnRetard(),
+    console.log('\n' + '='.repeat(70));
+    console.log('🔔 DÉTECTION DES SITUATIONS POUR ALERTES');
+    console.log('='.repeat(70));
+
+    const [visitesPassees, accidentsNonDeclares, agentsPrioritaires] = await Promise.all([
+      this.detecterVisitesPasseesSansAction(),
       this.detecterAccidentsNonDeclares(),
-      this.detecterConvocationsAVenir()
+      this.detecterAgentsPrioritairesSansVisite()
     ]);
 
-    toutes.push(...periodiques, ...reprises, ...visitesRetard, ...accidentsNonDeclares, ...convocations);
+    toutes.push(...visitesPassees, ...accidentsNonDeclares, ...agentsPrioritaires);
 
-    console.log(`📊 ${toutes.length} situation(s) détectée(s):`);
+    console.log(`\n📊 RÉSUMÉ: ${toutes.length} situation(s) détectée(s)`);
     toutes.forEach(s => {
-      console.log(`   - ${s.type} (${s.niveau}): ${s.titre}`);
+      console.log(`   - [${s.niveau}] ${s.titre || s.type}`);
     });
+    console.log('='.repeat(70) + '\n');
 
     return toutes;
   }
@@ -460,12 +408,14 @@ class NotificationIntelligenteService {
   // ============================================================
 
   async envoyerNotifications() {
-    console.log('\n🔔 Détection des situations pour notifications...');
+    console.log('\n🔔 Lancement du système intelligent d\'alertes...');
 
     const situations = await this.detecterToutesSituations();
-    console.log(`📊 ${situations.length} situation(s) détectée(s)`);
 
-    if (situations.length === 0) return 0;
+    if (situations.length === 0) {
+      console.log('ℹ️ Aucune situation nécessitant une alerte');
+      return 0;
+    }
 
     const users = await this.getUsersCibles(['social', 'admin']);
     if (users.length === 0) {
@@ -518,36 +468,36 @@ class NotificationIntelligenteService {
     
     return notifications;
   }
-// Dans notificationIntelligenteService.js
-async marquerCommeLue(idNotification, idUtilisateur) {
-  try {
-    const notification = await NotificationIntelligente.findOne({
-      where: { id_notification: idNotification, id_utilisateur: idUtilisateur }
-    });
-    
-    if (!notification) return null;
-    
-    notification.statut = 'lu';
-    notification.lu_le = new Date();
-    await notification.save();
-    
-    return notification;
-  } catch (error) {
-    console.error('❌ Erreur marquerCommeLue:', error);
-    return null;
+
+  async marquerCommeLue(idNotification, idUtilisateur) {
+    try {
+      const notification = await NotificationIntelligente.findOne({
+        where: { id: idNotification, id_utilisateur: idUtilisateur }
+      });
+      
+      if (!notification) return null;
+      
+      notification.statut = 'lu';
+      notification.lu_le = new Date();
+      await notification.save();
+      
+      return notification;
+    } catch (error) {
+      console.error('❌ Erreur marquerCommeLue:', error);
+      return null;
+    }
   }
-}
 
   async marquerToutesLues(idUtilisateur) {
     await NotificationIntelligente.update(
-      { statut: 'lu', lu_at: new Date() },
+      { statut: 'lu', lu_le: new Date() },
       { where: { id_utilisateur: idUtilisateur, statut: 'non_lu' } }
     );
   }
 
   async archiver(idNotification, idUtilisateur) {
     const notification = await NotificationIntelligente.findOne({
-      where: { id_notification: idNotification, id_utilisateur: idUtilisateur }
+      where: { id: idNotification, id_utilisateur: idUtilisateur }
     });
     
     if (!notification) return null;
@@ -560,7 +510,7 @@ async marquerCommeLue(idNotification, idUtilisateur) {
 
   async supprimer(idNotification, idUtilisateur) {
     const deleted = await NotificationIntelligente.destroy({
-      where: { id_notification: idNotification, id_utilisateur: idUtilisateur }
+      where: { id: idNotification, id_utilisateur: idUtilisateur }
     });
     
     return deleted > 0;
