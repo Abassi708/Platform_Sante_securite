@@ -12,10 +12,10 @@ import AgentSearchInput from '../common/AgentSearchInput';
 import '../../styles/GestionVisitesPage.css';
 
 const GestionVisitesPage = () => {
-  const [loading, setLoading] = useState(true);
-  const [visites, setVisites] = useState([]);
-  const [agents, setAgents] = useState([]);
-  const [stats, setStats] = useState({
+  const [gvp_loading, setGvp_loading] = useState(true);
+  const [gvp_visites, setGvp_visites] = useState([]);
+  const [gvp_agents, setGvp_agents] = useState([]);
+  const [gvp_stats, setGvp_stats] = useState({
     total: 0,
     aptes: 0,
     reserves: 0,
@@ -25,13 +25,13 @@ const GestionVisitesPage = () => {
     planningSemaine: 0,
     parMois: Array(12).fill(0)
   });
-  const [notification, setNotification] = useState({ show: false, type: 'info', title: '', message: '' });
+  const [gvp_notification, setGvp_notification] = useState({ show: false, type: 'info', title: '', message: '' });
 
   // ========== ÉTATS POUR LE FORMULAIRE ==========
-  const [showForm, setShowForm] = useState(false);
-  const [selectedVisite, setSelectedVisite] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [formData, setFormData] = useState({
+  const [gvp_showForm, setGvp_showForm] = useState(false);
+  const [gvp_selectedVisite, setGvp_selectedVisite] = useState(null);
+  const [gvp_editMode, setGvp_editMode] = useState(false);
+  const [gvp_formData, setGvp_formData] = useState({
     matricule_agent: '',
     date_visite: '',
     heure_visite: '09:00:00',
@@ -41,23 +41,23 @@ const GestionVisitesPage = () => {
   });
   
   // ========== ÉTATS POUR LE CALENDRIER INTELLIGENT ==========
-  const [joursDisponibles, setJoursDisponibles] = useState([]);
-  const [creneauxDisponibles, setCreneauxDisponibles] = useState([]);
-  const [loadingCreneaux, setLoadingCreneaux] = useState(false);
-  const [isLoadingJours, setIsLoadingJours] = useState(false);
-  const [moisActuel, setMoisActuel] = useState(new Date().getMonth());
-  const [anneeActuelle, setAnneeActuelle] = useState(new Date().getFullYear());
+  const [gvp_joursDisponibles, setGvp_joursDisponibles] = useState([]);
+  const [gvp_creneauxDisponibles, setGvp_creneauxDisponibles] = useState([]);
+  const [gvp_loadingCreneaux, setGvp_loadingCreneaux] = useState(false);
+  const [gvp_isLoadingJours, setGvp_isLoadingJours] = useState(false);
+  const [gvp_moisActuel, setGvp_moisActuel] = useState(new Date().getMonth());
+  const [gvp_anneeActuelle, setGvp_anneeActuelle] = useState(new Date().getFullYear());
   
-  const [formErrors, setFormErrors] = useState({});
-  const [saving, setSaving] = useState(false);
-  const [checkingSlot, setCheckingSlot] = useState(false);
-  const [visiteHasActions, setVisiteHasActions] = useState({});
+  const [gvp_formErrors, setGvp_formErrors] = useState({});
+  const [gvp_saving, setGvp_saving] = useState(false);
+  const [gvp_checkingSlot, setGvp_checkingSlot] = useState(false);
+  const [gvp_visiteHasActions, setGvp_visiteHasActions] = useState({});
 
-  const [nouvelleDate, setNouvelleDate] = useState('');
-const [nouvelleHeure, setNouvelleHeure] = useState('');
+  const [gvp_nouvelleDate, setGvp_nouvelleDate] = useState('');
+  const [gvp_nouvelleHeure, setGvp_nouvelleHeure] = useState('');
 
   // ========== ÉTATS POUR LES FILTRES ==========
-  const [filters, setFilters] = useState({
+  const [gvp_filters, setGvp_filters] = useState({
     search: '',
     type: 'all',
     resultat: 'all',
@@ -65,68 +65,67 @@ const [nouvelleHeure, setNouvelleHeure] = useState('');
     dateFin: '',
     agent: 'all'
   });
-    const [moisFiltre, setMoisFiltre] = useState('all');
-  const [anneeFiltre, setAnneeFiltre] = useState(new Date().getFullYear());
-  const [showFilters, setShowFilters] = useState(false);
+  const [gvp_moisFiltre, setGvp_moisFiltre] = useState('all');
+  const [gvp_anneeFiltre, setGvp_anneeFiltre] = useState(new Date().getFullYear());
+  const [gvp_showFilters, setGvp_showFilters] = useState(false);
 
   // ========== PAGINATION ==========
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(15);
+  const [gvp_currentPage, setGvp_currentPage] = useState(1);
+  const [gvp_itemsPerPage] = useState(15);
 
   // ========== CHARGEMENT DES DONNÉES ==========
   useEffect(() => {
-    chargerDonnees();
+    gvp_chargerDonnees();
   }, []);
 
   useEffect(() => {
-  fetchVisites();
-}, [filters, moisFiltre, anneeFiltre]);
+    gvp_fetchVisites();
+  }, [gvp_filters, gvp_moisFiltre, gvp_anneeFiltre]);
 
   // Effet pour charger les jours disponibles quand l'agent change ou le mois change
   useEffect(() => {
-    if (showForm && formData.matricule_agent) {
-      chargerJoursDisponibles(moisActuel, anneeActuelle);
+    if (gvp_showForm && gvp_formData.matricule_agent) {
+      gvp_chargerJoursDisponibles(gvp_moisActuel, gvp_anneeActuelle);
     }
-  }, [showForm, formData.matricule_agent, moisActuel, anneeActuelle]);
+  }, [gvp_showForm, gvp_formData.matricule_agent, gvp_moisActuel, gvp_anneeActuelle]);
 
   // Effet pour charger les créneaux disponibles quand la date change
   useEffect(() => {
-    if (formData.date_visite) {
-      chargerCreneauxDisponibles(formData.date_visite);
+    if (gvp_formData.date_visite) {
+      gvp_chargerCreneauxDisponibles(gvp_formData.date_visite);
     } else {
-      setCreneauxDisponibles([]);
+      setGvp_creneauxDisponibles([]);
     }
-  }, [formData.date_visite, formData.matricule_agent, editMode]);
+  }, [gvp_formData.date_visite, gvp_formData.matricule_agent, gvp_editMode]);
 
   // ========== FONCTIONS DE CHARGEMENT ==========
-  const chargerDonnees = async () => {
-  setLoading(true);
-  try {
-    await Promise.all([
-      fetchAgents(),
-      //fetchVisites()
-    ]);
-  } catch (error) {
-    showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur de chargement' });
-  } finally {
-    setLoading(false);
-  }
-};
+  const gvp_chargerDonnees = async () => {
+    setGvp_loading(true);
+    try {
+      await Promise.all([
+        gvp_fetchAgents(),
+      ]);
+    } catch (error) {
+      gvp_showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur de chargement' });
+    } finally {
+      setGvp_loading(false);
+    }
+  };
 
-  const fetchAgents = async () => {
+  const gvp_fetchAgents = async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await response.json();
-      if (data.success) setAgents(data.agents);
+      if (data.success) setGvp_agents(data.agents);
     } catch (err) {
       console.error('Erreur chargement agents:', err);
     }
   };
 
-  const checkHasActions = async (matricule_visite) => {
+  const gvp_checkHasActions = async (matricule_visite) => {
     if (!matricule_visite) return false;
     try {
       const token = localStorage.getItem('token');
@@ -140,96 +139,85 @@ const [nouvelleHeure, setNouvelleHeure] = useState('');
     }
   };
 
-// ========== FETCH VISITES AVEC CALCUL DES STATS ==========
-// frontend/components/visites/GestionVisitesPage.js
+  const gvp_fetchVisites = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      let url = `${process.env.REACT_APP_API_URL}/api/visites?limit=2000&onlyManual=true`;
 
-const fetchVisites = async () => {
-  try {
-    const token = localStorage.getItem('token');
-    // ✅ Ajouter onlyManual=true pour ne récupérer que les visites manuelles
-    let url = `${process.env.REACT_APP_API_URL}/api/visites?limit=2000&onlyManual=true`;
-
-    if (filters.search) url += `&search=${encodeURIComponent(filters.search)}`;
-    if (filters.type !== 'all') url += `&type=${encodeURIComponent(filters.type)}`;
-    if (filters.resultat !== 'all') url += `&resultat=${encodeURIComponent(filters.resultat)}`;
-    
-    if (moisFiltre !== 'all' && anneeFiltre) {
-      const dateDebut = `${anneeFiltre}-${String(moisFiltre).padStart(2, '0')}-01`;
-      const dernierJour = new Date(anneeFiltre, moisFiltre, 0).getDate();
-      const dateFin = `${anneeFiltre}-${String(moisFiltre).padStart(2, '0')}-${dernierJour}`;
-      url += `&dateDebut=${dateDebut}&dateFin=${dateFin}`;
-    }
-    
-    if (filters.agent !== 'all') url += `&agentId=${filters.agent}`;
-
-    const response = await fetch(url, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const data = await response.json();
-    
-    if (data.success) {
-      let visitesData = data.visites || [];
+      if (gvp_filters.search) url += `&search=${encodeURIComponent(gvp_filters.search)}`;
+      if (gvp_filters.type !== 'all') url += `&type=${encodeURIComponent(gvp_filters.type)}`;
+      if (gvp_filters.resultat !== 'all') url += `&resultat=${encodeURIComponent(gvp_filters.resultat)}`;
       
-      // ✅ Garder uniquement la dernière version de chaque visite (par id_planning)
-      const visitesMap = new Map();
-      
-      for (const visite of visitesData) {
-        const key = visite.id_planning || visite.matricule_visite;
-        const existing = visitesMap.get(key);
-        
-        // Si la visite n'existe pas ou si celle-ci est plus récente, on garde celle-ci
-        if (!existing || new Date(visite.created_at) > new Date(existing.created_at)) {
-          visitesMap.set(key, visite);
-        }
+      if (gvp_moisFiltre !== 'all' && gvp_anneeFiltre) {
+        const dateDebut = `${gvp_anneeFiltre}-${String(gvp_moisFiltre).padStart(2, '0')}-01`;
+        const dernierJour = new Date(gvp_anneeFiltre, gvp_moisFiltre, 0).getDate();
+        const dateFin = `${gvp_anneeFiltre}-${String(gvp_moisFiltre).padStart(2, '0')}-${dernierJour}`;
+        url += `&dateDebut=${dateDebut}&dateFin=${dateFin}`;
       }
       
-      const visitesUniques = Array.from(visitesMap.values());
-      
-      // Trier par date décroissante
-      visitesUniques.sort((a, b) => new Date(b.date_visite) - new Date(a.date_visite));
-      
-      setVisites(visitesUniques);
-      
-      // Calcul des stats
-      const visitesEffectuees = visitesUniques.filter(v => v.type_action === 'EFFECTUEE');
-      const aptes = visitesEffectuees.filter(v => v.resultat === 'Apte').length;
-      const inaptes = visitesEffectuees.filter(v => 
-        v.resultat === 'Inapte temporaire' || v.resultat === 'Inapte définitif'
-      ).length;
-      
-      setStats({
-        total: visitesUniques.length,
-        aptes: aptes,
-        inaptes: inaptes
+      if (gvp_filters.agent !== 'all') url += `&agentId=${gvp_filters.agent}`;
+
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
+      const data = await response.json();
       
-      setCurrentPage(1);
+      if (data.success) {
+        let visitesData = data.visites || [];
+        
+        const visitesMap = new Map();
+        
+        for (const visite of visitesData) {
+          const key = visite.id_planning || visite.matricule_visite;
+          const existing = visitesMap.get(key);
+          
+          if (!existing || new Date(visite.created_at) > new Date(existing.created_at)) {
+            visitesMap.set(key, visite);
+          }
+        }
+        
+        const visitesUniques = Array.from(visitesMap.values());
+        
+        visitesUniques.sort((a, b) => new Date(b.date_visite) - new Date(a.date_visite));
+        
+        setGvp_visites(visitesUniques);
+        
+        const visitesEffectuees = visitesUniques.filter(v => v.type_action === 'EFFECTUEE');
+        const aptes = visitesEffectuees.filter(v => v.resultat === 'Apte').length;
+        const inaptes = visitesEffectuees.filter(v => 
+          v.resultat === 'Inapte temporaire' || v.resultat === 'Inapte définitif'
+        ).length;
+        
+        setGvp_stats({
+          total: visitesUniques.length,
+          aptes: aptes,
+          inaptes: inaptes
+        });
+        
+        setGvp_currentPage(1);
+      }
+    } catch (err) {
+      console.error('Erreur chargement visites:', err);
     }
-  } catch (err) {
-    console.error('Erreur chargement visites:', err);
-  }
-};
-
-
+  };
 
   // ========== CALENDRIER INTELLIGENT ==========
-  const chargerJoursDisponibles = async (mois, annee) => {
-    if (!formData.matricule_agent) {
+  const gvp_chargerJoursDisponibles = async (mois, annee) => {
+    if (!gvp_formData.matricule_agent) {
       console.log('⚠️ Aucun agent sélectionné');
       return;
     }
     
-    if (isLoadingJours) {
+    if (gvp_isLoadingJours) {
       console.log('⏳ Déjà en chargement...');
       return;
     }
     
-    setIsLoadingJours(true);
+    setGvp_isLoadingJours(true);
     
     try {
       const token = localStorage.getItem('token');
-      // mois + 1 car l'API attend 1-12
-      const url = `${process.env.REACT_APP_API_URL}/api/creneaux/jours-disponibles?mois=${mois + 1}&annee=${annee}&matricule_agent=${formData.matricule_agent}`;
+      const url = `${process.env.REACT_APP_API_URL}/api/creneaux/jours-disponibles?mois=${mois + 1}&annee=${annee}&matricule_agent=${gvp_formData.matricule_agent}`;
       console.log('📡 URL appelée:', url);
       
       const response = await fetch(url, { 
@@ -240,29 +228,29 @@ const fetchVisites = async () => {
       
       if (data.success) {
         console.log('✅ Jours disponibles:', data.jours.length);
-        setJoursDisponibles(data.jours);
+        setGvp_joursDisponibles(data.jours);
       } else {
         console.error('❌ Erreur API:', data.message);
       }
     } catch (err) {
       console.error('❌ Erreur chargement jours:', err);
     } finally {
-      setIsLoadingJours(false);
+      setGvp_isLoadingJours(false);
     }
   };
 
-  const chargerCreneauxDisponibles = async (date) => {
+  const gvp_chargerCreneauxDisponibles = async (date) => {
     if (!date) {
-      setCreneauxDisponibles([]);
+      setGvp_creneauxDisponibles([]);
       return;
     }
     
-    setLoadingCreneaux(true);
+    setGvp_loadingCreneaux(true);
     try {
       const token = localStorage.getItem('token');
-      let url = `${process.env.REACT_APP_API_URL}/api/creneaux/creneaux-disponibles?date=${date}&matricule_agent=${formData.matricule_agent}`;
-      if (editMode && selectedVisite) {
-        url += `&id_planning_exclu=${selectedVisite.id_planning}`;
+      let url = `${process.env.REACT_APP_API_URL}/api/creneaux/creneaux-disponibles?date=${date}&matricule_agent=${gvp_formData.matricule_agent}`;
+      if (gvp_editMode && gvp_selectedVisite) {
+        url += `&id_planning_exclu=${gvp_selectedVisite.id_planning}`;
       }
       console.log('📡 URL créneaux:', url);
       
@@ -273,49 +261,49 @@ const fetchVisites = async () => {
       console.log('📥 Créneaux reçus:', data);
       
       if (data.success) {
-        setCreneauxDisponibles(data.creneaux);
+        setGvp_creneauxDisponibles(data.creneaux);
         
         const premierDispo = data.creneaux.find(c => c.disponible);
-        if (premierDispo && !formData.heure_visite) {
-          setFormData(prev => ({ ...prev, heure_visite: premierDispo.heure }));
+        if (premierDispo && !gvp_formData.heure_visite) {
+          setGvp_formData(prev => ({ ...prev, heure_visite: premierDispo.heure }));
         }
       }
     } catch (err) {
       console.error('❌ Erreur chargement créneaux:', err);
     } finally {
-      setLoadingCreneaux(false);
+      setGvp_loadingCreneaux(false);
     }
   };
 
-  const handleMoisPrecedent = () => {
-    let newMois = moisActuel - 1;
-    let newAnnee = anneeActuelle;
+  const gvp_handleMoisPrecedent = () => {
+    let newMois = gvp_moisActuel - 1;
+    let newAnnee = gvp_anneeActuelle;
     if (newMois < 0) {
       newMois = 11;
       newAnnee--;
     }
-    setMoisActuel(newMois);
-    setAnneeActuelle(newAnnee);
+    setGvp_moisActuel(newMois);
+    setGvp_anneeActuelle(newAnnee);
   };
 
-  const handleMoisSuivant = () => {
-    let newMois = moisActuel + 1;
-    let newAnnee = anneeActuelle;
+  const gvp_handleMoisSuivant = () => {
+    let newMois = gvp_moisActuel + 1;
+    let newAnnee = gvp_anneeActuelle;
     if (newMois > 11) {
       newMois = 0;
       newAnnee++;
     }
-    setMoisActuel(newMois);
-    setAnneeActuelle(newAnnee);
+    setGvp_moisActuel(newMois);
+    setGvp_anneeActuelle(newAnnee);
   };
 
-  const getJourTitle = (jour) => {
+  const gvp_getJourTitle = (jour) => {
     if (jour.creneauxDisponibles === 1) return `${jour.creneauxDisponibles} créneau disponible`;
     return `${jour.creneauxDisponibles} créneaux disponibles`;
   };
 
   // ========== FONCTIONS DE VALIDATION ==========
-  const verifierConflitCreneau = async (date, heure) => {
+  const gvp_verifierConflitCreneau = async (date, heure) => {
     try {
       const token = localStorage.getItem('token');
       const heureComplete = heure.includes(':') && heure.length === 8 ? heure : `${heure}:00`;
@@ -332,7 +320,7 @@ const fetchVisites = async () => {
     }
   };
 
-  const verifierVisiteExistante = async (matricule_agent, date_visite, idPlanningExclu = null) => {
+  const gvp_verifierVisiteExistante = async (matricule_agent, date_visite, idPlanningExclu = null) => {
     try {
       const token = localStorage.getItem('token');
       let url = `${process.env.REACT_APP_API_URL}/api/planning/verifier-visite-existante?matricule=${matricule_agent}&date=${date_visite}`;
@@ -351,7 +339,7 @@ const fetchVisites = async () => {
     }
   };
 
-  const verifierConflitCreneauExclu = async (date, heure, idPlanningExclu) => {
+  const gvp_verifierConflitCreneauExclu = async (date, heure, idPlanningExclu) => {
     try {
       const token = localStorage.getItem('token');
       const heureComplete = heure.includes(':') && heure.length === 8 ? heure : `${heure}:00`;
@@ -368,217 +356,209 @@ const fetchVisites = async () => {
     }
   };
 
-  const validateForm = () => {
+  const gvp_validateForm = () => {
     const errors = {};
-    if (!formData.matricule_agent) errors.matricule_agent = 'Agent requis';
-    if (!formData.date_visite) errors.date_visite = 'Date requise';
-    if (!formData.heure_visite) errors.heure_visite = 'Heure requise';
+    if (!gvp_formData.matricule_agent) errors.matricule_agent = 'Agent requis';
+    if (!gvp_formData.date_visite) errors.date_visite = 'Date requise';
+    if (!gvp_formData.heure_visite) errors.heure_visite = 'Heure requise';
     return errors;
   };
 
-// ========== MODIFIER UNE VISITE ==========
-const handleEdit = async (visite) => {
-  console.log('📝 Données de la visite à modifier:', visite);
-  
-  // Vérifier si c'est une visite manuelle
-  if (visite.source !== 'FORMULAIRE' && visite.type_action !== 'SAISIE_MANUELLE' && visite.source_originale !== 'manuel') {
-    showNotification({ 
-      type: 'warning', 
-      title: '⚠️ Modification impossible', 
-      message: 'Cette visite provient du planning automatique et ne peut pas être modifiée.' 
-    });
-    return;
-  }
-  
-  setSelectedVisite(visite);
-  setEditMode(true);
-  
-  // Préremplir le formulaire avec les données de la visite
-  setFormData({
-    matricule_agent: visite.matricule_agent,
-    date_visite: visite.date_visite,
-    heure_visite: visite.heure_visite || '09:00:00',
-    type_visite: visite.type_visite || 'Périodique',
-    motif: visite.motif_reprogrammation || visite.motif_action || '',
-    medecin: visite.medecin || 'Dr. Mahmoud Khelifi',
-    observation: visite.observation || ''
-  });
-  
-  setShowForm(true);
-  
-  // Charger les disponibilités pour la date actuelle
-  if (visite.date_visite) {
-    chargerCreneauxDisponibles(visite.date_visite);
-  }
-};
-  // ========== SOUMISSION ==========
-
-const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  const errors = validateForm();
-  if (Object.keys(errors).length > 0) {
-    setFormErrors(errors);
-    showNotification({ type: 'error', title: '❌ Erreur', message: 'Champs obligatoires manquants' });
-    return;
-  }
-
-  setCheckingSlot(true);
-  
-  // Vérifier si l'agent n'a pas déjà une visite ce jour
-  let visiteExistante = false;
-  if (editMode && selectedVisite) {
-    visiteExistante = await verifierVisiteExistante(formData.matricule_agent, formData.date_visite, selectedVisite.id_planning);
-  } else {
-    visiteExistante = await verifierVisiteExistante(formData.matricule_agent, formData.date_visite);
-  }
-  
-  if (visiteExistante) {
-    setCheckingSlot(false);
-    showNotification({ 
-      type: 'warning', 
-      title: '⚠️ Agent déjà programmé', 
-      message: `Cet agent a déjà une visite programmée le ${new Date(formData.date_visite).toLocaleDateString('fr-FR')}.` 
-    });
-    return;
-  }
-
-  // Vérifier la disponibilité du créneau
-  let conflit = false;
-  if (editMode && selectedVisite) {
-    conflit = await verifierConflitCreneauExclu(formData.date_visite, formData.heure_visite, selectedVisite.id_planning);
-  } else {
-    conflit = await verifierConflitCreneau(formData.date_visite, formData.heure_visite);
-  }
-  
-  setCheckingSlot(false);
-  
-  if (conflit) {
-    showNotification({ 
-      type: 'warning', 
-      title: '⚠️ Créneau indisponible', 
-      message: `Le créneau du ${new Date(formData.date_visite).toLocaleDateString('fr-FR')} à ${formData.heure_visite.substring(0,5)} est déjà occupé.` 
-    });
-    return;
-  }
-
-  setSaving(true);
-  try {
-    const token = localStorage.getItem('token');
-    let url, method, bodyData;
+  // ========== MODIFIER UNE VISITE ==========
+  const gvp_handleEdit = async (visite) => {
+    console.log('📝 Données de la visite à modifier:', visite);
     
-    if (editMode && selectedVisite) {
-      // Mode édition
-      url = `${process.env.REACT_APP_API_URL}/api/visites/${selectedVisite.matricule_visite}`;
-      method = 'PUT';
-      bodyData = {
-        date_visite: formData.date_visite,
-        heure_visite: formData.heure_visite,
-        type_visite: formData.type_visite,
-        medecin: formData.medecin
-      };
-    } else {
-      // ✅ Mode création - utiliser la bonne route selon le type
-      if (formData.type_visite === 'Reclassement') {
-        url = `${process.env.REACT_APP_API_URL}/api/planifier-reclassement`;
-        method = 'POST';
-        bodyData = {
-          matricule_agent: formData.matricule_agent,
-          date_visite: formData.date_visite,
-          heure_visite: formData.heure_visite,
-          motif: formData.motif,
-          medecin: formData.medecin
-        };
-      } else if (formData.type_visite === 'Embauche') {
-        url = `${process.env.REACT_APP_API_URL}/api/planifier-embauche`;
-        method = 'POST';
-        bodyData = {
-          matricule_agent: formData.matricule_agent,
-          date_visite: formData.date_visite,
-          heure_visite: formData.heure_visite,
-          motif: formData.motif,
-          medecin: formData.medecin
-        };
-      } else {
-        
-        url = `${process.env.REACT_APP_API_URL}/api/visites`;
-        method = 'POST';
-        bodyData = {
-          matricule_agent: formData.matricule_agent,
-          date_visite: formData.date_visite,
-          heure_visite: formData.heure_visite,
-          type_visite: formData.type_visite || 'Périodique',
-          motif: formData.motif,
-          medecin: formData.medecin
-        };
-      }
+    if (visite.source !== 'FORMULAIRE' && visite.type_action !== 'SAISIE_MANUELLE' && visite.source_originale !== 'manuel') {
+      gvp_showNotification({ 
+        type: 'warning', 
+        title: '⚠️ Modification impossible', 
+        message: 'Cette visite provient du planning automatique et ne peut pas être modifiée.' 
+      });
+      return;
+    }
+    
+    setGvp_selectedVisite(visite);
+    setGvp_editMode(true);
+    
+    setGvp_formData({
+      matricule_agent: visite.matricule_agent,
+      date_visite: visite.date_visite,
+      heure_visite: visite.heure_visite || '09:00:00',
+      type_visite: visite.type_visite || 'Périodique',
+      motif: visite.motif_reprogrammation || visite.motif_action || '',
+      medecin: visite.medecin || 'Dr. Mahmoud Khelifi',
+      observation: visite.observation || ''
+    });
+    
+    setGvp_showForm(true);
+    
+    if (visite.date_visite) {
+      gvp_chargerCreneauxDisponibles(visite.date_visite);
+    }
+  };
+  
+  // ========== SOUMISSION ==========
+  const gvp_handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const errors = gvp_validateForm();
+    if (Object.keys(errors).length > 0) {
+      setGvp_formErrors(errors);
+      gvp_showNotification({ type: 'error', title: '❌ Erreur', message: 'Champs obligatoires manquants' });
+      return;
     }
 
-    console.log('📤 Envoi requête:', { url, method, bodyData });
-
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(bodyData)
-    });
-
-    const data = await response.json();
+    setGvp_checkingSlot(true);
     
-    if (data.success) {
-  showNotification({
-    type: 'success',
-    title: selectedVisite ? '✅ Modifiée' : '✅ Programmée',
-    message: selectedVisite ? 'Visite modifiée avec succès' : 'Visite programmée avec succès'
-  });
-  setShowForm(false);
-  resetForm();
-  await chargerDonnees();
-  await fetchVisites();
-      await fetchAgents();
-   window.dispatchEvent(new CustomEvent('refresh-planning'));
-} else {
-  showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
-}
-  } catch (err) {
-    console.error('Erreur:', err);
-    showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur lors de l\'enregistrement' });
-  } finally {
-    setSaving(false);
-  }
-};
+    let visiteExistante = false;
+    if (gvp_editMode && gvp_selectedVisite) {
+      visiteExistante = await gvp_verifierVisiteExistante(gvp_formData.matricule_agent, gvp_formData.date_visite, gvp_selectedVisite.id_planning);
+    } else {
+      visiteExistante = await gvp_verifierVisiteExistante(gvp_formData.matricule_agent, gvp_formData.date_visite);
+    }
+    
+    if (visiteExistante) {
+      setGvp_checkingSlot(false);
+      gvp_showNotification({ 
+        type: 'warning', 
+        title: '⚠️ Agent déjà programmé', 
+        message: `Cet agent a déjà une visite programmée le ${new Date(gvp_formData.date_visite).toLocaleDateString('fr-FR')}.` 
+      });
+      return;
+    }
 
-  const resetForm = () => {
-  setFormData({
-    matricule_agent: '',
-    date_visite: '',
-    heure_visite: '09:00:00',
-    type_visite: 'Périodique',
-    motif: '',
-    medecin: 'Dr. Mahmoud Khelifi'
-  });
-    setFormErrors({});
-    setSelectedVisite(null);
-    setEditMode(false);
-    setMoisActuel(new Date().getMonth());
-    setAnneeActuelle(new Date().getFullYear());
-    setJoursDisponibles([]);
-    setCreneauxDisponibles([]);
+    let conflit = false;
+    if (gvp_editMode && gvp_selectedVisite) {
+      conflit = await gvp_verifierConflitCreneauExclu(gvp_formData.date_visite, gvp_formData.heure_visite, gvp_selectedVisite.id_planning);
+    } else {
+      conflit = await gvp_verifierConflitCreneau(gvp_formData.date_visite, gvp_formData.heure_visite);
+    }
+    
+    setGvp_checkingSlot(false);
+    
+    if (conflit) {
+      gvp_showNotification({ 
+        type: 'warning', 
+        title: '⚠️ Créneau indisponible', 
+        message: `Le créneau du ${new Date(gvp_formData.date_visite).toLocaleDateString('fr-FR')} à ${gvp_formData.heure_visite.substring(0,5)} est déjà occupé.` 
+      });
+      return;
+    }
+
+    setGvp_saving(true);
+    try {
+      const token = localStorage.getItem('token');
+      let url, method, bodyData;
+      
+      if (gvp_editMode && gvp_selectedVisite) {
+        url = `${process.env.REACT_APP_API_URL}/api/visites/${gvp_selectedVisite.matricule_visite}`;
+        method = 'PUT';
+        bodyData = {
+          date_visite: gvp_formData.date_visite,
+          heure_visite: gvp_formData.heure_visite,
+          type_visite: gvp_formData.type_visite,
+          medecin: gvp_formData.medecin
+        };
+      } else {
+        if (gvp_formData.type_visite === 'Reclassement') {
+          url = `${process.env.REACT_APP_API_URL}/api/planifier-reclassement`;
+          method = 'POST';
+          bodyData = {
+            matricule_agent: gvp_formData.matricule_agent,
+            date_visite: gvp_formData.date_visite,
+            heure_visite: gvp_formData.heure_visite,
+            motif: gvp_formData.motif,
+            medecin: gvp_formData.medecin
+          };
+        } else if (gvp_formData.type_visite === 'Embauche') {
+          url = `${process.env.REACT_APP_API_URL}/api/planifier-embauche`;
+          method = 'POST';
+          bodyData = {
+            matricule_agent: gvp_formData.matricule_agent,
+            date_visite: gvp_formData.date_visite,
+            heure_visite: gvp_formData.heure_visite,
+            motif: gvp_formData.motif,
+            medecin: gvp_formData.medecin
+          };
+        } else {
+          url = `${process.env.REACT_APP_API_URL}/api/visites`;
+          method = 'POST';
+          bodyData = {
+            matricule_agent: gvp_formData.matricule_agent,
+            date_visite: gvp_formData.date_visite,
+            heure_visite: gvp_formData.heure_visite,
+            type_visite: gvp_formData.type_visite || 'Périodique',
+            motif: gvp_formData.motif,
+            medecin: gvp_formData.medecin
+          };
+        }
+      }
+
+      console.log('📤 Envoi requête:', { url, method, bodyData });
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(bodyData)
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        gvp_showNotification({
+          type: 'success',
+          title: gvp_selectedVisite ? '✅ Modifiée' : '✅ Programmée',
+          message: gvp_selectedVisite ? 'Visite modifiée avec succès' : 'Visite programmée avec succès'
+        });
+        setGvp_showForm(false);
+        gvp_resetForm();
+        await gvp_chargerDonnees();
+        await gvp_fetchVisites();
+        await gvp_fetchAgents();
+        window.dispatchEvent(new CustomEvent('refresh-planning'));
+      } else {
+        gvp_showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
+      }
+    } catch (err) {
+      console.error('Erreur:', err);
+      gvp_showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur lors de l\'enregistrement' });
+    } finally {
+      setGvp_saving(false);
+    }
   };
 
-  const showNotification = ({ type, title, message }) => {
-    setNotification({ show: true, type, title, message });
-    setTimeout(() => setNotification({ show: false, type: '', title: '', message: '' }), 5000);
+  const gvp_resetForm = () => {
+    setGvp_formData({
+      matricule_agent: '',
+      date_visite: '',
+      heure_visite: '09:00:00',
+      type_visite: 'Périodique',
+      motif: '',
+      medecin: 'Dr. Mahmoud Khelifi'
+    });
+    setGvp_formErrors({});
+    setGvp_selectedVisite(null);
+    setGvp_editMode(false);
+    setGvp_moisActuel(new Date().getMonth());
+    setGvp_anneeActuelle(new Date().getFullYear());
+    setGvp_joursDisponibles([]);
+    setGvp_creneauxDisponibles([]);
   };
 
-  const getAgentNom = (matricule) => {
-  const agent = agents.find(a => a.matricule_agent === matricule);
-  return agent ? `${agent.nom} ${agent.prenom}` : `Agent ${matricule}`;
-};
+  const gvp_showNotification = ({ type, title, message }) => {
+    setGvp_notification({ show: true, type, title, message });
+    setTimeout(() => setGvp_notification({ show: false, type: '', title: '', message: '' }), 5000);
+  };
 
-  const getResultatClass = (resultat) => {
+  const gvp_getAgentNom = (matricule) => {
+    const agent = gvp_agents.find(a => a.matricule_agent === matricule);
+    return agent ? `${agent.nom} ${agent.prenom}` : `Agent ${matricule}`;
+  };
+
+  const gvp_getResultatClass = (resultat) => {
     switch(resultat) {
       case 'Apte': return 'apte';
       case 'Apte avec réserves': return 'reserves';
@@ -588,7 +568,7 @@ const handleSubmit = async (e) => {
     }
   };
 
-  const getResultatIcon = (resultat) => {
+  const gvp_getResultatIcon = (resultat) => {
     switch(resultat) {
       case 'Apte': return <CheckCircle size={14} color="#10b981" />;
       case 'Apte avec réserves': return <AlertCircle size={14} color="#f59e0b" />;
@@ -598,43 +578,43 @@ const handleSubmit = async (e) => {
     }
   };
 
-  const formatDate = (date) => {
+  const gvp_formatDate = (date) => {
     if (!date) return '';
     return new Date(date).toLocaleDateString('fr-FR', {
       day: '2-digit', month: '2-digit', year: 'numeric'
     });
   };
 
-  const formatDateTime = (date, time) => {
+  const gvp_formatDateTime = (date, time) => {
     if (!date) return '';
     const [year, month, day] = date.split('-');
     const heure = time ? time.substring(0,5) : '';
     return `${day}/${month}/${year} ${heure}`;
   };
 
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentVisites = visites.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(visites.length / itemsPerPage);
+  const gvp_indexOfLastItem = gvp_currentPage * gvp_itemsPerPage;
+  const gvp_indexOfFirstItem = gvp_indexOfLastItem - gvp_itemsPerPage;
+  const gvp_currentVisites = gvp_visites.slice(gvp_indexOfFirstItem, gvp_indexOfLastItem);
+  const gvp_totalPages = Math.ceil(gvp_visites.length / gvp_itemsPerPage);
 
   // ========== RENDU ==========
   return (
-    <div className="gestion-visites-page">
+    <div className="gvp_gestion-visites-page">
       {/* NOTIFICATION */}
-      {notification.show && (
-        <div className={`notification-container ${notification.type}`}>
-          <div className="notification-content">
-            <div className="notification-icon">
-              {notification.type === 'success' && <CheckCircle size={24} />}
-              {notification.type === 'error' && <XCircle size={24} />}
-              {notification.type === 'warning' && <AlertCircle size={24} />}
-              {notification.type === 'info' && <Info size={24} />}
+      {gvp_notification.show && (
+        <div className={`gvp_notification-container ${gvp_notification.type}`}>
+          <div className="gvp_notification-content">
+            <div className="gvp_notification-icon">
+              {gvp_notification.type === 'success' && <CheckCircle size={24} />}
+              {gvp_notification.type === 'error' && <XCircle size={24} />}
+              {gvp_notification.type === 'warning' && <AlertCircle size={24} />}
+              {gvp_notification.type === 'info' && <Info size={24} />}
             </div>
-            <div className="notification-text">
-              <h4>{notification.title}</h4>
-              <p>{notification.message}</p>
+            <div className="gvp_notification-text">
+              <h4>{gvp_notification.title}</h4>
+              <p>{gvp_notification.message}</p>
             </div>
-            <button className="notification-close" onClick={() => setNotification({...notification, show: false})}>
+            <button className="gvp_notification-close" onClick={() => setGvp_notification({...gvp_notification, show: false})}>
               <X size={16} />
             </button>
           </div>
@@ -642,32 +622,32 @@ const handleSubmit = async (e) => {
       )}
 
       {/* HEADER */}
-      <div className="gestion-header">
-        <div className="header-left">
-          <div className="header-icon">
+      <div className="gvp_gestion-header">
+        <div className="gvp_header-left">
+          <div className="gvp_header-icon">
             <Stethoscope size={28} />
           </div>
-          <div className="header-title">
-            <h1>Gestion des visites médicales - Reclassement & Embauche</h1>
+          <div className="gvp_header-title">
+            <h1>Gestion des visites médicales - Reclassement &amp; Embauche</h1>
             <p>Programmation des visites de reclassement et d'embauche (périodique pour les cas particulières)</p>
           </div>
         </div>
 
-        <div className="header-right">
-          <div className="header-stats">
-            <div className="header-stat-item">
+        <div className="gvp_header-right">
+          <div className="gvp_header-stats">
+            <div className="gvp_header-stat-item">
               <FileText size={16} />
-              <span><strong>{stats.total || 0}</strong> total</span>
+              <span><strong>{gvp_stats.total || 0}</strong> total</span>
             </div>
           </div>
 
-          <button className="btn-icon" onClick={chargerDonnees} title="Actualiser">
+          <button className="gvp_btn-icon" onClick={gvp_chargerDonnees} title="Actualiser">
             <RefreshCw size={18} />
           </button>
 
-          <button className="btn-primary" onClick={() => {
-            resetForm();
-            setShowForm(true);
+          <button className="gvp_btn-primary" onClick={() => {
+            gvp_resetForm();
+            setGvp_showForm(true);
           }}>
             <Plus size={16} /> Programmer une visite
           </button>
@@ -675,286 +655,283 @@ const handleSubmit = async (e) => {
       </div>
 
       {/* FILTRES */}
-      <div className="filters-section">
-        <div className="filters-header">
+      <div className="gvp_filters-section">
+        <div className="gvp_filters-header">
           <button
-            className={`filter-toggle-btn ${showFilters ? 'active' : ''}`}
-            onClick={() => setShowFilters(!showFilters)}
+            className={`gvp_filter-toggle-btn ${gvp_showFilters ? 'active' : ''}`}
+            onClick={() => setGvp_showFilters(!gvp_showFilters)}
           >
             <Filter size={16} /> Filtres avancés
           </button>
 
-          <div className="search-box">
+          <div className="gvp_search-box">
             <Search size={16} />
             <input
               type="text"
               placeholder="Rechercher un agent..."
-              value={filters.search}
-              onChange={(e) => setFilters({...filters, search: e.target.value})}
+              value={gvp_filters.search}
+              onChange={(e) => setGvp_filters({...gvp_filters, search: e.target.value})}
             />
           </div>
         </div>
 
-        {showFilters && (
-  <div className="filters-panel">
-    <div className="filters-grid">
-      <div className="filter-group">
-        <label>Type de visite</label>
-        <select value={filters.type} onChange={(e) => setFilters({...filters, type: e.target.value})}>
-          <option value="all">Tous</option>
-          <option value="Périodique"> Périodique</option>
-          <option value="Reclassement"> Reclassement</option>
-          <option value="Embauche"> Embauche</option>
-        </select>
+        {gvp_showFilters && (
+          <div className="gvp_filters-panel">
+            <div className="gvp_filters-grid">
+              <div className="gvp_filter-group">
+                <label>Type de visite</label>
+                <select value={gvp_filters.type} onChange={(e) => setGvp_filters({...gvp_filters, type: e.target.value})}>
+                  <option value="all">Tous</option>
+                  <option value="Périodique">Périodique</option>
+                  <option value="Reclassement">Reclassement</option>
+                  <option value="Embauche">Embauche</option>
+                </select>
+              </div>
+
+              <div className="gvp_filter-group">
+                <label>Résultat</label>
+                <select value={gvp_filters.resultat} onChange={(e) => setGvp_filters({...gvp_filters, resultat: e.target.value})}>
+                  <option value="all">Tous</option>
+                  <option value="Apte">Apte</option>
+                  <option value="Inapte temporaire">Inapte temporaire</option>
+                  <option value="Inapte définitif">Inapte définitif</option>
+                </select>
+              </div>
+
+              <div className="gvp_filter-group">
+                <label>Période</label>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <select 
+                    value={gvp_moisFiltre} 
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setGvp_moisFiltre(value === 'all' ? 'all' : parseInt(value));
+                    }}
+                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                  >
+                    <option value="all">Tous les mois</option>
+                    <option value={1}>Janvier</option>
+                    <option value={2}>Février</option>
+                    <option value={3}>Mars</option>
+                    <option value={4}>Avril</option>
+                    <option value={5}>Mai</option>
+                    <option value={6}>Juin</option>
+                    <option value={7}>Juillet</option>
+                    <option value={8}>Août</option>
+                    <option value={9}>Septembre</option>
+                    <option value={10}>Octobre</option>
+                    <option value={11}>Novembre</option>
+                    <option value={12}>Décembre</option>
+                  </select>
+                  <input 
+                    type="number" 
+                    value={gvp_anneeFiltre} 
+                    onChange={(e) => setGvp_anneeFiltre(parseInt(e.target.value))}
+                    style={{ width: '80px', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                    min="2020"
+                    max="2030"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="gvp_filters-actions">
+              <button className="gvp_btn-secondary" onClick={() => {
+                setGvp_filters({
+                  search: '', 
+                  type: 'all', 
+                  resultat: 'all', 
+                  agent: 'all'
+                });
+                setGvp_moisFiltre('all');      
+                setGvp_anneeFiltre(new Date().getFullYear());  
+                gvp_fetchVisites(); 
+              }}>
+                Réinitialiser
+              </button>
+              <button className="gvp_btn-primary" onClick={gvp_fetchVisites}>
+                Appliquer les filtres
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="filter-group">
-        <label>Résultat</label>
-        <select value={filters.resultat} onChange={(e) => setFilters({...filters, resultat: e.target.value})}>
-          <option value="all"> Tous</option>
-          <option value="Apte"> Apte</option>
-          <option value="Inapte temporaire"> Inapte temporaire</option>
-          <option value="Inapte définitif">Inapte définitif</option>
-        </select>
+      <div className="gvp_stats-mini-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+        <div className="gvp_stat-mini-card">
+          <div className="gvp_stat-mini-icon" style={{ background: '#2563eb20', color: '#2563eb' }}>
+            <FileText size={20} />
+          </div>
+          <div className="gvp_stat-mini-content">
+            <span className="gvp_stat-mini-label">Total visites manuelles</span>
+            <span className="gvp_stat-mini-value">{gvp_stats.total || 0}</span>
+          </div>
+        </div>
+
+        <div className="gvp_stat-mini-card">
+          <div className="gvp_stat-mini-icon" style={{ background: '#10b98120', color: '#10b981' }}>
+            <CheckCircle size={20} />
+          </div>
+          <div className="gvp_stat-mini-content">
+            <span className="gvp_stat-mini-label">Aptes</span>
+            <span className="gvp_stat-mini-value">{gvp_stats.aptes || 0}</span>
+          </div>
+        </div>
+
+        <div className="gvp_stat-mini-card">
+          <div className="gvp_stat-mini-icon" style={{ background: '#ef444420', color: '#ef4444' }}>
+            <XCircle size={20} />
+          </div>
+          <div className="gvp_stat-mini-content">
+            <span className="gvp_stat-mini-label">Inaptes</span>
+            <span className="gvp_stat-mini-value">{gvp_stats.inaptes || 0}</span>
+          </div>
+        </div>
       </div>
-
-      {/* ✅ Remplacer les champs date par ce sélecteur */}
-      <div className="filter-group">
-  <label>Période</label>
-  <div style={{ display: 'flex', gap: '8px' }}>
-    <select 
-      value={moisFiltre} 
-      onChange={(e) => {
-        const value = e.target.value;
-        setMoisFiltre(value === 'all' ? 'all' : parseInt(value));
-      }}
-      style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-    >
-      <option value="all"> Tous les mois</option>
-      <option value={1}>Janvier</option>
-      <option value={2}>Février</option>
-      <option value={3}>Mars</option>
-      <option value={4}>Avril</option>
-      <option value={5}>Mai</option>
-      <option value={6}>Juin</option>
-      <option value={7}>Juillet</option>
-      <option value={8}>Août</option>
-      <option value={9}>Septembre</option>
-      <option value={10}>Octobre</option>
-      <option value={11}>Novembre</option>
-      <option value={12}>Décembre</option>
-    </select>
-    <input 
-      type="number" 
-      value={anneeFiltre} 
-      onChange={(e) => setAnneeFiltre(parseInt(e.target.value))}
-      style={{ width: '80px', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-      min="2020"
-      max="2030"
-    />
-  </div>
-</div>
-    </div>
-
-    <div className="filters-actions">
-      <button className="btn-secondary" onClick={() => {
-  setFilters({
-    search: '', 
-    type: 'all', 
-    resultat: 'all', 
-    agent: 'all'
-  });
-  setMoisFiltre('all');      
-  setAnneeFiltre(new Date().getFullYear());  
-  fetchVisites(); 
-}}>
-  Réinitialiser
-</button>
-      <button className="btn-primary" onClick={fetchVisites}>
-        Appliquer les filtres
-      </button>
-    </div>
-  </div>
-)}
-      </div>
-
-<div className="stats-mini-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-  <div className="stat-mini-card">
-    <div className="stat-mini-icon" style={{ background: '#2563eb20', color: '#2563eb' }}>
-      <FileText size={20} />
-    </div>
-    <div className="stat-mini-content">
-      <span className="stat-mini-label">Total visites manuelles</span>
-      <span className="stat-mini-value">{stats.total || 0}</span>
-    </div>
-  </div>
-
-  <div className="stat-mini-card">
-    <div className="stat-mini-icon" style={{ background: '#10b98120', color: '#10b981' }}>
-      <CheckCircle size={20} />
-    </div>
-    <div className="stat-mini-content">
-      <span className="stat-mini-label">Aptes</span>
-      <span className="stat-mini-value">{stats.aptes || 0}</span>
-    </div>
-  </div>
-
-  <div className="stat-mini-card">
-    <div className="stat-mini-icon" style={{ background: '#ef444420', color: '#ef4444' }}>
-      <XCircle size={20} />
-    </div>
-    <div className="stat-mini-content">
-      <span className="stat-mini-label">Inaptes</span>
-      <span className="stat-mini-value">{stats.inaptes || 0}</span>
-    </div>
-  </div>
-</div>
+      
       {/* TABLEAU DES VISITES */}
-      {loading ? (
-        <div className="loading-state">
-          <div className="spinner"></div>
+      {gvp_loading ? (
+        <div className="gvp_loading-state">
+          <div className="gvp_spinner"></div>
           <p>Chargement des visites...</p>
         </div>
-      ) : visites.length === 0 ? (
-        <div className="empty-state">
+      ) : gvp_visites.length === 0 ? (
+        <div className="gvp_empty-state">
           <Stethoscope size={48} />
           <h3>Aucune visite trouvée</h3>
           <p>Commencez par programmer une visite de reclassement ou d'embauche</p>
-          <button className="btn-primary" onClick={() => {
-            resetForm();
-            setShowForm(true);
+          <button className="gvp_btn-primary" onClick={() => {
+            gvp_resetForm();
+            setGvp_showForm(true);
           }}>
             <Plus size={16} /> Programmer une visite
           </button>
         </div>
       ) : (
         <>
-          <div className="table-container">
-            <table className="visites-table">
-  <thead>
-    <tr>
-      <th>Date & Heure</th>
-      <th>Agent</th>
-      <th>Type</th>
-      <th>Médecin</th>
-      <th>Résultat</th>
-      <th>Observations</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {currentVisites.map(visite => (
-    <tr key={visite.matricule_visite}>
-      <td>
-        <div className="date-cell">
-          <Calendar size={12} />
-          {visite.date_visite ? formatDateTime(visite.date_visite, visite.heure_visite) : 'Date non définie'}
-        </div>
-      </td>
-    <td>
-      <div className="agent-cell">
-        <div className="agent-avatar-small">
-          {/* Utiliser visite.visiteAgent s'il existe, sinon chercher dans agents */}
-          {(visite.visiteAgent?.nom?.charAt(0) || visite.agent_nom?.charAt(0) || '?')}
-          {(visite.visiteAgent?.prenom?.charAt(0) || visite.agent_prenom?.charAt(0) || '')}
-        </div>
-        <div className="agent-info">
-          <span>{visite.visiteAgent?.nom || visite.agent_nom} {visite.visiteAgent?.prenom || visite.agent_prenom}</span>
-          <small>#{visite.matricule_agent}</small>
-        </div>
-      </div>
-    </td>
-        <td>
-          {/* ✅ Affichage correct du type */}
-          {visite.type_visite === 'Périodique' && (
-            <span className="type-badge periodique">📋 Périodique</span>
-          )}
-          {visite.type_visite === 'Reclassement' && (
-            <span className="type-badge reclassement">📝 Reclassement</span>
-          )}
-          {visite.type_visite === 'Embauche' && (
-            <span className="type-badge embauche">👔 Embauche</span>
-          )}
-          {!visite.type_visite && (
-            <span className="type-badge periodique">📋 Périodique</span>
-          )}
-        </td>
-        <td>
-          <div className="medecin-cell">
-            <User size={12} />
-            {visite.medecin || 'Dr. Mahmoud Khelifi'}
-          </div>
-        </td>
-        <td>
-          {/* ✅ Affichage du résultat uniquement si la visite a été effectuée */}
-          {visite.type_action === 'EFFECTUEE' ? (
-            <span className={`resultat-badge ${getResultatClass(visite.resultat)}`}>
-              {getResultatIcon(visite.resultat)}
-              {visite.resultat || 'Non défini'}
-            </span>
-          ) : (
-            <span className="resultat-badge non-effectue">
-              <Clock size={12} /> En attente
-            </span>
-          )}
-        </td>
-        <td>
-          <div className="observation-cell" title={visite.observation}>
-            {visite.observation?.substring(0, 50) || '-'}
-            {visite.observation?.length > 50 && '...'}
-          </div>
-        </td>
-        <td>
-          <div className="row-actions">
-            <button
-              className={`action-btn edit ${visite.hasActions ? 'disabled' : ''}`}
-              onClick={() => !visite.hasActions && handleEdit(visite)}
-              title={visite.hasActions ? 'Modification impossible - Une action a déjà été effectuée' : 'Modifier la programmation'}
-              disabled={visite.hasActions}
-            >
-              <Edit size={14} />
-            </button>
-          </div>
-        </td>
-      </tr>
-    ))}
-  </tbody>
-</table>
+          <div className="gvp_table-container">
+            <table className="gvp_visites-table">
+              <thead>
+                <tr>
+                  <th>Date & Heure</th>
+                  <th>Agent</th>
+                  <th>Type</th>
+                  <th>Médecin</th>
+                  <th>Résultat</th>
+                  <th>Observations</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gvp_currentVisites.map(visite => (
+                  <tr key={visite.matricule_visite}>
+                    <td>
+                      <div className="gvp_date-cell">
+                        <Calendar size={12} />
+                        {visite.date_visite ? gvp_formatDateTime(visite.date_visite, visite.heure_visite) : 'Date non définie'}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="gvp_agent-cell">
+                        <div className="gvp_agent-avatar-small">
+                          {(visite.visiteAgent?.nom?.charAt(0) || visite.agent_nom?.charAt(0) || '?')}
+                          {(visite.visiteAgent?.prenom?.charAt(0) || visite.agent_prenom?.charAt(0) || '')}
+                        </div>
+                        <div className="gvp_agent-info">
+                          <span>{visite.visiteAgent?.nom || visite.agent_nom} {visite.visiteAgent?.prenom || visite.agent_prenom}</span>
+                          <small>#{visite.matricule_agent}</small>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      {visite.type_visite === 'Périodique' && (
+                        <span className="gvp_type-badge periodique">📋 Périodique</span>
+                      )}
+                      {visite.type_visite === 'Reclassement' && (
+                        <span className="gvp_type-badge reclassement">📝 Reclassement</span>
+                      )}
+                      {visite.type_visite === 'Embauche' && (
+                        <span className="gvp_type-badge embauche">👔 Embauche</span>
+                      )}
+                      {!visite.type_visite && (
+                        <span className="gvp_type-badge periodique">📋 Périodique</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="gvp_medecin-cell">
+                        <User size={12} />
+                        {visite.medecin || 'Dr. Mahmoud Khelifi'}
+                      </div>
+                    </td>
+                    <td>
+                      {visite.type_action === 'EFFECTUEE' ? (
+                        <span className={`gvp_resultat-badge ${gvp_getResultatClass(visite.resultat)}`}>
+                          {gvp_getResultatIcon(visite.resultat)}
+                          {visite.resultat || 'Non défini'}
+                        </span>
+                      ) : (
+                        <span className="gvp_resultat-badge non-effectue">
+                          <Clock size={12} /> En attente
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="gvp_observation-cell" title={visite.observation}>
+                        {visite.observation?.substring(0, 50) || '-'}
+                        {visite.observation?.length > 50 && '...'}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="gvp_row-actions">
+                        <button
+                          className={`gvp_action-btn edit ${visite.hasActions ? 'disabled' : ''}`}
+                          onClick={() => !visite.hasActions && gvp_handleEdit(visite)}
+                          title={visite.hasActions ? 'Modification impossible - Une action a déjà été effectuée' : 'Modifier la programmation'}
+                          disabled={visite.hasActions}
+                        >
+                          <Edit size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
 
           {/* PAGINATION */}
-          {visites.length > 0 && (
-            <div className="pagination">
+          {gvp_visites.length > 0 && (
+            <div className="gvp_pagination">
               <button
-                className="pagination-btn"
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
+                className="gvp_pagination-btn"
+                onClick={() => setGvp_currentPage(1)}
+                disabled={gvp_currentPage === 1}
               >
                 <ChevronsLeft size={16} />
               </button>
               <button
-                className="pagination-btn"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
+                className="gvp_pagination-btn"
+                onClick={() => setGvp_currentPage(prev => Math.max(1, prev - 1))}
+                disabled={gvp_currentPage === 1}
               >
                 <ChevronLeft size={16} />
               </button>
 
-              <span className="pagination-info">
-                Page {currentPage} / {totalPages}
+              <span className="gvp_pagination-info">
+                Page {gvp_currentPage} / {gvp_totalPages}
               </span>
 
               <button
-                className="pagination-btn"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
+                className="gvp_pagination-btn"
+                onClick={() => setGvp_currentPage(prev => Math.min(gvp_totalPages, prev + 1))}
+                disabled={gvp_currentPage === gvp_totalPages}
               >
                 <ChevronRight size={16} />
               </button>
               <button
-                className="pagination-btn"
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
+                className="gvp_pagination-btn"
+                onClick={() => setGvp_currentPage(gvp_totalPages)}
+                disabled={gvp_currentPage === gvp_totalPages}
               >
                 <ChevronsRight size={16} />
               </button>
@@ -965,208 +942,204 @@ const handleSubmit = async (e) => {
 
       {/* ========== MODAL FORMULAIRE AVEC CALENDRIER INTELLIGENT ========== */}
       <AnimatePresence>
-        {showForm && (
+        {gvp_showForm && (
           <motion.div
-            className="modal-overlay"
+            className="gvp_modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => setShowForm(false)}
+            onClick={() => setGvp_showForm(false)}
           >
             <motion.div
-              className="modal-content large"
+              className="gvp_modal-content large"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={e => e.stopPropagation()}
             >
-              <div className="modal-header">
-                <div className="header-icon" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
+              <div className="gvp_modal-header">
+                <div className="gvp_header-icon" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>
                   <Calendar size={24} />
                 </div>
-                <h2>{editMode ? 'Modifier la programmation' : 'Programmer une visite'}</h2>
-                <button className="modal-close" onClick={() => setShowForm(false)}>
+                <h2>{gvp_editMode ? 'Modifier la programmation' : 'Programmer une visite'}</h2>
+                <button className="gvp_modal-close" onClick={() => setGvp_showForm(false)}>
                   <X size={18} />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit}>
-  <div className="modal-body">
-    <div className="form-info-banner">
-      <Info size={16} />
-      <span>Programmation d'une visite de <strong>{formData.type_visite === 'Reclassement' ? 'Reclassement' : 'Embauche'}</strong></span>
-    </div>
+              <form onSubmit={gvp_handleSubmit}>
+                <div className="gvp_modal-body">
+                  <div className="gvp_form-info-banner">
+                    <Info size={16} />
+                    <span>Programmation d'une visite de <strong>{gvp_formData.type_visite === 'Reclassement' ? 'Reclassement' : 'Embauche'}</strong></span>
+                  </div>
 
-    <div className="form-grid two-columns">
-    {/* Sélection de l'agent - en mode édition, afficher mais désactiver */}
-<div className="form-group full-width">
-  <label>
-    <User size={14} />
-    Agent <span className="required">*</span>
-  </label>
-  
-  {editMode ? (
-    // Mode édition : afficher l'agent sans possibilité de modification
-    <div style={{
-      background: '#f1f5f9',
-      padding: '12px 15px',
-      borderRadius: '10px',
-      border: '1px solid #e2e8f0'
-    }}>
-      <strong>{getAgentNom(formData.matricule_agent)}</strong>
-      <span style={{ marginLeft: '10px', fontSize: '12px', color: '#64748b' }}>
-        #{formData.matricule_agent}
-      </span>
-      <input type="hidden" name="matricule_agent" value={formData.matricule_agent} />
-    </div>
-  ) : (
-    <AgentSearchInput
-      value={formData.matricule_agent}
-      onChange={(matricule) => {
-        setFormData({...formData, matricule_agent: matricule, date_visite: '', heure_visite: ''});
-        setJoursDisponibles([]);
-        setCreneauxDisponibles([]);
-      }}
-      onSelect={(agent) => console.log('Agent sélectionné:', agent)}
-      placeholder="Tapez le nom, prénom ou matricule..."
-    />
-  )}
-  {formErrors.matricule_agent && (
-    <div className="error-message">{formErrors.matricule_agent}</div>
-  )}
-</div>
+                  <div className="gvp_form-grid two-columns">
+                    {/* Sélection de l'agent */}
+                    <div className="gvp_form-group full-width">
+                      <label>
+                        <User size={14} />
+                        Agent <span className="required">*</span>
+                      </label>
+                      
+                      {gvp_editMode ? (
+                        <div style={{
+                          background: '#f1f5f9',
+                          padding: '12px 15px',
+                          borderRadius: '10px',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <strong>{gvp_getAgentNom(gvp_formData.matricule_agent)}</strong>
+                          <span style={{ marginLeft: '10px', fontSize: '12px', color: '#64748b' }}>
+                            #{gvp_formData.matricule_agent}
+                          </span>
+                          <input type="hidden" name="matricule_agent" value={gvp_formData.matricule_agent} />
+                        </div>
+                      ) : (
+                        <AgentSearchInput
+                          value={gvp_formData.matricule_agent}
+                          onChange={(matricule) => {
+                            setGvp_formData({...gvp_formData, matricule_agent: matricule, date_visite: '', heure_visite: ''});
+                            setGvp_joursDisponibles([]);
+                            setGvp_creneauxDisponibles([]);
+                          }}
+                          onSelect={(agent) => console.log('Agent sélectionné:', agent)}
+                          placeholder="Tapez le nom, prénom ou matricule..."
+                        />
+                      )}
+                      {gvp_formErrors.matricule_agent && (
+                        <div className="gvp_error-message">{gvp_formErrors.matricule_agent}</div>
+                      )}
+                    </div>
 
-      {/* Type de visite */}
-     
-<div className="form-group">
-  <label>
-    <FileText size={14} />
-    Type de visite <span className="required">*</span>
-  </label>
-  <select
-    value={formData.type_visite}
-    onChange={(e) => setFormData({...formData, type_visite: e.target.value})}
-    required
-  >
-    <option value="Périodique"> Périodique</option>
-    <option value="Reclassement"> Reclassement</option>
-    <option value="Embauche"> Embauche</option>
-  </select>
-</div>
+                    {/* Type de visite */}
+                    <div className="gvp_form-group">
+                      <label>
+                        <FileText size={14} />
+                        Type de visite <span className="required">*</span>
+                      </label>
+                      <select
+                        value={gvp_formData.type_visite}
+                        onChange={(e) => setGvp_formData({...gvp_formData, type_visite: e.target.value})}
+                        required
+                      >
+                        <option value="Périodique">Périodique</option>
+                        <option value="Reclassement">Reclassement</option>
+                        <option value="Embauche">Embauche</option>
+                      </select>
+                    </div>
 
-<div className="form-group">
-  <label>
-    <User size={14} />
-    Médecin
-  </label>
-  <div className="medecin-default-box">
-    <User size={16} className="medecin-icon" />
-    <span className="medecin-name">Dr. Mahmoud Khelifi</span>
-    <span className="medecin-badge">Médecin du travail</span>
-  </div>
-  <input type="hidden" name="medecin" value="Dr. Mahmoud Khelifi" />
-  <small className="form-hint">Médecin par défaut - Non modifiable</small>
-</div>
+                    <div className="gvp_form-group">
+                      <label>
+                        <User size={14} />
+                        Médecin
+                      </label>
+                      <div className="gvp_medecin-default-box">
+                        <User size={16} className="gvp_medecin-icon" />
+                        <span className="gvp_medecin-name">Dr. Mahmoud Khelifi</span>
+                        <span className="gvp_medecin-badge">Médecin du travail</span>
+                      </div>
+                      <input type="hidden" name="medecin" value="Dr. Mahmoud Khelifi" />
+                      <small className="gvp_form-hint">Médecin par défaut - Non modifiable</small>
+                    </div>
+                    
                     {/* ========== CALENDRIER INTELLIGENT - JOURS ========== */}
-<div className="form-group full-width">
-  <label>
-    <Calendar size={14} />
-    Date <span className="required">*</span>
-  </label>
-  
-  {/* Navigation mois */}
-  <div className="mois-navigation">
-    <button type="button" onClick={handleMoisPrecedent}>◀</button>
-    <span>{new Date(anneeActuelle, moisActuel).toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</span>
-    <button type="button" onClick={handleMoisSuivant}>▶</button>
-  </div>
-  
-  {/* ✅ Grille des jours - UNIQUEMENT les jours ouvrés avec créneaux > 0 */}
-  {!formData.matricule_agent ? (
-    <div className="no-jours-disponibles">
-      <AlertCircle size={16} />
-      <span>Sélectionnez d'abord un agent</span>
-    </div>
-  ) : joursDisponibles.filter(jour => jour.creneauxDisponibles > 0).length === 0 ? (
-    <div className="no-jours-disponibles">
-      <AlertCircle size={16} />
-      <span>Aucun jour ouvré disponible avec créneaux libres pour ce mois</span>
-    </div>
-  ) : (
-    <div className="calendrier-jours">
-      {joursDisponibles
-        .filter(jour => jour.creneauxDisponibles > 0) // ✅ Filtrer les jours sans créneaux
-        .map(jour => {
-          // Parser la date sans décalage horaire
-          const [year, month, day] = jour.date.split('-');
-          const jourNum = parseInt(day);
-          const dateObj = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
-          const jourSemaine = dateObj.getUTCDay();
-          
-          const estSelectionne = formData.date_visite === jour.date;
-          const joursSemaine = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-          
-          // ✅ Ne pas afficher Dimanche(0), Lundi(1), Samedi(6)
-          if (jourSemaine === 0 || jourSemaine === 1 || jourSemaine === 6) {
-            return null;
-          }
-          
-          return (
-            <button
-              key={jour.date}
-              type="button"
-              className={`jour-cell ${estSelectionne ? 'selected' : ''}`}
-              onClick={() => {
-                setFormData({...formData, date_visite: jour.date, heure_visite: ''});
-              }}
-              title={`${jour.creneauxDisponibles} créneau(x) disponible(s)`}
-            >
-              <span className="jour-num">{jourNum}</span>
-              <span className="jour-semaine">{joursSemaine[jourSemaine]}</span>
-              <span className="creneaux-count">{jour.creneauxDisponibles} créneau(x)</span>
-            </button>
-          );
-        })}
-    </div>
-  )}
-</div>
+                    <div className="gvp_form-group full-width">
+                      <label>
+                        <Calendar size={14} />
+                        Date <span className="required">*</span>
+                      </label>
+                      
+                      {/* Navigation mois */}
+                      <div className="gvp_mois-navigation">
+                        <button type="button" onClick={gvp_handleMoisPrecedent}>◀</button>
+                        <span>{new Date(gvp_anneeActuelle, gvp_moisActuel).toLocaleString('fr-FR', { month: 'long', year: 'numeric' })}</span>
+                        <button type="button" onClick={gvp_handleMoisSuivant}>▶</button>
+                      </div>
+                      
+                      {!gvp_formData.matricule_agent ? (
+                        <div className="gvp_no-jours-disponibles">
+                          <AlertCircle size={16} />
+                          <span>Sélectionnez d'abord un agent</span>
+                        </div>
+                      ) : gvp_joursDisponibles.filter(jour => jour.creneauxDisponibles > 0).length === 0 ? (
+                        <div className="gvp_no-jours-disponibles">
+                          <AlertCircle size={16} />
+                          <span>Aucun jour ouvré disponible avec créneaux libres pour ce mois</span>
+                        </div>
+                      ) : (
+                        <div className="gvp_calendrier-jours">
+                          {gvp_joursDisponibles
+                            .filter(jour => jour.creneauxDisponibles > 0)
+                            .map(jour => {
+                              const [year, month, day] = jour.date.split('-');
+                              const jourNum = parseInt(day);
+                              const dateObj = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+                              const jourSemaine = dateObj.getUTCDay();
+                              
+                              const estSelectionne = gvp_formData.date_visite === jour.date;
+                              const joursSemaine = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+                              
+                              if (jourSemaine === 0 || jourSemaine === 1 || jourSemaine === 6) {
+                                return null;
+                              }
+                              
+                              return (
+                                <button
+                                  key={jour.date}
+                                  type="button"
+                                  className={`gvp_jour-cell ${estSelectionne ? 'selected' : ''}`}
+                                  onClick={() => {
+                                    setGvp_formData({...gvp_formData, date_visite: jour.date, heure_visite: ''});
+                                  }}
+                                  title={`${jour.creneauxDisponibles} créneau(x) disponible(s)`}
+                                >
+                                  <span className="gvp_jour-num">{jourNum}</span>
+                                  <span className="gvp_jour-semaine">{joursSemaine[jourSemaine]}</span>
+                                  <span className="gvp_creneaux-count">{jour.creneauxDisponibles} créneau(x)</span>
+                                </button>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </div>
 
                     {/* ========== CALENDRIER INTELLIGENT - CRÉNEAUX ========== */}
-                    <div className="form-group">
+                    <div className="gvp_form-group">
                       <label>
                         <Clock size={14} />
                         Heure <span className="required">*</span>
                       </label>
-                      {!formData.date_visite ? (
-                        <div className="info-message">
+                      {!gvp_formData.date_visite ? (
+                        <div className="gvp_info-message">
                           <Info size={14} />
                           <span>Sélectionnez une date d'abord</span>
                         </div>
-                      ) : loadingCreneaux ? (
-                        <div className="loading-creneaux">Chargement des créneaux...</div>
+                      ) : gvp_loadingCreneaux ? (
+                        <div className="gvp_loading-creneaux">Chargement des créneaux...</div>
                       ) : (
-                        <div className="creneaux-grid">
-                          {creneauxDisponibles.map(creneau => (
+                        <div className="gvp_creneaux-grid">
+                          {gvp_creneauxDisponibles.map(creneau => (
                             <button
                               key={creneau.heure}
                               type="button"
-                              className={`creneau-cell ${creneau.disponible ? 'disponible' : 'indisponible'} ${formData.heure_visite === creneau.heure ? 'selected' : ''}`}
+                              className={`gvp_creneau-cell ${creneau.disponible ? 'disponible' : 'indisponible'} ${gvp_formData.heure_visite === creneau.heure ? 'selected' : ''}`}
                               onClick={() => {
                                 if (creneau.disponible) {
-                                  setFormData({...formData, heure_visite: creneau.heure});
+                                  setGvp_formData({...gvp_formData, heure_visite: creneau.heure});
                                 }
                               }}
                               disabled={!creneau.disponible}
                               title={creneau.message}
                             >
                               {creneau.heure_affichage}
-                              {creneau.disponible && formData.heure_visite === creneau.heure && <span className="check-icon">✓</span>}
+                              {creneau.disponible && gvp_formData.heure_visite === creneau.heure && <span className="gvp_check-icon">✓</span>}
                             </button>
                           ))}
                         </div>
                       )}
-                      {!loadingCreneaux && formData.date_visite && creneauxDisponibles.filter(c => c.disponible).length === 0 && (
-                        <div className="no-creneaux-disponibles">
+                      {!gvp_loadingCreneaux && gvp_formData.date_visite && gvp_creneauxDisponibles.filter(c => c.disponible).length === 0 && (
+                        <div className="gvp_no-creneaux-disponibles">
                           <AlertCircle size={14} />
                           <span>Aucun créneau disponible pour cette date</span>
                         </div>
@@ -1174,32 +1147,32 @@ const handleSubmit = async (e) => {
                     </div>
 
                     {/* Motif (optionnel) */}
-                    <div className="form-group full-width">
+                    <div className="gvp_form-group full-width">
                       <label>
                         <Info size={14} />
                         Motif (optionnel)
                       </label>
                       <textarea
                         rows="2"
-                        value={formData.motif}
-                        onChange={(e) => setFormData({...formData, motif: e.target.value})}
+                        value={gvp_formData.motif}
+                        onChange={(e) => setGvp_formData({...gvp_formData, motif: e.target.value})}
                         placeholder="Motif de la programmation..."
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="modal-footer">
-                  <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>
+                <div className="gvp_modal-footer">
+                  <button type="button" className="gvp_btn-secondary" onClick={() => setGvp_showForm(false)}>
                     Annuler
                   </button>
-                  <button type="submit" className="btn-primary" disabled={saving || checkingSlot || !formData.heure_visite}>
-                    {checkingSlot ? (
-                      <><span className="spinner-small"></span> Vérification créneau...</>
-                    ) : saving ? (
-                      <><span className="spinner-small"></span> Enregistrement...</>
+                  <button type="submit" className="gvp_btn-primary" disabled={gvp_saving || gvp_checkingSlot || !gvp_formData.heure_visite}>
+                    {gvp_checkingSlot ? (
+                      <><span className="gvp_spinner-small"></span> Vérification créneau...</>
+                    ) : gvp_saving ? (
+                      <><span className="gvp_spinner-small"></span> Enregistrement...</>
                     ) : (
-                      <><Save size={16} /> {editMode ? 'Modifier' : 'Programmer'}</>
+                      <><Save size={16} /> {gvp_editMode ? 'Modifier' : 'Programmer'}</>
                     )}
                   </button>
                 </div>
@@ -1212,4 +1185,4 @@ const handleSubmit = async (e) => {
   );
 };
 
-export default GestionVisitesPage; 
+export default GestionVisitesPage;

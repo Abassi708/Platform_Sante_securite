@@ -2,13 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  FileText, Clock, Calendar, TrendingUp, Download, ArrowLeft, 
-  LogOut, Search, Filter, Eye, CheckCircle, XCircle, BarChart,
-  Users, Briefcase, Award, Zap, Bell, Settings, HelpCircle, Key,
-  Trash2, X, AlertCircle, Info, User, Mail, Shield, Eye as EyeIcon,
-  EyeOff, Send, MessageCircle, Hash, Crown, Wrench, Heart,
-  History, ChevronRight, Home, Building2, Activity, UserCheck, UserX,
-  Truck  // ← AJOUTEZ CETTE LIGNE
+  FileText, Clock, Calendar, TrendingUp, Download, 
+  LogOut, Search, Filter, Eye, CheckCircle, 
+  Users, Bell, Key, Trash2, X, AlertCircle, User,
+  Eye as EyeIcon, EyeOff, History, ChevronRight, Home,
+  Building2, Activity, UserCheck, Truck, LayoutDashboard,
+  Wrench, ArrowUpRight, MoreHorizontal, RefreshCw,
+  Zap, Shield, FolderKanban, BarChart3, Settings,
+  Crown, Heart
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AgentsList from '../components/AgentsList';
@@ -21,17 +22,15 @@ const TechnicienDashboard = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [greeting, setGreeting] = useState('');
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // ========== STATS (simulées) ==========
   const [stats] = useState({
     rapports: 24,
     enAttente: 7,
     completes: 17,
-    taches: 12,
     taux: 75
   });
 
-  // ========== ÉTATS POUR LES NOTIFICATIONS ==========
   const [notifications, setNotifications] = useState([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -40,11 +39,9 @@ const TechnicienDashboard = () => {
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  // ========== STATISTIQUES GLOBALES ==========
   const [globalStats, setGlobalStats] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
 
-  // ========== EFFETS ==========
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
@@ -69,15 +66,10 @@ const TechnicienDashboard = () => {
     
     const parsedUser = JSON.parse(userData);
     setUser(parsedUser);
-    
-    // Charger les notifications de l'utilisateur
     fetchNotifications(parsedUser.id);
-    
-    // Charger les statistiques globales
     fetchGlobalStats();
   }, [navigate]);
 
-  // ========== CHARGER LES STATISTIQUES GLOBALES ==========
   const fetchGlobalStats = async () => {
     setLoadingStats(true);
     try {
@@ -85,20 +77,15 @@ const TechnicienDashboard = () => {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/technicien/stats/dashboard`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
       const data = await response.json();
-      
-      if (data.success) {
-        setGlobalStats(data.data);
-      }
+      if (data.success) setGlobalStats(data.data);
     } catch (err) {
-      console.error('Erreur chargement statistiques:', err);
+      console.error('Erreur:', err);
     } finally {
       setLoadingStats(false);
     }
   };
 
-  // ========== CHARGER LES NOTIFICATIONS ==========
   const fetchNotifications = async (userId) => {
     setLoadingNotifications(true);
     try {
@@ -106,621 +93,550 @@ const TechnicienDashboard = () => {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/user/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
       const data = await response.json();
-      
       if (data.success) {
         setNotifications(data.notifications || []);
         const unread = data.notifications?.filter(n => n.status !== 'read').length || 0;
         setUnreadCount(unread);
       }
     } catch (err) {
-      console.error('Erreur chargement notifications:', err);
+      console.error('Erreur:', err);
     } finally {
       setLoadingNotifications(false);
     }
   };
 
-  // ========== MARQUER COMME LUE ==========
   const markAsRead = async (notificationId) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}/read`, {
+      await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}/read`, {
         method: 'PUT',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
       });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setNotifications(notifications.map(n => 
-          n.id === notificationId ? { ...n, status: 'read' } : n
-        ));
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
+      setNotifications(notifications.map(n => 
+        n.id === notificationId ? { ...n, status: 'read' } : n
+      ));
+      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
-      console.error('Erreur marquage notification:', err);
+      console.error('Erreur:', err);
     }
   };
 
-  // ========== SUPPRIMER UNE NOTIFICATION ==========
   const deleteNotification = async (notificationId) => {
     if (!window.confirm('Supprimer cette notification ?')) return;
-    
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}`, {
+      await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notificationId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        const updatedNotifications = notifications.filter(n => n.id !== notificationId);
-        setNotifications(updatedNotifications);
-        const unread = updatedNotifications.filter(n => n.status !== 'read').length;
-        setUnreadCount(unread);
-        if (selectedNotification?.id === notificationId) {
-          setShowNotificationModal(false);
-        }
-      }
+      const updated = notifications.filter(n => n.id !== notificationId);
+      setNotifications(updated);
+      setUnreadCount(updated.filter(n => n.status !== 'read').length);
+      if (selectedNotification?.id === notificationId) setShowNotificationModal(false);
     } catch (err) {
-      console.error('Erreur suppression notification:', err);
+      console.error('Erreur:', err);
     }
   };
 
-  // ========== OUVRIR UNE NOTIFICATION ==========
   const openNotification = async (notification) => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/notifications/${notification.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
       const data = await response.json();
-      
       if (data.success) {
         setSelectedNotification(data.notification);
         setShowNotificationModal(true);
-        setShowPassword(false);
-        
-        if (notification.status !== 'read') {
-          markAsRead(notification.id);
-        }
+        if (notification.status !== 'read') markAsRead(notification.id);
       }
     } catch (err) {
-      console.error('Erreur ouverture notification:', err);
+      console.error('Erreur:', err);
     }
   };
 
-  // ========== DÉCONNEXION ==========
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/');
   };
 
-  // ========== HISTORIQUE ==========
   const handleHistorique = () => {
     navigate('/technicien/historique');
   };
 
-  // ========== FORMATER LA DATE ==========
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchGlobalStats();
+    if (user) await fetchNotifications(user.id);
+    setTimeout(() => setIsRefreshing(false), 1000);
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'Date inconnue';
     const date = new Date(dateString);
     const now = new Date();
-    const diffTime = Math.abs(now - date);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) {
-      return "Aujourd'hui";
-    } else if (diffDays === 1) {
-      return "Hier";
-    } else if (diffDays < 7) {
-      return `Il y a ${diffDays} jours`;
-    } else {
-      return date.toLocaleDateString('fr-FR', { 
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-      });
-    }
-  };
-
-  // ========== FONCTIONS UTILITAIRES ==========
-  const getRoleIcon = (role) => {
-    switch(role) {
-      case 'admin': return <Crown size={16} />;
-      case 'technicien': return <Wrench size={16} />;
-      case 'social': return <Heart size={16} />;
-      case 'agent': return <User size={16} />;
-      default: return <User size={16} />;
-    }
+    const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return "Aujourd'hui";
+    if (diffDays === 1) return "Hier";
+    if (diffDays < 7) return `Il y a ${diffDays} jours`;
+    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   const getRoleColor = (role) => {
+    const colors = { admin: '#3b82f6', technicien: '#f59e0b', social: '#10b981', agent: '#8b5cf6' };
+    return colors[role] || '#64748b';
+  };
+
+  const getRoleIcon = (role) => {
     switch(role) {
-      case 'admin': return '#2563eb';
-      case 'technicien': return '#f59e0b';
-      case 'social': return '#10b981';
-      case 'agent': return '#8b5cf6';
-      default: return '#64748b';
+      case 'admin': return <Crown size={14} />;
+      case 'technicien': return <Wrench size={14} />;
+      case 'social': return <Heart size={14} />;
+      default: return <User size={14} />;
     }
   };
 
   const getRoleLabel = (role) => {
-    const labels = { 
-      'admin': 'Administrateur', 
-      'technicien': 'Technicien', 
-      'social': 'Service Social', 
-      'agent': 'Agent' 
-    };
+    const labels = { admin: 'Administrateur', technicien: 'Technicien', social: 'Service Social', agent: 'Agent' };
     return labels[role] || role;
   };
 
   return (
-    <div className="technicien-dashboard">
-      
-      {/* HEADER */}
-      <motion.div 
-        className="dashboard-header"
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        <div className="header-left">
-          <div className="logo-icon" style={{ background: `linear-gradient(135deg, #f59e0b, #d97706)` }}>
-            <Wrench size={28} color="white" />
-          </div>
-          <div>
-            <h1>Espace Technicien</h1>
-            <p className="header-greeting">{greeting}, <strong>{user?.email?.split('@')[0] || 'Technicien'}</strong></p>
+    <div className="hse-tech-dashboard">
+      {/* SIDEBAR */}
+      <aside className="hse-sidebar">
+        <div className="hse-sidebar-header">
+          <div className="hse-logo">
+            <Wrench size={24} />
+            <span>HSE Manager</span>
+            
           </div>
         </div>
         
-        <div className="header-right">
-          <div className="datetime">
-            <Clock size={14} /> 
-            <span>{currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-            <Calendar size={14} /> 
-            <span>{currentTime.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-          </div>
-          
-          {/* BOUTON NOTIFICATIONS */}
-          <div className="notifications-wrapper">
-            <button 
-              className={`btn-icon notification-btn ${unreadCount > 0 ? 'has-notifications' : ''}`}
-              onClick={() => setShowNotifications(!showNotifications)}
-              title="Notifications"
-            >
-              <Bell size={18} />
-              {unreadCount > 0 && (
-                <span className="notification-badge">{unreadCount}</span>
-              )}
-            </button>
-            
-            {/* DROPDOWN DES NOTIFICATIONS */}
-            <AnimatePresence>
-              {showNotifications && (
-                <motion.div 
-                  className="notifications-dropdown"
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <div className="notifications-header">
-                    <h3>Notifications</h3>
-                    <button onClick={() => setShowNotifications(false)}>
-                      <X size={16} />
-                    </button>
-                  </div>
-                  
-                  <div className="notifications-list">
-                    {loadingNotifications ? (
-                      <div className="notifications-loading">
-                        <div className="spinner"></div>
-                      </div>
-                    ) : notifications.length === 0 ? (
-                      <div className="notifications-empty">
-                        <Bell size={32} />
-                        <p>Aucune notification</p>
-                      </div>
-                    ) : (
-                      notifications.slice(0, 5).map(notif => (
-                        <div 
-                          key={notif.id} 
-                          className={`notification-item ${notif.status !== 'read' ? 'unread' : ''}`}
-                          onClick={() => openNotification(notif)}
-                        >
-                          <div className="notification-icon" style={{ background: `${getRoleColor(notif.user_role)}20`, color: getRoleColor(notif.user_role) }}>
-                            <Key size={16} />
-                          </div>
-                          <div className="notification-content">
-                            <div className="notification-title">
-                              Mot de passe modifié
-                            </div>
-                            <div className="notification-message">
-                              {notif.reason?.substring(0, 50)}...
-                            </div>
-                            <div className="notification-time">
-                              {formatDate(notif.created_at)}
-                            </div>
-                          </div>
-                          {notif.status !== 'read' && (
-                            <span className="notification-dot"></span>
-                          )}
-                        </div>
-                      ))
-                    )}
-                    
-                    {notifications.length > 5 && (
-                      <button className="view-all-btn">
-                        Voir toutes les notifications
-                      </button>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-          
-          {/* BOUTON HISTORIQUE PROFESSIONNEL */}
-          <motion.button 
-            className="btn-historique"
-            onClick={handleHistorique}
-            title="Voir l'historique des connexions"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+        <nav className="hse-sidebar-nav">
+          <button 
+            className={`hse-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setActiveTab('dashboard')}
           >
+            <LayoutDashboard size={18} />
+            <span>Tableau de bord</span>
+          </button>
+          <button 
+            className={`hse-nav-item ${activeTab === 'agents' ? 'active' : ''}`}
+            onClick={() => setActiveTab('agents')}
+          >
+            <Users size={18} />
+            <span>Agents</span>
+          </button>
+          <button 
+            className={`hse-nav-item ${activeTab === 'distribution' ? 'active' : ''}`}
+            onClick={() => setActiveTab('distribution')}
+          >
+            <FolderKanban size={18} />
+            <span>Distribution</span>
+          </button>
+        </nav>
+
+        <div className="hse-sidebar-footer">
+          <button className="hse-nav-item" onClick={handleHistorique}>
             <History size={18} />
             <span>Historique</span>
-            <ChevronRight size={16} className="historique-arrow" />
-          </motion.button>
-          
-          <button className="btn-icon logout-btn" onClick={handleLogout} title="Déconnexion">
+          </button>
+          <button className="hse-nav-item hse-logout" onClick={handleLogout}>
             <LogOut size={18} />
+            <span>Déconnexion</span>
           </button>
         </div>
-      </motion.div>
+      </aside>
 
-      {/* STATS CARDS */}
-      <motion.div 
-        className="stats-grid"
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.3 }}
-      >
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#f59e0b20', color: '#f59e0b' }}>
-            <FileText size={24} />
+      {/* MAIN CONTENT */}
+      <main className="hse-main-content">
+        {/* TOP BAR */}
+        <header className="hse-top-bar">
+          <div className="hse-welcome-section">
+            <h1>{activeTab === 'dashboard' ? 'Tableau de bord' : activeTab === 'agents' ? 'Gestion des agents' : 'Distribution des affectations'}</h1>
+            <p>{greeting}, {user?.email?.split('@')[0] || 'Technicien'}</p>
           </div>
-          <div className="stat-content">
-            <span className="stat-label">Rapports</span>
-            <span className="stat-value">{stats.rapports}</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#ef444420', color: '#ef4444' }}>
-            <Clock size={24} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">En attente</span>
-            <span className="stat-value">{stats.enAttente}</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
-            <CheckCircle size={24} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Complétés</span>
-            <span className="stat-value">{stats.completes}</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#2563eb20', color: '#2563eb' }}>
-            <TrendingUp size={24} />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Taux</span>
-            <span className="stat-value">{stats.taux}%</span>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* TABS DE NAVIGATION */}
-      <div className="dashboard-tabs">
-        <button
-          className={`tab-nav-btn ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
-        >
-          <Home size={18} />
-          <span>Tableau de bord</span>
-        </button>
-        <button
-          className={`tab-nav-btn ${activeTab === 'agents' ? 'active' : ''}`}
-          onClick={() => setActiveTab('agents')}
-        >
-          <Users size={18} />
-          <span>Agents</span>
-        </button>
-        <button
-          className={`tab-nav-btn ${activeTab === 'distribution' ? 'active' : ''}`}
-          onClick={() => setActiveTab('distribution')}
-        >
-          <BarChart size={18} />
-          <span>Distribution</span>
-        </button>
-      </div>
-
-      {/* CONTENU DES TABS */}
-      <AnimatePresence mode="wait">
-        {activeTab === 'dashboard' && (
-          <motion.div
-            key="dashboard"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="tab-content"
-          >
-            {/* Cartes statistiques globales */}
-            {globalStats && !loadingStats && (
-              <div className="global-stats-grid">
-                <div className="global-stat-card">
-                  <div className="global-stat-icon" style={{ background: '#2563eb20', color: '#2563eb' }}>
-                    <Users size={24} />
-                  </div>
-                  <div className="global-stat-info">
-                    <span className="global-stat-value">{globalStats.agents.total}</span>
-                    <span className="global-stat-label">Agents</span>
-                  </div>
-                </div>
-                <div className="global-stat-card">
-                  <div className="global-stat-icon" style={{ background: '#10b98120', color: '#10b981' }}>
-                    <UserCheck size={24} />
-                  </div>
-                  <div className="global-stat-info">
-                    <span className="global-stat-value">{globalStats.agents.actifs}</span>
-                    <span className="global-stat-label">Actifs</span>
-                  </div>
-                </div>
-                <div className="global-stat-card">
-                  <div className="global-stat-icon" style={{ background: '#ef444420', color: '#ef4444' }}>
-                    <AlertCircle size={24} />
-                  </div>
-                  <div className="global-stat-info">
-                    <span className="global-stat-value">{globalStats.agents.enInaptitude}</span>
-                    <span className="global-stat-label">En inaptitude</span>
-                  </div>
-                </div>
-                <div className="global-stat-card">
-                  <div className="global-stat-icon" style={{ background: '#f59e0b20', color: '#f59e0b' }}>
-                    <Activity size={24} />
-                  </div>
-                  <div className="global-stat-info">
-                    <span className="global-stat-value">{globalStats.agents.tauxActivite}%</span>
-                    <span className="global-stat-label">Taux activité</span>
-                  </div>
-                </div>
-                <div className="global-stat-card">
-                  <div className="global-stat-icon" style={{ background: '#8b5cf620', color: '#8b5cf6' }}>
-                    <Truck size={24} />
-                  </div>
-                  <div className="global-stat-info">
-                    <span className="global-stat-value">{globalStats.affectations.chauffeurs}</span>
-                    <span className="global-stat-label">Chauffeurs</span>
-                  </div>
-                </div>
-                <div className="global-stat-card">
-                  <div className="global-stat-icon" style={{ background: '#06b6d420', color: '#06b6d4' }}>
-                    <Calendar size={24} />
-                  </div>
-                  <div className="global-stat-info">
-                    <span className="global-stat-value">{globalStats.visites.aVenir}</span>
-                    <span className="global-stat-label">Visites à venir</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* BANNIÈRE HISTORIQUE */}
-            <motion.div 
-              className="historique-banner"
-              onClick={handleHistorique}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <div className="banner-icon">
-                <History size={32} />
-              </div>
-              <div className="banner-content">
-                <h3>Consultez votre historique de connexions</h3>
-                <p>Retrouvez toutes vos activités récentes et suivez votre parcours</p>
-              </div>
-              <div className="banner-arrow">
-                <ChevronRight size={24} />
-              </div>
-            </motion.div>
+          
+          <div className="hse-header-actions">
+            <div className="hse-date-time">
+              <Calendar size={12} />
+              <span>{currentTime.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              <span className="hse-separator">•</span>
+              <Clock size={12} />
+              <span>{currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
             
-            {/* SECTION NOTIFICATIONS RÉCENTES */}
-            {notifications.length > 0 && (
-              <div className="recent-notifications">
-                <h3>
-                  <Bell size={18} />
-                  Notifications récentes
-                  {unreadCount > 0 && <span className="unread-badge">{unreadCount} non lue(s)</span>}
-                </h3>
-                
-                <div className="recent-list">
-                  {notifications.slice(0, 3).map(notif => (
-                    <div 
-                      key={notif.id} 
-                      className={`recent-item ${notif.status !== 'read' ? 'unread' : ''}`}
-                      onClick={() => openNotification(notif)}
-                    >
-                      <div className="recent-icon" style={{ background: `${getRoleColor(notif.user_role)}20`, color: getRoleColor(notif.user_role) }}>
-                        <Key size={16} />
-                      </div>
-                      <div className="recent-content">
-                        <div className="recent-title">
-                          Mot de passe modifié
-                          {notif.status !== 'read' && <span className="new-badge">Nouveau</span>}
+            <button className="hse-icon-btn" onClick={handleRefresh}>
+              <RefreshCw size={18} className={isRefreshing ? 'hse-spin' : ''} />
+            </button>
+            
+            <div className="hse-notifications-wrapper">
+              <button className="hse-icon-btn hse-notif-btn" onClick={() => setShowNotifications(!showNotifications)}>
+                <Bell size={18} />
+                {unreadCount > 0 && <span className="hse-notif-badge">{unreadCount}</span>}
+              </button>
+              
+              <AnimatePresence>
+                {showNotifications && (
+                  <motion.div 
+                    className="hse-notif-dropdown"
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="hse-notif-header">
+                      <h3>Notifications</h3>
+                      <button onClick={() => setShowNotifications(false)}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="hse-notif-list">
+                      {notifications.length === 0 ? (
+                        <div className="hse-notif-empty">
+                          <Bell size={32} />
+                          <p>Aucune notification</p>
                         </div>
-                        <div className="recent-reason">{notif.reason}</div>
-                        <div className="recent-date">{formatDate(notif.created_at)}</div>
+                      ) : (
+                        notifications.slice(0, 5).map(notif => (
+                          <div 
+                            key={notif.id}
+                            className={`hse-notif-item ${notif.status !== 'read' ? 'unread' : ''}`}
+                            onClick={() => openNotification(notif)}
+                          >
+                            <div className="hse-notif-icon">
+                              <Key size={14} />
+                            </div>
+                            <div className="hse-notif-info">
+                              <div className="hse-notif-title">Mot de passe modifié</div>
+                              <div className="hse-notif-desc">{notif.reason?.substring(0, 40)}</div>
+                              <div className="hse-notif-date">{formatDate(notif.created_at)}</div>
+                            </div>
+                            {notif.status !== 'read' && <div className="hse-notif-unread-dot"></div>}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </header>
+
+        {/* DASHBOARD CONTENT */}
+        <AnimatePresence mode="wait">
+          {activeTab === 'dashboard' && (
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="hse-dashboard-view"
+            >
+              {/* STATS GRID */}
+              <div className="hse-stats-grid">
+                <div className="hse-stat-card">
+                  <div className="hse-stat-icon orange">
+                    <FileText size={22} />
+                  </div>
+                  <div className="hse-stat-info">
+                    <span className="hse-stat-value">{stats.rapports}</span>
+                    <span className="hse-stat-label">Rapports</span>
+                  </div>
+                  <ArrowUpRight size={14} className="hse-stat-trend up" />
+                </div>
+                <div className="hse-stat-card">
+                  <div className="hse-stat-icon red">
+                    <Clock size={22} />
+                  </div>
+                  <div className="hse-stat-info">
+                    <span className="hse-stat-value">{stats.enAttente}</span>
+                    <span className="hse-stat-label">En attente</span>
+                  </div>
+                </div>
+                <div className="hse-stat-card">
+                  <div className="hse-stat-icon green">
+                    <CheckCircle size={22} />
+                  </div>
+                  <div className="hse-stat-info">
+                    <span className="hse-stat-value">{stats.completes}</span>
+                    <span className="hse-stat-label">Complétés</span>
+                  </div>
+                </div>
+                <div className="hse-stat-card">
+                  <div className="hse-stat-icon purple">
+                    <TrendingUp size={22} />
+                  </div>
+                  <div className="hse-stat-info">
+                    <span className="hse-stat-value">{stats.taux}%</span>
+                    <span className="hse-stat-label">Taux activité</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* GLOBAL STATS SECTION AMÉLIORÉE */}
+              {globalStats && !loadingStats && (
+                <div className="hse-global-stats-section">
+                  <div className="hse-section-header">
+                    <div className="hse-section-title-wrapper">
+                      <div className="hse-section-icon">
+                        <LayoutDashboard size={18} />
+                      </div>
+                      <h2>Vue d'ensemble</h2>
+                      <span className="hse-section-badge">Statistiques en temps réel</span>
+                    </div>
+                    <div className="hse-live-indicator">
+                      <span className="hse-live-dot"></span>
+                      <span>Live</span>
+                    </div>
+                  </div>
+                  
+                  <div className="hse-global-stats-grid">
+                    {/* Agents */}
+                    <div className="hse-global-card" data-type="agents">
+                      <div className="hse-global-card-icon">
+                        <Users size={22} />
+                      </div>
+                      <div className="hse-global-value">{globalStats.agents.total}</div>
+                      <div className="hse-global-label">Agents</div>
+                      <div className="hse-global-trend up">
+                        <TrendingUp size={10} /> +8%
                       </div>
                     </div>
-                  ))}
+                    
+                    {/* Actifs */}
+                    <div className="hse-global-card" data-type="actifs">
+                      <div className="hse-global-card-icon">
+                        <UserCheck size={22} />
+                      </div>
+                      <div className="hse-global-value">{globalStats.agents.actifs}</div>
+                      <div className="hse-global-label">Actifs</div>
+                      <div className="hse-global-trend up">
+                        <TrendingUp size={10} /> +5%
+                      </div>
+                    </div>
+                    
+                    {/* Inaptitudes */}
+                    <div className="hse-global-card" data-type="inaptitudes">
+                      <div className="hse-global-card-icon">
+                        <AlertCircle size={22} />
+                      </div>
+                      <div className="hse-global-value">{globalStats.agents.enInaptitude}</div>
+                      <div className="hse-global-label">Inaptitudes</div>
+                      <div className="hse-global-trend down">
+                        <TrendingUp size={10} style={{ transform: 'rotate(180deg)' }} /> -2%
+                      </div>
+                    </div>
+                    
+                    {/* Taux activité */}
+                    <div className="hse-global-card" data-type="taux">
+                      <div className="hse-global-card-icon">
+                        <Activity size={22} />
+                      </div>
+                      <div className="hse-global-value">{globalStats.agents.tauxActivite}%</div>
+                      <div className="hse-global-label">Taux activité</div>
+                      <div className="hse-global-trend up">
+                        <TrendingUp size={10} /> +12%
+                      </div>
+                    </div>
+                    
+                    {/* Chauffeurs */}
+                    <div className="hse-global-card" data-type="chauffeurs">
+                      <div className="hse-global-card-icon">
+                        <Truck size={22} />
+                      </div>
+                      <div className="hse-global-value">{globalStats.affectations.chauffeurs}</div>
+                      <div className="hse-global-label">Chauffeurs</div>
+                      <div className="hse-global-trend neutral">
+                        <TrendingUp size={10} style={{ transform: 'rotate(90deg)' }} /> Stable
+                      </div>
+                    </div>
+                    
+                    {/* Visites à venir */}
+                    <div className="hse-global-card" data-type="visites">
+                      <div className="hse-global-card-icon">
+                        <Calendar size={22} />
+                      </div>
+                      <div className="hse-global-value">{globalStats.visites.aVenir}</div>
+                      <div className="hse-global-label">Visites à venir</div>
+                      <div className="hse-global-trend up">
+                        <TrendingUp size={10} /> +3
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              {/* HISTORIQUE BANNER */}
+              <motion.div 
+                className="hse-historique-banner" 
+                onClick={handleHistorique}
+                whileHover={{ x: 5 }}
+                transition={{ type: "spring", stiffness: 400 }}
+              >
+                <div className="hse-banner-icon">
+                  <History size={24} />
+                </div>
+                <div className="hse-banner-text">
+                  <h3>Historique des connexions</h3>
+                  <p>Consultez l'ensemble de vos activités récentes et suivez votre parcours</p>
+                </div>
+                <div className="hse-banner-arrow">
+                  <ChevronRight size={18} />
+                </div>
+              </motion.div>
+
+              {/* RECENT NOTIFICATIONS */}
+              {notifications.length > 0 && (
+                <div className="hse-recent-section">
+                  <div className="hse-section-header">
+                    <div className="hse-section-title-wrapper">
+                      <div className="hse-section-icon">
+                        <Bell size={16} />
+                      </div>
+                      <h3>Notifications récentes</h3>
+                      {unreadCount > 0 && <span className="hse-badge">{unreadCount} non lue(s)</span>}
+                    </div>
+                  </div>
+                  <div className="hse-recent-grid">
+                    {notifications.slice(0, 3).map((notif, index) => (
+                      <motion.div 
+                        key={notif.id}
+                        className={`hse-recent-card ${notif.status !== 'read' ? 'unread' : ''}`}
+                        onClick={() => openNotification(notif)}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        whileHover={{ y: -3 }}
+                      >
+                        <div className="hse-recent-icon">
+                          <Key size={16} />
+                        </div>
+                        <div className="hse-recent-info">
+                          <div className="hse-recent-title">
+                            Modification du mot de passe
+                            {notif.status !== 'read' && <span className="hse-new-badge">Nouveau</span>}
+                          </div>
+                          <div className="hse-recent-desc">{notif.reason?.substring(0, 60)}</div>
+                          <div className="hse-recent-date">{formatDate(notif.created_at)}</div>
+                        </div>
+                        {notif.status !== 'read' && <div className="hse-recent-unread-indicator"></div>}
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {activeTab === 'agents' && (
+            <motion.div
+              key="agents"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="hse-tab-view"
+            >
+              <div className="hse-glass-container">
+                <AgentsList />
               </div>
-            )}
-          </motion.div>
-        )}
+            </motion.div>
+          )}
 
-        {activeTab === 'agents' && (
-          <motion.div
-            key="agents"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="tab-content"
-          >
-            <AgentsList />
-          </motion.div>
-        )}
+          {activeTab === 'distribution' && (
+            <motion.div
+              key="distribution"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="hse-tab-view"
+            >
+              <div className="hse-glass-container">
+                <AffectationsView />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
 
-        {activeTab === 'distribution' && (
-          <motion.div
-            key="distribution"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="tab-content"
-          >
-            <AffectationsView />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* MODALE DE NOTIFICATION */}
+      {/* MODALE NOTIFICATION PREMIUM */}
       <AnimatePresence>
         {showNotificationModal && selectedNotification && (
           <motion.div 
-            className="modal-overlay"
+            className="hse-modal-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowNotificationModal(false)}
           >
             <motion.div 
-              className="modal-content"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
+              className="hse-modal"
+              initial={{ scale: 0.9, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 30 }}
+              transition={{ type: "spring", damping: 25 }}
               onClick={e => e.stopPropagation()}
             >
-              <div className="modal-header" style={{ background: `linear-gradient(135deg, #f59e0b20, #d9770620)` }}>
-                <div className="header-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
-                  <Bell size={24} />
+              <div className="hse-modal-header">
+                <div className="hse-modal-icon">
+                  <Bell size={20} />
                 </div>
-                <h2>Notification de changement de mot de passe</h2>
-                <button className="modal-close" onClick={() => setShowNotificationModal(false)}>
+                <h3>Détail de la notification</h3>
+                <button className="hse-modal-close" onClick={() => setShowNotificationModal(false)}>
                   <X size={18} />
                 </button>
               </div>
               
-              <div className="modal-body">
-                <div className="notification-preview">
-                  <div className="preview-card">
-                    <div className="preview-row">
-                      <span className="preview-label">Destinataire :</span>
-                      <span className="preview-value">
-                        <strong>{selectedNotification.user_email}</strong>
-                      </span>
-                    </div>
-                    <div className="preview-row">
-                      <span className="preview-label">Rôle :</span>
-                      <span className="preview-value">
-                        <span className="role-badge-small" style={{ background: getRoleColor(selectedNotification.user_role) }}>
-                          {getRoleIcon(selectedNotification.user_role)} {getRoleLabel(selectedNotification.user_role)}
-                        </span>
-                      </span>
-                    </div>
-                    <div className="preview-row">
-                      <span className="preview-label">Date d'envoi :</span>
-                      <span className="preview-value">
-                        {new Date(selectedNotification.created_at).toLocaleString('fr-FR', {
-                          day: '2-digit', month: '2-digit', year: 'numeric',
-                          hour: '2-digit', minute: '2-digit'
-                        })}
-                      </span>
-                    </div>
-                    <div className="preview-row">
-                      <span className="preview-label">Raison :</span>
-                      <span className="preview-value reason">{selectedNotification.reason}</span>
-                    </div>
-                    <div className="preview-row password-row">
-                      <span className="preview-label">Nouveau mot de passe :</span>
-                      <div className="password-display">
-                        <span className={`preview-value password ${showPassword ? '' : 'hidden'}`}>
-                          {showPassword ? selectedNotification.new_password : '••••••••'}
-                        </span>
-                        <button 
-                          className="password-toggle-btn"
-                          onClick={() => setShowPassword(!showPassword)}
-                          title={showPassword ? 'Masquer' : 'Afficher'}
-                        >
-                          {showPassword ? <EyeOff size={16} /> : <EyeIcon size={16} />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="preview-row">
-                      <span className="preview-label">Statut :</span>
-                      <span className={`preview-value status ${selectedNotification.status}`}>
-                        {selectedNotification.status === 'read' ? 'Lu' : 'Non lu'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="notification-message-box">
-                    <h4>Message complet</h4>
-                    <div className="message-content">
-                      <p><strong>Objet :</strong> Changement de votre mot de passe</p>
-                      <p>Bonjour {user?.email},</p>
-                      <p>Votre mot de passe a été modifié par l'administrateur.</p>
-                      <p><strong>Raison :</strong> {selectedNotification.reason}</p>
-                      <p><strong>Nouveau mot de passe :</strong> <span className="password-highlight">{showPassword ? selectedNotification.new_password : '••••••••'}</span></p>
-                      <p>Nous vous recommandons de changer ce mot de passe après votre prochaine connexion.</p>
-                      <p>Cordialement,<br/>L'équipe HSE Manager</p>
-                    </div>
+              <div className="hse-modal-body">
+                <div className="hse-info-row">
+                  <span className="hse-info-label">Destinataire</span>
+                  <span className="hse-info-value">{selectedNotification.user_email}</span>
+                </div>
+                <div className="hse-info-row">
+                  <span className="hse-info-label">Rôle</span>
+                  <span className="hse-info-value" style={{ color: getRoleColor(selectedNotification.user_role) }}>
+                    {getRoleIcon(selectedNotification.user_role)} {getRoleLabel(selectedNotification.user_role)}
+                  </span>
+                </div>
+                <div className="hse-info-row">
+                  <span className="hse-info-label">Date d'envoi</span>
+                  <span className="hse-info-value">
+                    {new Date(selectedNotification.created_at).toLocaleString('fr-FR')}
+                  </span>
+                </div>
+                <div className="hse-info-row">
+                  <span className="hse-info-label">Raison</span>
+                  <span className="hse-info-value hse-reason-text">{selectedNotification.reason}</span>
+                </div>
+                <div className="hse-info-row hse-password-info-row">
+                  <span className="hse-info-label">Mot de passe</span>
+                  <div className="hse-password-field">
+                    <span className={`hse-password-value ${showPassword ? '' : 'hidden'}`}>
+                      {showPassword ? selectedNotification.new_password : '••••••••'}
+                    </span>
+                    <button 
+                      className="hse-password-toggle"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff size={14} /> : <EyeIcon size={14} />}
+                    </button>
                   </div>
                 </div>
               </div>
               
-              <div className="modal-footer">
-                <button 
-                  className="btn-secondary"
-                  onClick={() => setShowNotificationModal(false)}
-                >
+              <div className="hse-modal-footer">
+                <button className="hse-btn-secondary" onClick={() => setShowNotificationModal(false)}>
                   Fermer
                 </button>
-                <button 
-                  className="btn-delete"
-                  onClick={() => {
-                    if (window.confirm('Supprimer cette notification ?')) {
-                      deleteNotification(selectedNotification.id);
-                    }
-                  }}
-                >
-                  <Trash2 size={16} /> Supprimer
+                <button className="hse-btn-danger" onClick={() => deleteNotification(selectedNotification.id)}>
+                  <Trash2 size={14} /> Supprimer
                 </button>
               </div>
             </motion.div>

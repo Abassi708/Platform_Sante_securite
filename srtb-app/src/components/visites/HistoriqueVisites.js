@@ -6,7 +6,9 @@ import {
   Activity, Award, AlertTriangle, Filter, Search, ChevronLeft, 
   ChevronRight, Sliders, Grid3x3, List, PlusCircle, Repeat, Trash2, Users,
   TrendingUp, Calendar as CalendarIcon, Briefcase, Shield, Zap,
-  UserSearch, ChevronsLeft, ChevronsRight
+  UserSearch, ChevronsLeft, ChevronsRight, BarChart3, PieChart,
+  MoreHorizontal, Download, Mail, Phone, MapPin, Building2,
+  Star, TrendingDown, MinusCircle, ArrowRight, Dot
 } from 'lucide-react';
 import AgentSearchInput from '../common/AgentSearchInput';
 import '../../styles/HistoriqueVisites.css';
@@ -70,14 +72,167 @@ const formatDate = formatDateTimeFr;
 const formatDateSimple = formatDateFr;
 
 // ============================================
+// SOUS-COMPOSANTS PROFESSIONNELS
+// ============================================
+
+// Carte de statistique réutilisable
+const StatCard = ({ title, value, icon: Icon, color, trend, trendValue }) => (
+  <div className="hv-stat-card-premium" style={{ '--accent-color': color }}>
+    <div className="hv-stat-card-header">
+      <div className="hv-stat-icon-wrapper" style={{ backgroundColor: `${color}15` }}>
+        <Icon size={20} style={{ color }} />
+      </div>
+      {trend && (
+        <div className="hv-stat-trend">
+          {trend === 'up' ? <TrendingUp size={12} /> : trend === 'down' ? <TrendingDown size={12} /> : <MinusCircle size={12} />}
+          <span>{trendValue}</span>
+        </div>
+      )}
+    </div>
+    <div className="hv-stat-card-body">
+      <span className="hv-stat-value">{value}</span>
+      <span className="hv-stat-title">{title}</span>
+    </div>
+  </div>
+);
+
+// Badge de statut
+const StatusBadge = ({ type, value, size = 'md' }) => {
+  const configs = {
+    'Apte': { class: 'hv-status-apte', icon: CheckCircle },
+    'Apte avec réserves': { class: 'hv-status-reserves', icon: AlertCircle },
+    'Inapte temporaire': { class: 'hv-status-temporaire', icon: AlertTriangle },
+    'Inapte définitif': { class: 'hv-status-definitif', icon: XCircle },
+    'PROGRAMMATION': { class: 'hv-status-programmation', icon: Calendar },
+    'EFFECTUEE': { class: 'hv-status-effectuee', icon: CheckCircle },
+    'REPROGRAMMEE': { class: 'hv-status-reprogrammee', icon: Repeat },
+    'ANNULEE': { class: 'hv-status-annulee', icon: XCircle },
+    'REAFFECTEE': { class: 'hv-status-reaffectee', icon: Users },
+    'SAISIE_MANUELLE': { class: 'hv-status-saisie', icon: PenTool }
+  };
+  
+  const config = configs[type] || { class: 'hv-status-default', icon: Info };
+  const IconComponent = config.icon;
+  
+  return (
+    <div className={`hv-status-badge ${config.class} hv-status-${size}`}>
+      <IconComponent size={size === 'sm' ? 12 : 14} />
+      <span>{value || type}</span>
+    </div>
+  );
+};
+
+// Badge de type de visite
+const VisitTypeBadge = ({ type }) => {
+  const types = {
+    'Périodique': { icon: Calendar, color: '#4361ee' },
+    'Reprise': { icon: Activity, color: '#f59f00' },
+    'Reclassement': { icon: Briefcase, color: '#9c36b5' },
+    'Embauche': { icon: UserPlus, color: '#2b9348' }
+  };
+  const { icon: Icon, color } = types[type] || { icon: FileText, color: '#6c757d' };
+  
+  return (
+    <div className="hv-visit-type-badge" style={{ backgroundColor: `${color}12`, color }}>
+      <Icon size={12} />
+      <span>{type}</span>
+    </div>
+  );
+};
+
+// Carte d'action dans la timeline
+const ActionCard = ({ action, onViewDetails, viewMode }) => {
+  const actionColor = getActionColorStatic(action.type_action);
+  const resultatConfig = getResultatConfigStatic(action.resultat);
+  
+  return (
+    <div className={`hv-action-card ${viewMode === 'grid' ? 'hv-grid-mode' : ''}`}>
+      <div className="hv-action-card-marker" style={{ backgroundColor: actionColor }} />
+      
+      <div className="hv-action-card-header">
+        <div className="hv-action-header-left">
+          <StatusBadge type={action.type_action} value={action.actionLabel} size="sm" />
+          <div className="hv-action-source" style={{ color: action.sourceColor }}>
+            <span>{action.sourceIcon}</span>
+            <span>{action.sourceLabel}</span>
+          </div>
+          <VisitTypeBadge type={action.type_visite} />
+          {action.resultat && action.type_action === 'EFFECTUEE' && (
+            <StatusBadge type={action.resultat} value={action.resultat} size="sm" />
+          )}
+        </div>
+        <div className="hv-action-header-right">
+          <span className="hv-action-timestamp">{formatDateTimeFr(action.created_at)}</span>
+        </div>
+      </div>
+      
+      <div className="hv-action-card-body">
+        <div className="hv-agent-info-row">
+          <div className="hv-agent-avatar-sm">
+            {action.visiteAgent?.nom?.charAt(0)}{action.visiteAgent?.prenom?.charAt(0)}
+          </div>
+          <div className="hv-agent-details">
+            <span className="hv-agent-name">{action.visiteAgent?.nom} {action.visiteAgent?.prenom}</span>
+            <span className="hv-agent-matricule">#{action.matricule_agent}</span>
+          </div>
+        </div>
+        
+        <div className="hv-visit-info-row">
+          <div className="hv-visit-date">
+            <Calendar size={12} />
+            <span>{formatDateFr(action.date_visite)}</span>
+          </div>
+          <div className="hv-visit-time">
+            <Clock size={12} />
+            <span>{action.heure_visite?.substring(0,5) || '--:--'}</span>
+          </div>
+        </div>
+        
+        {action.motif_action && (
+          <div className="hv-motif-preview">
+            <FileText size={12} />
+            <span>{action.motif_action.substring(0, 60)}...</span>
+          </div>
+        )}
+      </div>
+      
+      <div className="hv-action-card-footer">
+        <button className="hv-btn-details" onClick={() => onViewDetails(action)}>
+          <Eye size={14} />
+          <span>Consulter</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Helpers statiques pour les couleurs
+const getActionColorStatic = (action) => {
+  const colors = {
+    'PROGRAMMATION': '#4361ee',
+    'EFFECTUEE': '#2b9348',
+    'REPROGRAMMEE': '#f59f00',
+    'ANNULEE': '#e63946',
+    'REAFFECTEE': '#9c36b5',
+    'SAISIE_MANUELLE': '#9c36b5'
+  };
+  return colors[action] || '#6c757d';
+};
+
+const getResultatConfigStatic = (resultat) => {
+  const configs = {
+    'Apte': { class: 'hv-apte', icon: CheckCircle, color: '#2b9348' },
+    'Apte avec réserves': { class: 'hv-reserves', icon: AlertCircle, color: '#f59f00' },
+    'Inapte temporaire': { class: 'hv-temporaire', icon: AlertTriangle, color: '#f59f00' },
+    'Inapte définitif': { class: 'hv-definitif', icon: XCircle, color: '#e63946' }
+  };
+  return configs[resultat] || { class: '', icon: Info, color: '#6c757d' };
+};
+
+// ============================================
 // COMPOSANT PRINCIPAL
 // ============================================
 
-/**
- * Composant HistoriqueVisites
- * Complètement isolé avec des classes prefixées 'hv-'
- * Aucun conflit CSS avec le reste de l'application
- */
 const HistoriqueVisites = () => {
   // ========== ÉTATS PRINCIPAUX ==========
   const [activeTab, setActiveTab] = useState('planning');
@@ -137,12 +292,12 @@ const HistoriqueVisites = () => {
 
   const getActionIcon = useCallback((action) => {
     const icons = {
-      'PROGRAMMATION': '',
-      'EFFECTUEE': '',
-      'REPROGRAMMEE': '',
-      'ANNULEE': '',
-      'REAFFECTEE': '',
-      'SAISIE_MANUELLE': ''
+      'PROGRAMMATION': '📅',
+      'EFFECTUEE': '✓',
+      'REPROGRAMMEE': '🔄',
+      'ANNULEE': '✗',
+      'REAFFECTEE': '👥',
+      'SAISIE_MANUELLE': '✏️'
     };
     return icons[action] || '📋';
   }, []);
@@ -163,8 +318,8 @@ const HistoriqueVisites = () => {
           source: 'PLANNING',
           sourceIcon: '📋',
           sourceLabel: 'Planning Auto',
-          sourceColor: '#3b82f6',
-          sourceBg: '#eff6ff',
+          sourceColor: '#4361ee',
+          sourceBg: '#eef0fd',
           actionLabel: getActionLabel(item.type_action),
           actionIcon: getActionIcon(item.type_action)
         }));
@@ -196,10 +351,11 @@ const HistoriqueVisites = () => {
       }
     } catch (err) {
       console.error(err);
+      setError("Impossible de charger l'historique du planning");
     } finally {
       setLoading(false);
     }
-  }, [planningFilters]);
+  }, [planningFilters, getActionLabel, getActionIcon]);
 
   // ========== CHARGEMENT DE L'HISTORIQUE FORMULAIRE ==========
   const chargerHistoriqueFormulaire = useCallback(async () => {
@@ -217,8 +373,8 @@ const HistoriqueVisites = () => {
           source: 'FORMULAIRE',
           sourceIcon: '✏️',
           sourceLabel: 'Saisie manuelle',
-          sourceColor: '#8b5cf6',
-          sourceBg: '#f5f3ff',
+          sourceColor: '#9c36b5',
+          sourceBg: '#f5f0fc',
           actionLabel: getActionLabel(item.type_action),
           actionIcon: getActionIcon(item.type_action)
         }));
@@ -250,10 +406,11 @@ const HistoriqueVisites = () => {
       }
     } catch (err) {
       console.error(err);
+      setError("Impossible de charger l'historique du formulaire");
     } finally {
       setLoading(false);
     }
-  }, [formulaireFilters]);
+  }, [formulaireFilters, getActionLabel, getActionIcon]);
 
   // ========== CHARGER L'HISTORIQUE PAR AGENT ==========
   const chargerHistoriqueParAgent = async (matricule) => {
@@ -302,10 +459,10 @@ const HistoriqueVisites = () => {
           } : item.visiteAgent,
           actionLabel: getActionLabel(item.type_action),
           actionIcon: getActionIcon(item.type_action),
-          sourceIcon: item.source === 'PLANNING' ? '' : '',
+          sourceIcon: item.source === 'PLANNING' ? '📋' : '✏️',
           sourceLabel: item.source === 'PLANNING' ? 'Planning Auto' : 'Formulaire',
-          sourceColor: item.source === 'PLANNING' ? '#3b82f6' : '#8b5cf6',
-          sourceBg: item.source === 'PLANNING' ? '#eff6ff' : '#f5f3ff'
+          sourceColor: item.source === 'PLANNING' ? '#4361ee' : '#9c36b5',
+          sourceBg: item.source === 'PLANNING' ? '#eef0fd' : '#f5f0fc'
         }));
         
         setHistoriqueAgent(actionsFormatees);
@@ -457,8 +614,8 @@ const HistoriqueVisites = () => {
     setCurrentPageFormulaire(1);
   };
 
-  // ========== RENDU DES CARTES STATS ==========
-  const getAdditionalStats = () => {
+  // ========== STATISTIQUES GLOBALES ==========
+  const getGlobalStats = () => {
     const actions = activeTab === 'planning' ? historiqueActionsPlanning : historiqueActionsFormulaire;
     if (!Array.isArray(actions)) return { 
       total: 0, effectuees: 0, reprogrammations: 0, annulations: 0, saisies: 0,
@@ -483,40 +640,7 @@ const HistoriqueVisites = () => {
     };
   };
 
-  const additionalStats = getAdditionalStats();
-
-  // ========== RENDU DES COULEURS ==========
-  const getActionColor = (action) => {
-    const colors = {
-      'PROGRAMMATION': '#3b82f6',
-      'EFFECTUEE': '#10b981',
-      'REPROGRAMMEE': '#f59e0b',
-      'ANNULEE': '#ef4444',
-      'REAFFECTEE': '#8b5cf6',
-      'SAISIE_MANUELLE': '#8b5cf6'
-    };
-    return colors[action] || '#64748b';
-  };
-
-  const getResultatConfig = (resultat) => {
-    const configs = {
-      'Apte': { class: 'hv-apte', icon: <CheckCircle size={14} />, color: '#10b981' },
-      'Apte avec réserves': { class: 'hv-reserves', icon: <AlertCircle size={14} />, color: '#f59e0b' },
-      'Inapte temporaire': { class: 'hv-temporaire', icon: <AlertTriangle size={14} />, color: '#f97316' },
-      'Inapte définitif': { class: 'hv-definitif', icon: <XCircle size={14} />, color: '#ef4444' }
-    };
-    return configs[resultat] || { class: '', icon: <Info size={14} />, color: '#64748b' };
-  };
-
-  const getTypeVisiteIcon = (type) => {
-    const icons = {
-      'Périodique': '🔄',
-      'Reprise': '⚕️',
-      'Reclassement': '📝',
-      'Embauche': '🆕'
-    };
-    return icons[type] || '📋';
-  };
+  const globalStats = getGlobalStats();
 
   // ========== MODAL DE DÉTAILS ==========
   const openDetailsModal = (action) => {
@@ -528,7 +652,7 @@ const HistoriqueVisites = () => {
     if (!showDetailsModal || !selectedAction) return null;
     
     const item = selectedAction;
-    const resultatConfig = getResultatConfig(item.resultat);
+    const resultatConfig = getResultatConfigStatic(item.resultat);
     
     const agentNom = item.visiteAgent?.nom || item.agent_nom || 'Agent';
     const agentPrenom = item.visiteAgent?.prenom || item.agent_prenom || '';
@@ -536,71 +660,138 @@ const HistoriqueVisites = () => {
     const agentAgence = item.visiteAgent?.code_agence || item.code_agence || 'N/A';
     
     return (
-      <div className="hv-modal-overlay" onClick={() => setShowDetailsModal(false)}>
-        <div className="hv-details-modal" onClick={e => e.stopPropagation()}>
-          <div className="hv-modal-header">
-            <h2>Détails de l'action</h2>
-            <button className="hv-modal-close" onClick={() => setShowDetailsModal(false)}>
+      <div className="hv-modal-overlay-premium" onClick={() => setShowDetailsModal(false)}>
+        <div className="hv-details-modal-premium" onClick={e => e.stopPropagation()}>
+          <div className="hv-modal-header-premium">
+            <div className="hv-modal-title-section">
+              <div className="hv-modal-icon">
+                <History size={24} />
+              </div>
+              <div>
+                <h2>Détails de l'action</h2>
+                <p>{item.actionLabel} · {formatDateTimeFr(item.created_at)}</p>
+              </div>
+            </div>
+            <button className="hv-modal-close-premium" onClick={() => setShowDetailsModal(false)}>
               <XCircle size={20} />
             </button>
           </div>
           
-          <div className="hv-modal-body">
-            <div className="hv-details-agent">
-              <div className="hv-agent-avatar hv-large">
+          <div className="hv-modal-body-premium">
+            {/* Section Agent */}
+            <div className="hv-details-agent-premium">
+              <div className="hv-agent-avatar-premium">
                 {agentNom.charAt(0)}{agentPrenom.charAt(0)}
               </div>
-              <div className="hv-agent-info">
+              <div className="hv-agent-info-premium">
                 <h3>{agentNom} {agentPrenom}</h3>
-                <span className="hv-matricule">Matricule: #{agentMatricule}</span>
-                <span className="hv-agence">Agence: {agentAgence !== 'N/A' ? `Agence ${agentAgence}` : 'Non spécifiée'}</span>
+                <div className="hv-agent-meta-premium">
+                  <span className="hv-meta-item">
+                    <Hash size={12} /> Matricule: #{agentMatricule}
+                  </span>
+                  <span className="hv-meta-item">
+                    <Building2 size={12} /> Agence: {agentAgence !== 'N/A' ? `Agence ${agentAgence}` : 'Non spécifiée'}
+                  </span>
+                </div>
               </div>
             </div>
             
-            <div className="hv-details-section">
-              <h4> Informations</h4>
-              <div className="hv-details-grid">
-                <div className="hv-detail-item"><Calendar size={16} /><span>Date visite: <strong>{formatDateFr(item.date_visite)}</strong></span></div>
-                <div className="hv-detail-item"><Clock size={16} /><span>Heure: <strong>{item.heure_visite?.substring(0,5) || '--:--'}</strong></span></div>
-                <div className="hv-detail-item"><FileText size={16} /><span>Type action: <strong>{item.actionLabel || item.type_action}</strong></span></div>
-                <div className="hv-detail-item"><Layers size={16} /><span>Source: <strong>{item.sourceLabel || item.source}</strong></span></div>
-                <div className="hv-detail-item"><Briefcase size={16} /><span>Type visite: <strong>{item.type_visite || 'Non spécifié'}</strong></span></div>
-                {item.medecin && (<div className="hv-detail-item"><User size={16} /><span>Médecin: <strong>{item.medecin}</strong></span></div>)}
+            {/* Grille d'informations */}
+            <div className="hv-details-grid-premium">
+              <div className="hv-detail-card-premium">
+                <div className="hv-detail-icon"><Calendar size={16} /></div>
+                <div className="hv-detail-content">
+                  <label>Date de visite</label>
+                  <span className="hv-detail-value">{formatDateFr(item.date_visite)}</span>
+                </div>
+              </div>
+              
+              <div className="hv-detail-card-premium">
+                <div className="hv-detail-icon"><Clock size={16} /></div>
+                <div className="hv-detail-content">
+                  <label>Horaire</label>
+                  <span className="hv-detail-value">{item.heure_visite?.substring(0,5) || '--:--'}</span>
+                </div>
+              </div>
+              
+              <div className="hv-detail-card-premium">
+                <div className="hv-detail-icon"><Layers size={16} /></div>
+                <div className="hv-detail-content">
+                  <label>Type d'action</label>
+                  <span className="hv-detail-value">{item.actionLabel}</span>
+                </div>
+              </div>
+              
+              <div className="hv-detail-card-premium">
+                <div className="hv-detail-icon"><Briefcase size={16} /></div>
+                <div className="hv-detail-content">
+                  <label>Type de visite</label>
+                  <span className="hv-detail-value">{item.type_visite || 'Non spécifié'}</span>
+                </div>
+              </div>
+              
+              {item.medecin && (
+                <div className="hv-detail-card-premium">
+                  <div className="hv-detail-icon"><User size={16} /></div>
+                  <div className="hv-detail-content">
+                    <label>Médecin</label>
+                    <span className="hv-detail-value">{item.medecin}</span>
+                  </div>
+                </div>
+              )}
+              
+              <div className="hv-detail-card-premium">
+                <div className="hv-detail-icon"><Activity size={16} /></div>
+                <div className="hv-detail-content">
+                  <label>Source</label>
+                  <span className="hv-detail-value">{item.sourceLabel}</span>
+                </div>
               </div>
             </div>
             
+            {/* Décision médicale */}
             {item.resultat && (
-              <div className={`hv-details-decision ${resultatConfig.class}`}>
-                <div className="hv-decision-icon">{resultatConfig.icon}</div>
-                <div className="hv-decision-content">
+              <div className={`hv-decision-section-premium ${resultatConfig.class}`}>
+                <div className="hv-decision-icon-premium">
+                  <resultatConfig.icon size={24} />
+                </div>
+                <div className="hv-decision-info-premium">
                   <span className="hv-decision-label">Décision médicale</span>
                   <span className="hv-decision-value">{item.resultat}</span>
                 </div>
               </div>
             )}
             
+            {/* Motif */}
             {item.motif_action && (
-              <div className="hv-details-section">
-                <h4>Motif</h4>
-                <div className="hv-motif-box"><p>{item.motif_action}</p></div>
+              <div className="hv-motif-section-premium">
+                <h4>Motif de l'action</h4>
+                <div className="hv-motif-content-premium">
+                  <p>{item.motif_action}</p>
+                </div>
               </div>
             )}
             
+            {/* Prochaine visite */}
             {item.details && item.details.prochaine_visite && (
-              <div className="hv-details-section hv-highlight">
-                <h4>Prochaine visite</h4>
-                <p>{formatDateFr(item.details.prochaine_visite)} ({item.details.periodicite_texte || '1 an'})</p>
+              <div className="hv-next-visit-premium">
+                <CalendarIcon size={16} />
+                <div>
+                  <label>Prochaine visite programmée</label>
+                  <span>{formatDateFr(item.details.prochaine_visite)}</span>
+                  {item.details.periodicite_texte && <small>({item.details.periodicite_texte})</small>}
+                </div>
               </div>
             )}
-            
-            <div className="hv-details-footer">
-              <Clock size={12} />
-              <span>Enregistré le: {formatDateTimeFr(item.created_at)}</span>
-            </div>
           </div>
           
-          <div className="hv-modal-footer">
-            <button className="hv-btn-close" onClick={() => setShowDetailsModal(false)}>Fermer</button>
+          <div className="hv-modal-footer-premium">
+            <button className="hv-btn-secondary-premium" onClick={() => setShowDetailsModal(false)}>
+              Fermer
+            </button>
+            <button className="hv-btn-primary-premium" onClick={() => setShowDetailsModal(false)}>
+              <CheckCircle size={16} /> Compris
+            </button>
           </div>
         </div>
       </div>
@@ -609,26 +800,37 @@ const HistoriqueVisites = () => {
 
   // ========== RENDU PRINCIPAL ==========
   return (
-    <div className="hv-container">
+    <div className="hv-container-premium">
       
-      {/* HEADER */}
-      <div className="hv-header">
-        <div className="hv-header-left">
-          <div className="hv-header-icon"><History size={28} /></div>
-          <div className="hv-header-title">
+      {/* HEADER PREMIUM */}
+      <div className="hv-header-premium">
+        <div className="hv-header-left-premium">
+          <div className="hv-header-icon-premium">
+            <History size={28} />
+          </div>
+          <div className="hv-header-title-premium">
             <h1>Historique des actions</h1>
-            <p>Suivi complet de toutes les actions (planning automatique + saisies manuelles)</p>
+            <p>Suivi complet de toutes les opérations (planning automatique + saisies manuelles)</p>
           </div>
         </div>
-        <div className="hv-header-right">
-          {activeTab === 'planning' ? (
-            <div className="hv-stats-badge hv-planning"><Layers size={14} /><span>Planning: {stats.PLANNING}</span></div>
-          ) : activeTab === 'formulaire' ? (
-            <div className="hv-stats-badge hv-formulaire"><PenTool size={14} /><span>Formulaire: {stats.FORMULAIRE}</span></div>
-          ) : (
-            <div className="hv-stats-badge hv-agent"><UserSearch size={14} /><span>Agent: {selectedAgentDetail ? selectedAgentDetail.nom : 'Non sélectionné'}</span></div>
-          )}
-          <button className="hv-btn-icon" onClick={() => {
+        <div className="hv-header-right-premium">
+          <div className="hv-stats-summary">
+            <div className="hv-stat-chip">
+              <Activity size={14} />
+              <span>Planning: <strong>{stats.PLANNING}</strong></span>
+            </div>
+            <div className="hv-stat-chip">
+              <PenTool size={14} />
+              <span>Formulaire: <strong>{stats.FORMULAIRE}</strong></span>
+            </div>
+            {activeTab === 'agent' && selectedAgentDetail && (
+              <div className="hv-stat-chip hv-agent-chip">
+                <User size={14} />
+                <span>{selectedAgentDetail.nom} {selectedAgentDetail.prenom}</span>
+              </div>
+            )}
+          </div>
+          <button className="hv-btn-icon-premium" onClick={() => {
             if (activeTab === 'planning') chargerHistoriquePlanning();
             else if (activeTab === 'formulaire') chargerHistoriqueFormulaire();
             else if (selectedAgent) chargerHistoriqueParAgent(selectedAgent);
@@ -636,235 +838,225 @@ const HistoriqueVisites = () => {
             <RefreshCw size={18} />
           </button>
           {activeTab !== 'agent' && (
-            <button className={`hv-btn-icon ${showFilters ? 'hv-active' : ''}`} onClick={() => setShowFilters(!showFilters)}>
+            <button className={`hv-btn-icon-premium ${showFilters ? 'hv-active' : ''}`} onClick={() => setShowFilters(!showFilters)}>
               <Sliders size={18} />
             </button>
           )}
-          <div className="hv-view-toggle">
-            <button className={`hv-view-btn ${viewMode === 'list' ? 'hv-active' : ''}`} onClick={() => setViewMode('list')}><List size={16} /></button>
-            <button className={`hv-view-btn ${viewMode === 'grid' ? 'hv-active' : ''}`} onClick={() => setViewMode('grid')}><Grid3x3 size={16} /></button>
+          <div className="hv-view-toggle-premium">
+            <button className={`hv-view-btn-premium ${viewMode === 'list' ? 'hv-active' : ''}`} onClick={() => setViewMode('list')}>
+              <List size={16} />
+            </button>
+            <button className={`hv-view-btn-premium ${viewMode === 'grid' ? 'hv-active' : ''}`} onClick={() => setViewMode('grid')}>
+              <Grid3x3 size={16} />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* STATS CARTES - UNIQUEMENT POUR PLANNING/FORMULAIRE */}
+      {/* STATS CARTES PREMIUM - UNIQUEMENT POUR PLANNING/FORMULAIRE */}
       {(activeTab === 'planning' || activeTab === 'formulaire') && (
         <>
-          <div className="hv-stats-cards">
-            <div className="hv-stat-card hv-total">
-              <div className="hv-stat-icon"><Activity size={20} /></div>
-              <div className="hv-stat-info">
-                <span className="hv-stat-value">{additionalStats.total}</span>
-                <span className="hv-stat-label">Total actions</span>
-              </div>
-            </div>
-            <div className="hv-stat-card hv-effectue">
-              <div className="hv-stat-icon"><CheckCircle size={20} /></div>
-              <div className="hv-stat-info">
-                <span className="hv-stat-value">{additionalStats.effectuees}</span>
-                <span className="hv-stat-label">Visites effectuées</span>
-              </div>
-            </div>
-            <div className="hv-stat-card hv-reprogramme">
-              <div className="hv-stat-icon"><Repeat size={20} /></div>
-              <div className="hv-stat-info">
-                <span className="hv-stat-value">{additionalStats.reprogrammations}</span>
-                <span className="hv-stat-label">Reprogrammations</span>
-              </div>
-            </div>
-            <div className="hv-stat-card hv-saisie">
-              <div className="hv-stat-icon"><PenTool size={20} /></div>
-              <div className="hv-stat-info">
-                <span className="hv-stat-value">{additionalStats.saisies}</span>
-                <span className="hv-stat-label">Saisies manuelles</span>
-              </div>
-            </div>
+          <div className="hv-stats-grid-premium">
+            <StatCard title="Total actions" value={globalStats.total} icon={Activity} color="#4361ee" />
+            <StatCard title="Visites effectuées" value={globalStats.effectuees} icon={CheckCircle} color="#2b9348" trend="up" trendValue="+12%" />
+            <StatCard title="Reprogrammations" value={globalStats.reprogrammations} icon={Repeat} color="#f59f00" />
+            <StatCard title="Saisies manuelles" value={globalStats.saisies} icon={PenTool} color="#9c36b5" />
           </div>
           
-          <div className="hv-stats-types">
-            <div className="hv-stat-type hv-periodique">
-              <span className="hv-type-icon">🔄</span>
-              <div className="hv-type-info">
-                <span className="hv-type-value">{additionalStats.periodiques}</span>
-                <span className="hv-type-label">Périodiques</span>
+          <div className="hv-stats-secondary-premium">
+            <div className="hv-stat-group-premium">
+              <span className="hv-stat-group-title">Par type de visite</span>
+              <div className="hv-type-stats-premium">
+                <div className="hv-type-stat-item">
+                  <span className="hv-type-dot hv-periodic" />
+                  <span>Périodiques</span>
+                  <strong>{globalStats.periodiques}</strong>
+                </div>
+                <div className="hv-type-stat-item">
+                  <span className="hv-type-dot hv-reprise" />
+                  <span>Reprises</span>
+                  <strong>{globalStats.reprises}</strong>
+                </div>
+                <div className="hv-type-stat-item">
+                  <span className="hv-type-dot hv-reclassement" />
+                  <span>Reclassements</span>
+                  <strong>{globalStats.reclassements}</strong>
+                </div>
+                <div className="hv-type-stat-item">
+                  <span className="hv-type-dot hv-embauche" />
+                  <span>Embauches</span>
+                  <strong>{globalStats.embauches}</strong>
+                </div>
               </div>
             </div>
-            <div className="hv-stat-type hv-reprise">
-              <span className="hv-type-icon">⚕️</span>
-              <div className="hv-type-info">
-                <span className="hv-type-value">{additionalStats.reprises}</span>
-                <span className="hv-type-label">Reprises</span>
+            
+            <div className="hv-stat-group-premium">
+              <span className="hv-stat-group-title">Par résultat</span>
+              <div className="hv-result-stats-premium">
+                <div className="hv-result-stat-item hv-apte">
+                  <CheckCircle size={14} />
+                  <span>Aptes</span>
+                  <strong>{globalStats.aptes}</strong>
+                </div>
+                <div className="hv-result-stat-item hv-temporaire">
+                  <AlertTriangle size={14} />
+                  <span>Inaptes temp.</span>
+                  <strong>{globalStats.inaptesTemp}</strong>
+                </div>
+                <div className="hv-result-stat-item hv-definitif">
+                  <XCircle size={14} />
+                  <span>Inaptes déf.</span>
+                  <strong>{globalStats.inaptesDef}</strong>
+                </div>
               </div>
-            </div>
-            <div className="hv-stat-type hv-reclassement">
-              <span className="hv-type-icon">📝</span>
-              <div className="hv-type-info">
-                <span className="hv-type-value">{additionalStats.reclassements}</span>
-                <span className="hv-type-label">Reclassements</span>
-              </div>
-            </div>
-            <div className="hv-stat-type hv-embauche">
-              <span className="hv-type-icon">🆕</span>
-              <div className="hv-type-info">
-                <span className="hv-type-value">{additionalStats.embauches}</span>
-                <span className="hv-type-label">Embauches</span>
-              </div>
-            </div>
-          </div>
-          
-          <div className="hv-stats-resultats">
-            <div className="hv-stat-resultat hv-apte">
-              <CheckCircle size={14} />
-              <span className="hv-resultat-value">{additionalStats.aptes}</span>
-              <span className="hv-resultat-label">Aptes</span>
-            </div>
-            <div className="hv-stat-resultat hv-temporaire">
-              <AlertTriangle size={14} />
-              <span className="hv-resultat-value">{additionalStats.inaptesTemp}</span>
-              <span className="hv-resultat-label">Inaptes temp.</span>
-            </div>
-            <div className="hv-stat-resultat hv-definitif">
-              <XCircle size={14} />
-              <span className="hv-resultat-value">{additionalStats.inaptesDef}</span>
-              <span className="hv-resultat-label">Inaptes déf.</span>
             </div>
           </div>
         </>
       )}
 
-      {/* ========== ONGLETS ========== */}
-      <div className="hv-historique-tabs">
-        <button className={`hv-tab-btn ${activeTab === 'planning' ? 'hv-active' : ''}`} onClick={() => { setActiveTab('planning'); setShowFilters(false); }}>
-          <Activity size={18} /><span>Planning</span><span className="hv-tab-count">{stats.PLANNING}</span>
+      {/* ========== ONGLETS PREMIUM ========== */}
+      <div className="hv-tabs-premium">
+        <button 
+          className={`hv-tab-premium ${activeTab === 'planning' ? 'hv-active' : ''}`} 
+          onClick={() => { setActiveTab('planning'); setShowFilters(false); }}
+        >
+          <Activity size={18} />
+          <span>Planning automatique</span>
+          <span className="hv-tab-badge">{stats.PLANNING}</span>
         </button>
-        <button className={`hv-tab-btn ${activeTab === 'formulaire' ? 'hv-active' : ''}`} onClick={() => { setActiveTab('formulaire'); setShowFilters(false); }}>
-          <PenTool size={18} /><span>Formulaire</span><span className="hv-tab-count">{stats.FORMULAIRE}</span>
+        <button 
+          className={`hv-tab-premium ${activeTab === 'formulaire' ? 'hv-active' : ''}`} 
+          onClick={() => { setActiveTab('formulaire'); setShowFilters(false); }}
+        >
+          <PenTool size={18} />
+          <span>Saisies manuelles</span>
+          <span className="hv-tab-badge">{stats.FORMULAIRE}</span>
         </button>
-        <button className={`hv-tab-btn ${activeTab === 'agent' ? 'hv-active' : ''}`} onClick={() => { setActiveTab('agent'); setShowFilters(false); setCurrentPageAgent(1); }}>
-          <UserSearch size={18} /><span>Historique par Agent</span><span className="hv-tab-count">{historiqueAgent.length}</span>
+        <button 
+          className={`hv-tab-premium ${activeTab === 'agent' ? 'hv-active' : ''}`} 
+          onClick={() => { setActiveTab('agent'); setShowFilters(false); setCurrentPageAgent(1); }}
+        >
+          <UserSearch size={18} />
+          <span>Historique par agent</span>
+          <span className="hv-tab-badge">{historiqueAgent.length}</span>
         </button>
       </div>
 
       {/* ========== ONGLET PLANNING ========== */}
       {activeTab === 'planning' && (
         <>
-          <div className="hv-search-bar-container">
-            <div className="hv-search-input-wrapper">
+          <div className="hv-search-section-premium">
+            <div className="hv-search-wrapper-premium">
               <Search size={18} />
-              <input type="text" placeholder="Rechercher par agent, matricule..." value={planningFilters.searchTerm} onChange={(e) => updatePlanningFilter('searchTerm', e.target.value)} />
-              {planningFilters.searchTerm && <button className="hv-clear-search" onClick={() => updatePlanningFilter('searchTerm', '')}><XCircle size={16} /></button>}
+              <input 
+                type="text" 
+                placeholder="Rechercher par nom d'agent, prénom ou matricule..." 
+                value={planningFilters.searchTerm} 
+                onChange={(e) => updatePlanningFilter('searchTerm', e.target.value)} 
+              />
+              {planningFilters.searchTerm && (
+                <button className="hv-clear-premium" onClick={() => updatePlanningFilter('searchTerm', '')}>
+                  <XCircle size={16} />
+                </button>
+              )}
             </div>
           </div>
 
           {showFilters && (
-            <div className="hv-filters-panel">
-              <div className="hv-filters-header">
-                <h4><Filter size={16} /> Filtres avancés</h4>
-                <button className="hv-reset-filters" onClick={resetPlanningFilters}>
+            <div className="hv-filters-premium">
+              <div className="hv-filters-header-premium">
+                <div className="hv-filters-title">
+                  <Filter size={16} />
+                  <h4>Filtres avancés</h4>
+                </div>
+                <button className="hv-reset-premium" onClick={resetPlanningFilters}>
                   <RefreshCw size={14} /> Réinitialiser
                 </button>
               </div>
-              <div className="hv-filters-grid">
-                <div className="hv-filter-group">
+              <div className="hv-filters-grid-premium">
+                <div className="hv-filter-premium">
                   <label>Date de visite</label>
                   <input type="date" value={planningFilters.dateUnique} onChange={(e) => updatePlanningFilter('dateUnique', e.target.value)} />
                 </div>
-                <div className="hv-filter-group">
+                <div className="hv-filter-premium">
                   <label>Type de visite</label>
                   <select value={planningFilters.filterTypeVisite} onChange={(e) => updatePlanningFilter('filterTypeVisite', e.target.value)}>
-                    <option value="all"> Tous</option>
-                    <option value="Périodique"> Périodique</option>
-                    <option value="Reprise"> Reprise</option>
-                    <option value="Reclassement"> Reclassement</option>
-                    <option value="Embauche"> Embauche</option>
+                    <option value="all">Tous les types</option>
+                    <option value="Périodique">Périodique</option>
+                    <option value="Reprise">Reprise</option>
+                    <option value="Reclassement">Reclassement</option>
+                    <option value="Embauche">Embauche</option>
                   </select>
                 </div>
-                <div className="hv-filter-group">
-                  <label>Résultat</label>
+                <div className="hv-filter-premium">
+                  <label>Résultat médical</label>
                   <select value={planningFilters.filterResultat} onChange={(e) => updatePlanningFilter('filterResultat', e.target.value)}>
-                    <option value="all"> Tous</option>
-                    <option value="Apte"> Apte</option>
-                    <option value="Inapte temporaire"> Inapte temporaire</option>
-                    <option value="Inapte définitif"> Inapte définitif</option>
+                    <option value="all">Tous les résultats</option>
+                    <option value="Apte">Apte</option>
+                    <option value="Inapte temporaire">Inapte temporaire</option>
+                    <option value="Inapte définitif">Inapte définitif</option>
                   </select>
                 </div>
-                <div className="hv-filter-group">
+                <div className="hv-filter-premium">
                   <label>Type d'action</label>
                   <select value={planningFilters.filterAction} onChange={(e) => updatePlanningFilter('filterAction', e.target.value)}>
-                    <option value="all"> Toutes</option>
-                    <option value="PROGRAMMATION"> Programmation</option>
-                    <option value="EFFECTUEE"> Effectuée</option>
-                    <option value="REPROGRAMMEE"> Reprogrammation</option>
-                    <option value="ANNULEE"> Annulation</option>
-                    <option value="REAFFECTEE"> Réaffectation</option>
+                    <option value="all">Toutes les actions</option>
+                    <option value="PROGRAMMATION">Programmation</option>
+                    <option value="EFFECTUEE">Effectuée</option>
+                    <option value="REPROGRAMMEE">Reprogrammation</option>
+                    <option value="ANNULEE">Annulation</option>
+                    <option value="REAFFECTEE">Réaffectation</option>
                   </select>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="hv-historique-content">
+          <div className="hv-content-premium">
             {loading ? (
-              <div className="hv-loading-state"><div className="hv-spinner"></div><p>Chargement...</p></div>
+              <div className="hv-loading-premium">
+                <div className="hv-spinner-premium"></div>
+                <p>Chargement des données...</p>
+              </div>
             ) : currentData.length === 0 ? (
-              <div className="hv-empty-state"><History size={48} /><h3>Aucune action</h3><button className="hv-btn-primary" onClick={chargerHistoriquePlanning}><RefreshCw size={16} /> Actualiser</button></div>
+              <div className="hv-empty-premium">
+                <History size={48} strokeWidth={1.5} />
+                <h3>Aucune action enregistrée</h3>
+                <p>Aucune action n'a été trouvée pour les critères sélectionnés.</p>
+                <button className="hv-btn-primary-premium" onClick={chargerHistoriquePlanning}>
+                  <RefreshCw size={16} /> Actualiser
+                </button>
+              </div>
             ) : (
               <>
-                <div className={`hv-timeline ${viewMode === 'grid' ? 'hv-grid-view' : ''}`}>
-                  {currentData.map((item, idx) => {
-                    const actionColor = getActionColor(item.type_action);
-                    const resultatConfig = getResultatConfig(item.resultat);
-                    const typeVisite = item.type_visite || 'Non spécifié';
-                    return (
-                      <div key={item.id || idx} className="hv-timeline-item">
-                        <div className="hv-timeline-marker" style={{ background: actionColor }}>{item.actionIcon}</div>
-                        <div className="hv-timeline-content">
-                          <div className="hv-timeline-header">
-                            <div className="hv-action-info">
-                              <span className="hv-action-type" style={{ color: actionColor }}>{item.actionLabel}</span>
-                              <span className="hv-source-badge" style={{ background: item.sourceBg, color: item.sourceColor }}>{item.sourceIcon} {item.sourceLabel}</span>
-                              <span className="hv-type-badge-medium">{getTypeVisiteIcon(typeVisite)} {typeVisite}</span>
-                              {item.resultat && item.type_action === 'EFFECTUEE' && (
-                                <span className={`hv-resultat-badge ${resultatConfig.class}`}>{resultatConfig.icon} {item.resultat}</span>
-                              )}
-                            </div>
-                            <span className="hv-action-date">{formatDateTimeFr(item.created_at)}</span>
-                          </div>
-                          <div className="hv-action-details">
-                            <div className="hv-detail-row">
-                              <User size={14} /><strong>Agent:</strong>
-                              <span>{item.visiteAgent?.nom} {item.visiteAgent?.prenom}</span>
-                              <span className="hv-matricule">#{item.matricule_agent}</span>
-                            </div>
-                            <div className="hv-detail-row">
-                              <Calendar size={14} />
-                              <strong>Date visite:</strong>
-                              <span>{formatDateFr(item.date_visite)}</span>
-                              <Clock size={12} />
-                              <span>{item.heure_visite?.substring(0,5)}</span>
-                            </div>
-                            {item.motif_action && (
-                              <div className="hv-detail-row hv-motif">
-                                <FileText size={14} /><strong>Motif:</strong>
-                                <span className="hv-motif-text">{item.motif_action.substring(0, 80)}...</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="hv-timeline-actions">
-                            <button className="hv-btn-details-small" onClick={() => openDetailsModal(item)}><Eye size={14} /> Détails</button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className={`hv-actions-grid-premium ${viewMode === 'grid' ? 'hv-grid-view' : 'hv-list-view'}`}>
+                  {currentData.map((item, idx) => (
+                    <ActionCard 
+                      key={item.id || idx} 
+                      action={item} 
+                      onViewDetails={openDetailsModal} 
+                      viewMode={viewMode}
+                    />
+                  ))}
                 </div>
+                
                 {totalPages > 1 && (
-                  <div className="hv-pagination">
-                    <button onClick={goToFirstPage} disabled={currentPageNum === 1}><ChevronsLeft size={16} /></button>
-                    <button onClick={goToPreviousPage} disabled={currentPageNum === 1}><ChevronLeft size={16} /> Précédent</button>
-                    <span className="hv-page-info">Page {currentPageNum} sur {totalPages}</span>
-                    <button onClick={goToNextPage} disabled={currentPageNum === totalPages}>Suivant <ChevronRight size={16} /></button>
-                    <button onClick={goToLastPage} disabled={currentPageNum === totalPages}><ChevronsRight size={16} /></button>
+                  <div className="hv-pagination-premium">
+                    <button onClick={goToFirstPage} disabled={currentPageNum === 1}>
+                      <ChevronsLeft size={16} />
+                    </button>
+                    <button onClick={goToPreviousPage} disabled={currentPageNum === 1}>
+                      <ChevronLeft size={16} /> Précédent
+                    </button>
+                    <span className="hv-page-info-premium">
+                      Page {currentPageNum} sur {totalPages}
+                    </span>
+                    <button onClick={goToNextPage} disabled={currentPageNum === totalPages}>
+                      Suivant <ChevronRight size={16} />
+                    </button>
+                    <button onClick={goToLastPage} disabled={currentPageNum === totalPages}>
+                      <ChevronsRight size={16} />
+                    </button>
                   </div>
                 )}
               </>
@@ -876,123 +1068,118 @@ const HistoriqueVisites = () => {
       {/* ========== ONGLET FORMULAIRE ========== */}
       {activeTab === 'formulaire' && (
         <>
-          <div className="hv-search-bar-container">
-            <div className="hv-search-input-wrapper">
+          <div className="hv-search-section-premium">
+            <div className="hv-search-wrapper-premium">
               <Search size={18} />
-              <input type="text" placeholder="Rechercher par agent, matricule..." value={formulaireFilters.searchTerm} onChange={(e) => updateFormulaireFilter('searchTerm', e.target.value)} />
-              {formulaireFilters.searchTerm && <button className="hv-clear-search" onClick={() => updateFormulaireFilter('searchTerm', '')}><XCircle size={16} /></button>}
+              <input 
+                type="text" 
+                placeholder="Rechercher par nom d'agent, prénom ou matricule..." 
+                value={formulaireFilters.searchTerm} 
+                onChange={(e) => updateFormulaireFilter('searchTerm', e.target.value)} 
+              />
+              {formulaireFilters.searchTerm && (
+                <button className="hv-clear-premium" onClick={() => updateFormulaireFilter('searchTerm', '')}>
+                  <XCircle size={16} />
+                </button>
+              )}
             </div>
           </div>
 
           {showFilters && (
-            <div className="hv-filters-panel">
-              <div className="hv-filters-header">
-                <h4><Filter size={16} /> Filtres avancés</h4>
-                <button className="hv-reset-filters" onClick={resetFormulaireFilters}>
+            <div className="hv-filters-premium">
+              <div className="hv-filters-header-premium">
+                <div className="hv-filters-title">
+                  <Filter size={16} />
+                  <h4>Filtres avancés</h4>
+                </div>
+                <button className="hv-reset-premium" onClick={resetFormulaireFilters}>
                   <RefreshCw size={14} /> Réinitialiser
                 </button>
               </div>
-              <div className="hv-filters-grid">
-                <div className="hv-filter-group">
+              <div className="hv-filters-grid-premium">
+                <div className="hv-filter-premium">
                   <label>Date de visite</label>
                   <input type="date" value={formulaireFilters.dateUnique} onChange={(e) => updateFormulaireFilter('dateUnique', e.target.value)} />
                 </div>
-                <div className="hv-filter-group">
+                <div className="hv-filter-premium">
                   <label>Type de visite</label>
                   <select value={formulaireFilters.filterTypeVisite} onChange={(e) => updateFormulaireFilter('filterTypeVisite', e.target.value)}>
-                    <option value="all"> Tous</option>
-                    <option value="Périodique"> Périodique</option>
-                    <option value="Reprise"> Reprise</option>
-                    <option value="Reclassement"> Reclassement</option>
-                    <option value="Embauche"> Embauche</option>
+                    <option value="all">Tous les types</option>
+                    <option value="Périodique">Périodique</option>
+                    <option value="Reprise">Reprise</option>
+                    <option value="Reclassement">Reclassement</option>
+                    <option value="Embauche">Embauche</option>
                   </select>
                 </div>
-                <div className="hv-filter-group">
-                  <label>Résultat</label>
+                <div className="hv-filter-premium">
+                  <label>Résultat médical</label>
                   <select value={formulaireFilters.filterResultat} onChange={(e) => updateFormulaireFilter('filterResultat', e.target.value)}>
-                    <option value="all"> Tous</option>
-                    <option value="Apte"> Apte</option>
-                    <option value="Inapte temporaire"> Inapte temporaire</option>
-                    <option value="Inapte définitif"> Inapte définitif</option>
+                    <option value="all">Tous les résultats</option>
+                    <option value="Apte">Apte</option>
+                    <option value="Inapte temporaire">Inapte temporaire</option>
+                    <option value="Inapte définitif">Inapte définitif</option>
                   </select>
                 </div>
-                <div className="hv-filter-group">
+                <div className="hv-filter-premium">
                   <label>Type d'action</label>
                   <select value={formulaireFilters.filterAction} onChange={(e) => updateFormulaireFilter('filterAction', e.target.value)}>
-                    <option value="all">Toutes</option>
-                    <option value="PROGRAMMATION"> Programmation</option>
-                    <option value="EFFECTUEE"> Effectuée</option>
-                    <option value="REPROGRAMMEE"> Reprogrammation</option>
-                    <option value="ANNULEE"> Annulation</option>
-                    <option value="REAFFECTEE"> Réaffectation</option>
+                    <option value="all">Toutes les actions</option>
+                    <option value="PROGRAMMATION">Programmation</option>
+                    <option value="EFFECTUEE">Effectuée</option>
+                    <option value="REPROGRAMMEE">Reprogrammation</option>
+                    <option value="ANNULEE">Annulation</option>
+                    <option value="REAFFECTEE">Réaffectation</option>
                   </select>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="hv-historique-content">
+          <div className="hv-content-premium">
             {loading ? (
-              <div className="hv-loading-state"><div className="hv-spinner"></div><p>Chargement...</p></div>
+              <div className="hv-loading-premium">
+                <div className="hv-spinner-premium"></div>
+                <p>Chargement des données...</p>
+              </div>
             ) : currentData.length === 0 ? (
-              <div className="hv-empty-state"><History size={48} /><h3>Aucune action</h3><button className="hv-btn-primary" onClick={chargerHistoriqueFormulaire}><RefreshCw size={16} /> Actualiser</button></div>
+              <div className="hv-empty-premium">
+                <History size={48} strokeWidth={1.5} />
+                <h3>Aucune action enregistrée</h3>
+                <p>Aucune action n'a été trouvée pour les critères sélectionnés.</p>
+                <button className="hv-btn-primary-premium" onClick={chargerHistoriqueFormulaire}>
+                  <RefreshCw size={16} /> Actualiser
+                </button>
+              </div>
             ) : (
               <>
-                <div className={`hv-timeline ${viewMode === 'grid' ? 'hv-grid-view' : ''}`}>
-                  {currentData.map((item, idx) => {
-                    const actionColor = getActionColor(item.type_action);
-                    const resultatConfig = getResultatConfig(item.resultat);
-                    const typeVisite = item.type_visite || 'Non spécifié';
-                    return (
-                      <div key={item.id || idx} className="hv-timeline-item">
-                        <div className="hv-timeline-marker" style={{ background: actionColor }}>{item.actionIcon}</div>
-                        <div className="hv-timeline-content">
-                          <div className="hv-timeline-header">
-                            <div className="hv-action-info">
-                              <span className="hv-action-type" style={{ color: actionColor }}>{item.actionLabel}</span>
-                              <span className="hv-source-badge" style={{ background: item.sourceBg, color: item.sourceColor }}>{item.sourceIcon} {item.sourceLabel}</span>
-                              <span className="hv-type-badge-medium">{getTypeVisiteIcon(typeVisite)} {typeVisite}</span>
-                              {item.resultat && item.type_action === 'EFFECTUEE' && (
-                                <span className={`hv-resultat-badge ${resultatConfig.class}`}>{resultatConfig.icon} {item.resultat}</span>
-                              )}
-                            </div>
-                            <span className="hv-action-date">{formatDateTimeFr(item.created_at)}</span>
-                          </div>
-                          <div className="hv-action-details">
-                            <div className="hv-detail-row">
-                              <User size={14} /><strong>Agent:</strong>
-                              <span>{item.visiteAgent?.nom} {item.visiteAgent?.prenom}</span>
-                              <span className="hv-matricule">#{item.matricule_agent}</span>
-                            </div>
-                            <div className="hv-detail-row">
-                              <Calendar size={14} />
-                              <strong>Date visite:</strong>
-                              <span>{formatDateFr(item.date_visite)}</span>
-                              <Clock size={12} />
-                              <span>{item.heure_visite?.substring(0,5)}</span>
-                            </div>
-                            {item.motif_action && (
-                              <div className="hv-detail-row hv-motif">
-                                <FileText size={14} /><strong>Motif:</strong>
-                                <span className="hv-motif-text">{item.motif_action.substring(0, 80)}...</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="hv-timeline-actions">
-                            <button className="hv-btn-details-small" onClick={() => openDetailsModal(item)}><Eye size={14} /> Détails</button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className={`hv-actions-grid-premium ${viewMode === 'grid' ? 'hv-grid-view' : 'hv-list-view'}`}>
+                  {currentData.map((item, idx) => (
+                    <ActionCard 
+                      key={item.id || idx} 
+                      action={item} 
+                      onViewDetails={openDetailsModal} 
+                      viewMode={viewMode}
+                    />
+                  ))}
                 </div>
+                
                 {totalPages > 1 && (
-                  <div className="hv-pagination">
-                    <button onClick={goToFirstPage} disabled={currentPageNum === 1}><ChevronsLeft size={16} /></button>
-                    <button onClick={goToPreviousPage} disabled={currentPageNum === 1}><ChevronLeft size={16} /> Précédent</button>
-                    <span className="hv-page-info">Page {currentPageNum} sur {totalPages}</span>
-                    <button onClick={goToNextPage} disabled={currentPageNum === totalPages}>Suivant <ChevronRight size={16} /></button>
-                    <button onClick={goToLastPage} disabled={currentPageNum === totalPages}><ChevronsRight size={16} /></button>
+                  <div className="hv-pagination-premium">
+                    <button onClick={goToFirstPage} disabled={currentPageNum === 1}>
+                      <ChevronsLeft size={16} />
+                    </button>
+                    <button onClick={goToPreviousPage} disabled={currentPageNum === 1}>
+                      <ChevronLeft size={16} /> Précédent
+                    </button>
+                    <span className="hv-page-info-premium">
+                      Page {currentPageNum} sur {totalPages}
+                    </span>
+                    <button onClick={goToNextPage} disabled={currentPageNum === totalPages}>
+                      Suivant <ChevronRight size={16} />
+                    </button>
+                    <button onClick={goToLastPage} disabled={currentPageNum === totalPages}>
+                      <ChevronsRight size={16} />
+                    </button>
                   </div>
                 )}
               </>
@@ -1004,14 +1191,14 @@ const HistoriqueVisites = () => {
       {/* ========== ONGLET HISTORIQUE PAR AGENT ========== */}
       {activeTab === 'agent' && (
         <>
-          <div className="hv-agent-search-section" style={{ background: '#f8fafc', padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
-            <div className="hv-agent-search-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-              <UserSearch size={20} color="#3b82f6" />
-              <h3 style={{ fontSize: '16px', fontWeight: '600' }}>Rechercher un agent</h3>
+          <div className="hv-agent-search-premium">
+            <div className="hv-agent-search-header-premium">
+              <UserSearch size={20} />
+              <h3>Rechercher un agent</h3>
             </div>
-            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-              <div style={{ flex: 1, minWidth: '250px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '5px' }}>Agent</label>
+            <div className="hv-agent-search-form-premium">
+              <div className="hv-agent-input-premium">
+                <label>Agent</label>
                 <AgentSearchInput 
                   value={selectedAgent} 
                   onChange={(matricule) => { 
@@ -1023,100 +1210,93 @@ const HistoriqueVisites = () => {
                   placeholder="Tapez le nom, prénom ou matricule..." 
                 />
               </div>
-              <button className="hv-btn-reset" onClick={() => { setSelectedAgent(''); setHistoriqueAgent([]); setSelectedAgentDetail(null); }} style={{ padding: '8px 16px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer' }}>
+              <button className="hv-btn-reset-premium" onClick={() => { setSelectedAgent(''); setHistoriqueAgent([]); setSelectedAgentDetail(null); }}>
                 <XCircle size={14} /> Réinitialiser
               </button>
             </div>
           </div>
 
           {selectedAgentDetail && (
-            <div className="hv-agent-info-card" style={{ background: 'linear-gradient(135deg, #1e40af, #2563eb)', color: 'white', padding: '20px', borderRadius: '12px', marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                  <div style={{ width: '50px', height: '50px', background: 'rgba(255,255,255,0.2)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 'bold' }}>
-                    {selectedAgentDetail.nom?.charAt(0)}{selectedAgentDetail.prenom?.charAt(0)}
-                  </div>
-                  <div>
-                    <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0 }}>{selectedAgentDetail.nom} {selectedAgentDetail.prenom}</h2>
-                    <p style={{ margin: '5px 0 0', opacity: 0.8, fontSize: '13px' }}>Matricule: #{selectedAgentDetail.matricule_agent}</p>
-                    <p style={{ margin: '5px 0 0', opacity: 0.7, fontSize: '11px' }}>Agence: {selectedAgentDetail.code_agence || 'Non spécifiée'}</p>
-                  </div>
+            <div className="hv-agent-profile-premium">
+              <div className="hv-profile-avatar-premium">
+                {selectedAgentDetail.nom?.charAt(0)}{selectedAgentDetail.prenom?.charAt(0)}
+              </div>
+              <div className="hv-profile-info-premium">
+                <h2>{selectedAgentDetail.nom} {selectedAgentDetail.prenom}</h2>
+                <div className="hv-profile-details-premium">
+                  <span><Hash size={12} /> Matricule: #{selectedAgentDetail.matricule_agent}</span>
+                  <span><Building2 size={12} /> Agence: {selectedAgentDetail.code_agence || 'Non spécifiée'}</span>
                 </div>
-                <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                  <div style={{ textAlign: 'center' }}><div style={{ fontSize: '24px', fontWeight: 'bold' }}>{agentStats.total}</div><div style={{ fontSize: '11px', opacity: 0.8 }}>Total</div></div>
-                  <div style={{ textAlign: 'center' }}><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#34d399' }}>{agentStats.effectuees}</div><div style={{ fontSize: '11px', opacity: 0.8 }}>Effectuées</div></div>
-                  <div style={{ textAlign: 'center' }}><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#fbbf24' }}>{agentStats.programmations}</div><div style={{ fontSize: '11px', opacity: 0.8 }}>Programmations</div></div>
-                  <div style={{ textAlign: 'center' }}><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f87171' }}>{agentStats.annulations}</div><div style={{ fontSize: '11px', opacity: 0.8 }}>Annulations</div></div>
-                  <div style={{ textAlign: 'center' }}><div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f59e0b' }}>{agentStats.reprogrammations}</div><div style={{ fontSize: '11px', opacity: 0.8 }}>Reprogrammations</div></div>
+              </div>
+              <div className="hv-profile-stats-premium">
+                <div className="hv-profile-stat">
+                  <span className="hv-stat-number">{agentStats.total}</span>
+                  <span className="hv-stat-label">Total actions</span>
+                </div>
+                <div className="hv-profile-stat">
+                  <span className="hv-stat-number hv-success">{agentStats.effectuees}</span>
+                  <span className="hv-stat-label">Effectuées</span>
+                </div>
+                <div className="hv-profile-stat">
+                  <span className="hv-stat-number hv-warning">{agentStats.programmations}</span>
+                  <span className="hv-stat-label">Programmations</span>
+                </div>
+                <div className="hv-profile-stat">
+                  <span className="hv-stat-number hv-danger">{agentStats.annulations}</span>
+                  <span className="hv-stat-label">Annulations</span>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="hv-historique-content">
+          <div className="hv-content-premium">
             {loadingAgent ? (
-              <div className="hv-loading-state"><div className="hv-spinner"></div><p>Chargement...</p></div>
+              <div className="hv-loading-premium">
+                <div className="hv-spinner-premium"></div>
+                <p>Chargement de l'historique...</p>
+              </div>
             ) : !selectedAgent ? (
-              <div className="hv-empty-state"><UserSearch size={48} /><h3>Aucun agent sélectionné</h3><p>Recherchez un agent pour voir son historique complet</p></div>
+              <div className="hv-empty-premium">
+                <UserSearch size={48} strokeWidth={1.5} />
+                <h3>Aucun agent sélectionné</h3>
+                <p>Recherchez un agent pour visualiser son historique complet</p>
+              </div>
             ) : historiqueAgent.length === 0 ? (
-              <div className="hv-empty-state"><History size={48} /><h3>Aucune action</h3><p>Cet agent n'a aucune action enregistrée</p></div>
+              <div className="hv-empty-premium">
+                <History size={48} strokeWidth={1.5} />
+                <h3>Aucune action trouvée</h3>
+                <p>Cet agent n'a aucune action enregistrée dans l'historique</p>
+              </div>
             ) : (
               <>
-                <div className={`hv-timeline ${viewMode === 'grid' ? 'hv-grid-view' : ''}`}>
-                  {currentData.map((item, idx) => {
-                    const actionColor = getActionColor(item.type_action);
-                    const resultatConfig = getResultatConfig(item.resultat);
-                    const typeVisite = item.type_visite || 'Non spécifié';
-                    return (
-                      <div key={item.id || idx} className="hv-timeline-item">
-                        <div className="hv-timeline-marker" style={{ background: actionColor }}>{item.actionIcon}</div>
-                        <div className="hv-timeline-content">
-                          <div className="hv-timeline-header">
-                            <div className="hv-action-info">
-                              <span className="hv-action-type" style={{ color: actionColor }}>{item.actionLabel}</span>
-                              <span className="hv-source-badge" style={{ background: item.sourceBg, color: item.sourceColor }}>{item.sourceIcon} {item.sourceLabel}</span>
-                              <span className="hv-type-badge-medium">{getTypeVisiteIcon(typeVisite)} {typeVisite}</span>
-                              {item.resultat && item.type_action === 'EFFECTUEE' && (
-                                <span className={`hv-resultat-badge ${resultatConfig.class}`}>{resultatConfig.icon} {item.resultat}</span>
-                              )}
-                            </div>
-                            <span className="hv-action-date">{formatDateTimeFr(item.created_at)}</span>
-                          </div>
-                          <div className="hv-action-details">
-                            <div className="hv-detail-row">
-                              <Calendar size={14} />
-                              <strong>Date visite:</strong>
-                              <span>{formatDateFr(item.date_visite)}</span>
-                              <Clock size={12} />
-                              <span>{item.heure_visite?.substring(0,5)}</span>
-                            </div>
-                            {item.medecin && (
-                              <div className="hv-detail-row">
-                                <User size={14} /><strong>Médecin:</strong><span>{item.medecin}</span>
-                              </div>
-                            )}
-                            {item.motif_action && (
-                              <div className="hv-detail-row hv-motif">
-                                <FileText size={14} /><strong>Motif:</strong>
-                                <span className="hv-motif-text">{item.motif_action.substring(0, 80)}...</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="hv-timeline-actions">
-                            <button className="hv-btn-details-small" onClick={() => openDetailsModal(item)}><Eye size={14} /> Détails</button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div className={`hv-actions-grid-premium ${viewMode === 'grid' ? 'hv-grid-view' : 'hv-list-view'}`}>
+                  {currentData.map((item, idx) => (
+                    <ActionCard 
+                      key={item.id || idx} 
+                      action={item} 
+                      onViewDetails={openDetailsModal} 
+                      viewMode={viewMode}
+                    />
+                  ))}
                 </div>
+                
                 {totalPages > 1 && (
-                  <div className="hv-pagination">
-                    <button onClick={goToFirstPage} disabled={currentPageNum === 1}><ChevronsLeft size={16} /></button>
-                    <button onClick={goToPreviousPage} disabled={currentPageNum === 1}><ChevronLeft size={16} /> Précédent</button>
-                    <span className="hv-page-info">Page {currentPageNum} sur {totalPages}</span>
-                    <button onClick={goToNextPage} disabled={currentPageNum === totalPages}>Suivant <ChevronRight size={16} /></button>
-                    <button onClick={goToLastPage} disabled={currentPageNum === totalPages}><ChevronsRight size={16} /></button>
+                  <div className="hv-pagination-premium">
+                    <button onClick={goToFirstPage} disabled={currentPageNum === 1}>
+                      <ChevronsLeft size={16} />
+                    </button>
+                    <button onClick={goToPreviousPage} disabled={currentPageNum === 1}>
+                      <ChevronLeft size={16} /> Précédent
+                    </button>
+                    <span className="hv-page-info-premium">
+                      Page {currentPageNum} sur {totalPages}
+                    </span>
+                    <button onClick={goToNextPage} disabled={currentPageNum === totalPages}>
+                      Suivant <ChevronRight size={16} />
+                    </button>
+                    <button onClick={goToLastPage} disabled={currentPageNum === totalPages}>
+                      <ChevronsRight size={16} />
+                    </button>
                   </div>
                 )}
               </>
@@ -1129,5 +1309,25 @@ const HistoriqueVisites = () => {
     </div>
   );
 };
+
+// Composant UserPlus manquant
+const UserPlus = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <line x1="19" y1="8" x2="19" y2="14" />
+    <line x1="22" y1="11" x2="16" y2="11" />
+  </svg>
+);
+
+// Composant Hash manquant
+const Hash = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <line x1="4" y1="9" x2="20" y2="9" />
+    <line x1="4" y1="15" x2="20" y2="15" />
+    <line x1="10" y1="3" x2="8" y2="21" />
+    <line x1="16" y1="3" x2="14" y2="21" />
+  </svg>
+);
 
 export default HistoriqueVisites;

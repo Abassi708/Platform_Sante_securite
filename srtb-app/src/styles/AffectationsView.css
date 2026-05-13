@@ -1,37 +1,65 @@
 /* frontend/src/styles/AffectationsView.css */
-.affectations-container {
-  padding: 24px;
-  background: #f8fafc;
-  min-height: 100vh;
+/* ============================================ */
+/* HSE AFFECTATIONS VIEW - STYLES PREMIUM
+/* Design cohérent avec l'espace technicien
+/* Tous les sélecteurs préfixés avec .hse-
+/* ============================================ */
+
+/* Container principal */
+.hse-affectations-container {
+  padding: 0;
+  min-height: 100%;
 }
 
-.affectations-header {
-  margin-bottom: 24px;
+/* ============================================ */
+/* EN-TÊTE
+/* ============================================ */
+
+.hse-affectations-header {
+  margin-bottom: 28px;
 }
 
-.affectations-header h2 {
+.hse-header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 24px;
-  color: #1e293b;
-  margin-bottom: 8px;
+  gap: 16px;
 }
 
-.affectations-header p {
-  color: #64748b;
-  font-size: 14px;
-}
-
-.tabs {
+.hse-header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 12px;
+  align-items: center;
+  justify-content: center;
 }
 
-.tab-btn {
+.hse-affectations-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.hse-affectations-header p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ============================================ */
+/* TABS
+/* ============================================ */
+
+.hse-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 28px;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0;
+}
+
+.hse-tab-btn {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -43,393 +71,615 @@
   font-weight: 500;
   color: #64748b;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
-.tab-btn.active {
-  background: white;
-  color: #f59e0b;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+.hse-tab-btn:hover {
+  background: #f1f5f9;
+  color: #2563eb;
 }
 
-.affectations-grid, .agences-grid {
+.hse-tab-btn.active {
+  background: #eff6ff;
+  color: #2563eb;
+  position: relative;
+}
+
+.hse-tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #2563eb;
+  border-radius: 2px;
+}
+
+/* ============================================ */
+/* GRILLES
+/* ============================================ */
+
+.hse-affectations-grid,
+.hse-agences-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   gap: 20px;
 }
 
-.affectation-card, .agence-card {
-  background: white;
-  border-radius: 16px;
+/* ============================================ */
+/* CARTES D'AFFECTATION
+/* ============================================ */
+
+.hse-affectation-card,
+.hse-agence-card {
+  background: #ffffff;
+  border-radius: 20px;
   padding: 20px;
   position: relative;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.affectation-card:hover, .agence-card:hover {
-  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+.hse-affectation-card:hover,
+.hse-agence-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.1);
+  border-color: #2563eb;
 }
 
-.card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+.hse-card-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 16px;
 }
 
-.card-content h3 {
+.hse-card-content h3 {
   font-size: 18px;
+  font-weight: 600;
   color: #1e293b;
-  margin-bottom: 8px;
+  margin: 0 0 8px 0;
 }
 
-.card-content .description {
+.hse-description {
   font-size: 13px;
   color: #64748b;
-  margin-bottom: 12px;
+  margin: 0 0 12px 0;
   line-height: 1.5;
 }
 
-.periodicite-info {
+.hse-periodicite-info {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 12px;
   color: #475569;
+  background: #f8fafc;
+  padding: 6px 12px;
+  border-radius: 30px;
+  width: fit-content;
 }
 
-.card-stats {
+/* ============================================ */
+/* STATISTIQUES DES CARTES
+/* ============================================ */
+
+.hse-card-stats {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid #e2e8f0;
 }
 
-.stat-item {
+.hse-stat-item {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
 }
 
-.stat-item strong {
-  font-size: 24px;
-  color: #f59e0b;
+.hse-stat-item strong {
+  font-size: 26px;
+  font-weight: 700;
 }
 
-.stat-details {
+.hse-stat-item span {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.hse-stat-details {
   display: flex;
   gap: 16px;
   font-size: 12px;
 }
 
-.stat-details span {
+.hse-stat-details span {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.card-arrow {
+.hse-stat-details .actif { color: #10b981; }
+.hse-stat-details .maladie { color: #ef4444; }
+.hse-stat-details .conge { color: #f59e0b; }
+
+.hse-card-arrow {
   position: absolute;
   top: 20px;
   right: 20px;
-  color: #cbd5e1;
+  opacity: 0.5;
+  transition: all 0.2s;
 }
 
-/* Agence card specific */
-.card-header-agence {
+.hse-affectation-card:hover .hse-card-arrow,
+.hse-agence-card:hover .hse-card-arrow {
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+/* ============================================ */
+/* CARTES D'AGENCE
+/* ============================================ */
+
+.hse-card-header-agence {
   display: flex;
   gap: 16px;
   margin-bottom: 16px;
 }
 
-.agence-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+.hse-agence-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.agence-info h3 {
+.hse-agence-info h3 {
   font-size: 18px;
+  font-weight: 600;
   color: #1e293b;
-  margin-bottom: 4px;
+  margin: 0 0 4px 0;
 }
 
-.agence-info p {
+.hse-agence-info p {
   font-size: 13px;
   color: #64748b;
+  margin: 0;
 }
 
-.agence-stats {
+.hse-agence-info small {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.hse-agence-stats {
   background: #f8fafc;
-  padding: 12px;
-  border-radius: 12px;
-  margin-bottom: 12px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  margin-bottom: 16px;
 }
 
-.stat-main {
+.hse-stat-main {
   display: flex;
   align-items: baseline;
   gap: 8px;
   margin-bottom: 8px;
 }
 
-.stat-number {
+.hse-stat-number {
   font-size: 28px;
-  font-weight: bold;
-  color: #2563eb;
+  font-weight: 700;
 }
 
-.stat-breakdown {
+.hse-stat-label {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.hse-stat-breakdown {
   display: flex;
   gap: 16px;
   font-size: 12px;
 }
 
-.affectation-breakdown {
+.hse-stat-breakdown .actif { color: #10b981; }
+.hse-stat-breakdown .inactif { color: #ef4444; }
+
+/* ============================================ */
+/* RÉPARTITION PAR AFFECTATION
+/* ============================================ */
+
+.hse-affectation-breakdown {
   margin-top: 12px;
 }
 
-.breakdown-title {
+.hse-breakdown-title {
   font-size: 12px;
   font-weight: 500;
   color: #64748b;
-  margin-bottom: 8px;
+  margin: 0 0 8px 0;
 }
 
-.breakdown-list {
+.hse-breakdown-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 8px;
 }
 
-.breakdown-item {
+.hse-breakdown-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  background: #f1f5f9;
-  padding: 4px 8px;
-  border-radius: 20px;
+  gap: 6px;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 30px;
+  font-weight: 500;
 }
 
-/* Modal styles */
-.modal-overlay {
+/* ============================================ */
+/* MODALE
+/* ============================================ */
+
+.hse-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  backdrop-filter: blur(4px);
 }
 
-.modal-content {
-  background: white;
-  border-radius: 24px;
+.hse-modal-content {
+  background: #ffffff;
+  border-radius: 28px;
   width: 90%;
-  max-width: 800px;
+  max-width: 850px;
   max-height: 85vh;
   overflow-y: auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
-.modal-header {
-  padding: 24px;
+.hse-modal-header {
+  padding: 24px 28px;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   gap: 16px;
-  position: relative;
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 10;
 }
 
-.modal-header .header-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+.hse-modal-header .hse-header-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.modal-close {
+.hse-modal-header h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.hse-modal-header p {
+  font-size: 13px;
+  margin: 4px 0 0 0;
+}
+
+.hse-modal-close {
   position: absolute;
-  top: 20px;
-  right: 20px;
-  background: none;
+  top: 24px;
+  right: 24px;
+  width: 32px;
+  height: 32px;
+  background: #f1f5f9;
   border: none;
-  font-size: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  color: #94a3b8;
+  color: #64748b;
+  transition: all 0.2s;
 }
 
-.modal-body {
-  padding: 24px;
+.hse-modal-close:hover {
+  background: #fee2e2;
+  color: #ef4444;
 }
 
-.info-section {
-  background: #f8fafc;
-  padding: 16px;
-  border-radius: 12px;
-  margin-bottom: 24px;
+.hse-modal-body {
+  padding: 28px;
 }
 
-.description-full {
-  margin-bottom: 16px;
+/* Section d'informations */
+.hse-info-section {
+  background: #eff6ff;
+  padding: 18px;
+  border-radius: 16px;
+  margin-bottom: 28px;
+}
+
+.hse-description-full {
+  font-size: 14px;
   line-height: 1.6;
-  color: #475569;
+  color: #334155;
+  margin: 0 0 12px 0;
 }
 
-.info-row {
+.hse-info-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
-.stats-section {
-  margin-bottom: 24px;
+.hse-info-label {
+  font-weight: 600;
+  color: #475569;
+  width: 80px;
 }
 
-.stats-section h3, .agents-list-modal h3, .affectation-distribution h3 {
+/* Statistiques modale */
+.hse-stats-section {
+  margin-bottom: 28px;
+}
+
+.hse-stats-section h3,
+.hse-agents-list-modal h3,
+.hse-affectation-distribution h3 {
   font-size: 16px;
-  margin-bottom: 16px;
+  font-weight: 600;
   color: #1e293b;
+  margin: 0 0 16px 0;
 }
 
-.stats-grid-modal {
+.hse-stats-grid-modal {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
 }
 
-.stat-box {
+.hse-stat-box {
   text-align: center;
-  padding: 16px;
+  padding: 18px 12px;
   background: #f8fafc;
-  border-radius: 12px;
+  border-radius: 16px;
+  transition: all 0.2s;
 }
 
-.stat-box svg {
-  margin-bottom: 8px;
-  color: #f59e0b;
+.hse-stat-box svg {
+  margin-bottom: 10px;
 }
 
-.stat-box strong {
+.hse-stat-box strong {
   display: block;
   font-size: 28px;
+  font-weight: 700;
   color: #1e293b;
+  margin: 6px 0;
 }
 
-.stat-box span {
+.hse-stat-box span {
   font-size: 12px;
   color: #64748b;
 }
 
-.agents-table-mini {
+/* Tableau des agents */
+.hse-agents-table-mini {
   overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
 }
 
-.agents-table-mini table {
+.hse-agents-table-mini table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
 
-.agents-table-mini th, .agents-table-mini td {
-  padding: 12px;
+.hse-agents-table-mini th,
+.hse-agents-table-mini td {
+  padding: 12px 16px;
   text-align: left;
   border-bottom: 1px solid #e2e8f0;
 }
 
-.agents-table-mini th {
+.hse-agents-table-mini th {
   background: #f8fafc;
   font-weight: 600;
   color: #475569;
 }
 
-.status-badge {
+.hse-agents-table-mini tr:hover td {
+  background: #fafbfc;
+}
+
+/* Badges de statut */
+.hse-status-badge {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 20px;
+  padding: 4px 12px;
+  border-radius: 30px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: capitalize;
 }
 
-.status-badge.actif {
+.hse-status-badge.actif {
   background: #d1fae5;
   color: #059669;
 }
 
-.status-badge.inactif {
+.hse-status-badge.inactif {
   background: #fee2e2;
   color: #dc2626;
 }
 
-.status-badge.conge {
+.hse-status-badge.conge {
   background: #fef3c7;
   color: #d97706;
 }
 
-.status-badge.maladie {
+.hse-status-badge.maladie {
   background: #e0e7ff;
   color: #4f46e5;
 }
 
-.distribution-list {
+/* Distribution par affectation */
+.hse-distribution-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  background: #f8fafc;
+  padding: 18px;
+  border-radius: 16px;
 }
 
-.distribution-item {
+.hse-distribution-item {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.dist-label {
-  width: 120px;
+.hse-dist-label {
+  width: 110px;
   font-size: 13px;
   font-weight: 500;
+  color: #334155;
 }
 
-.dist-bar {
+.hse-dist-bar {
   flex: 1;
   height: 8px;
   background: #e2e8f0;
-  border-radius: 4px;
+  border-radius: 10px;
   overflow: hidden;
 }
 
-.dist-fill {
+.hse-dist-fill {
   height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s;
+  border-radius: 10px;
+  transition: width 0.4s ease;
 }
 
-.dist-count {
+.hse-dist-count {
   width: 80px;
   font-size: 12px;
   color: #64748b;
+  font-weight: 500;
 }
 
-.affectations-loading {
+/* Loading state */
+.hse-affectations-loading {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 400px;
   gap: 16px;
+}
+
+.hse-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: hse-spin 0.8s linear infinite;
+}
+
+@keyframes hse-spin {
+  to { transform: rotate(360deg); }
+}
+
+.hse-affectations-loading p {
+  color: #64748b;
+  font-size: 14px;
+}
+
+/* ============================================ */
+/* RESPONSIVE
+/* ============================================ */
+
+@media (max-width: 900px) {
+  .hse-stats-grid-modal {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .hse-distribution-item {
+    flex-wrap: wrap;
+  }
+  
+  .hse-dist-label {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .hse-affectations-grid,
+  .hse-agences-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .hse-header-left {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .hse-tabs {
+    justify-content: center;
+  }
+  
+  .hse-modal-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .hse-modal-close {
+    top: 16px;
+    right: 16px;
+  }
+  
+  .hse-stats-grid-modal {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .hse-stat-details {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .hse-stats-grid-modal {
+    grid-template-columns: 1fr;
+  }
+  
+  .hse-modal-body {
+    padding: 16px;
+  }
+  
+  .hse-modal-header {
+    padding: 16px;
+  }
 }

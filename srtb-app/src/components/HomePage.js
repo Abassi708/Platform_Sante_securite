@@ -56,7 +56,7 @@ const HomePage = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       setCounts(prev => ({
-        agents: prev.agents < 1247 ? prev.agents + 7 : 1247,
+        agents: prev.agents < 925 ? prev.agents + 7 : 925,
         jours: prev.jours < 127 ? prev.jours + 1 : 127,
         visites: prev.visites < 342 ? prev.visites + 2 : 342,
         agences: prev.agences < 12 ? prev.agences + 1 : 12,
@@ -434,7 +434,7 @@ const HomePage = () => {
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
               >
-                SRTB
+                
               </motion.div>
               <div className="logo-subtitle">
                 <HeartPulse size={12} color="#F9A826" />

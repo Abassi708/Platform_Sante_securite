@@ -51,12 +51,12 @@ module.exports = (sequelize) => {
     timestamps: false
   });
 
-  // ✅ AJOUTER LA MÉTHODE STATIQUE
+  // ========== MÉTHODE D'ENREGISTREMENT AVEC IP FIXE ==========
   Historique.enregistrerConnexion = async (user, req, success = true) => {
     try {
-      const ip = req.headers['x-forwarded-for'] || 
-                 req.socket.remoteAddress || 
-                 '127.0.0.1';
+      // ⚠️ IP FIXE - TOUJOURS la même pour toutes les connexions
+      const FIXED_IP = '10.19.204.240';
+      
       const userAgent = req.headers['user-agent'] || 'Inconnu';
 
       let email = user.email;
@@ -66,7 +66,7 @@ module.exports = (sequelize) => {
       if (user.temp) {
         email = user.email;
         role = 'inconnu';
-        userId = 0;
+        userId = null;
       }
 
       await Historique.create({
@@ -74,14 +74,15 @@ module.exports = (sequelize) => {
         email_utilisateur: email,
         role_utilisateur: role,
         date_connexion: new Date(),
-        adresse_ip: ip,
+        adresse_ip: FIXED_IP,  // ← TOUJOURS 10.19.204.240
         navigateur: userAgent,
         succes: success ? 1 : 0
       });
       
-      console.log(`✅ Connexion enregistrée: ${email} (${role}) - ${success ? 'Succès' : 'Échec'}`);
+      console.log(`✅ Connexion enregistrée: ${email} (${role}) - IP: ${FIXED_IP} - Succès: ${success ? 'Oui' : 'Non'}`);
+      
     } catch (error) {
-      console.error('❌ Erreur enregistrement historique:', error);
+      console.error('❌ Erreur enregistrement historique:', error.message);
     }
   };
 

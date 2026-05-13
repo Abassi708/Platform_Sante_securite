@@ -185,11 +185,11 @@ const AuditLog = () => {
 
   const showToast = (type, message) => {
     const toast = document.createElement('div');
-    toast.className = `toast-notification ${type}`;
+    toast.className = `srtb-toast-notification ${type}`;
     toast.innerHTML = `
-      <div class="toast-content">
-        <span class="toast-icon">${type === 'success' ? '✓' : '✗'}</span>
-        <span class="toast-message">${message}</span>
+      <div class="srtb-toast-content">
+        <span class="srtb-toast-icon">${type === 'success' ? '✓' : '✗'}</span>
+        <span class="srtb-toast-message">${message}</span>
       </div>
     `;
     document.body.appendChild(toast);
@@ -360,70 +360,70 @@ const AuditLog = () => {
 
   // ========== RENDU ==========
   return (
-    <div className="audit-log-container">
+    <div className="srtb-audit-log-container">
       {/* Horloge */}
-      <div className="audit-clock">
+      <div className="srtb-audit-clock">
         <Clock size={14} />
         <span>{currentTime.toLocaleTimeString('fr-FR')}</span>
-        <span className="clock-date">{currentTime.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
+        <span className="srtb-clock-date">{currentTime.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
       </div>
 
       {/* En-tête */}
-      <div className="audit-header">
-        <div className="header-left">
-          <div className="header-icon">
+      <div className="srtb-audit-header">
+        <div className="srtb-header-left">
+          <div className="srtb-header-icon">
             <Activity size={28} />
           </div>
-          <div className="header-title">
+          <div className="srtb-header-title">
             <h1>Journal d'audit</h1>
             <p>Historique complet de toutes les actions sur la plateforme</p>
           </div>
         </div>
-        <div className="header-right">
-          <button className="btn-export" onClick={handleExport}>
+        <div className="srtb-header-right">
+          <button className="srtb-btn-export" onClick={handleExport}>
             <Download size={16} /> Exporter CSV
           </button>
-          <button className="btn-refresh" onClick={fetchLogs}>
+          <button className="srtb-btn-refresh" onClick={fetchLogs}>
             <RefreshCw size={16} />
           </button>
         </div>
       </div>
 
       {/* Statistiques */}
-      <div className="stats-cards">
-        <div className="stat-card">
-          <div className="stat-icon blue"><Activity size={20} /></div>
-          <div className="stat-info">
-            <span className="stat-value">{stats.total || 0}</span>
-            <span className="stat-label">Actions totales</span>
+      <div className="srtb-stats-cards">
+        <div className="srtb-stat-card">
+          <div className="srtb-stat-icon blue"><Activity size={20} /></div>
+          <div className="srtb-stat-info">
+            <span className="srtb-stat-value">{stats.total || 0}</span>
+            <span className="srtb-stat-label">Actions totales</span>
           </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-icon green"><Calendar size={20} /></div>
-          <div className="stat-info">
-            <span className="stat-value">{stats.aujourdhui || 0}</span>
-            <span className="stat-label">Aujourd'hui</span>
+        <div className="srtb-stat-card">
+          <div className="srtb-stat-icon green"><Calendar size={20} /></div>
+          <div className="srtb-stat-info">
+            <span className="srtb-stat-value">{stats.aujourdhui || 0}</span>
+            <span className="srtb-stat-label">Aujourd'hui</span>
           </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-icon purple"><Users size={20} /></div>
-          <div className="stat-info">
-            <span className="stat-value">{uniqueUsers.length}</span>
-            <span className="stat-label">Utilisateurs actifs</span>
+        <div className="srtb-stat-card">
+          <div className="srtb-stat-icon purple"><Users size={20} /></div>
+          <div className="srtb-stat-info">
+            <span className="srtb-stat-value">{uniqueUsers.length}</span>
+            <span className="srtb-stat-label">Utilisateurs actifs</span>
           </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-icon orange"><Database size={20} /></div>
-          <div className="stat-info">
-            <span className="stat-value">{modules.length}</span>
-            <span className="stat-label">Modules</span>
+        <div className="srtb-stat-card">
+          <div className="srtb-stat-icon orange"><Database size={20} /></div>
+          <div className="srtb-stat-info">
+            <span className="srtb-stat-value">{modules.length}</span>
+            <span className="srtb-stat-label">Modules</span>
           </div>
         </div>
       </div>
 
       {/* Filtres */}
-      <div className="audit-filters">
-        <div className="search-wrapper">
+      <div className="srtb-audit-filters">
+        <div className="srtb-search-wrapper">
           <Search size={16} />
           <input 
             type="text" 
@@ -432,30 +432,30 @@ const AuditLog = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           {searchTerm && (
-            <button className="clear-search" onClick={() => setSearchTerm('')}>
+            <button className="srtb-clear-search" onClick={() => setSearchTerm('')}>
               <X size={14} />
             </button>
           )}
         </div>
         
         <button 
-          className={`filter-toggle ${showFilters ? 'active' : ''}`} 
+          className={`srtb-filter-toggle ${showFilters ? 'active' : ''}`} 
           onClick={() => setShowFilters(!showFilters)}
         >
           <Filter size={16} /> Filtres
-          {getActiveFiltersCount() > 0 && <span className="filter-badge">{getActiveFiltersCount()}</span>}
+          {getActiveFiltersCount() > 0 && <span className="srtb-filter-badge">{getActiveFiltersCount()}</span>}
         </button>
       </div>
 
       {/* Panneau filtres */}
       {showFilters && (
-        <div className="filters-panel">
-          <div className="filters-header">
+        <div className="srtb-filters-panel">
+          <div className="srtb-filters-header">
             <h3>Filtres avancés</h3>
-            <button className="reset-filters" onClick={resetFilters}>Réinitialiser</button>
+            <button className="srtb-reset-filters" onClick={resetFilters}>Réinitialiser</button>
           </div>
-          <div className="filters-grid">
-            <div className="filter-group">
+          <div className="srtb-filters-grid">
+            <div className="srtb-filter-group">
               <label>Module</label>
               <select value={selectedModule} onChange={(e) => setSelectedModule(e.target.value)}>
                 <option value="all">Tous les modules</option>
@@ -465,7 +465,7 @@ const AuditLog = () => {
               </select>
             </div>
             
-            <div className="filter-group">
+            <div className="srtb-filter-group">
               <label>Action</label>
               <select value={selectedAction} onChange={(e) => setSelectedAction(e.target.value)}>
                 <option value="all">Toutes les actions</option>
@@ -475,7 +475,7 @@ const AuditLog = () => {
               </select>
             </div>
             
-            <div className="filter-group">
+            <div className="srtb-filter-group">
               <label>Utilisateur</label>
               <select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)}>
                 <option value="all">Tous les utilisateurs</option>
@@ -485,7 +485,7 @@ const AuditLog = () => {
               </select>
             </div>
             
-            <div className="filter-group">
+            <div className="srtb-filter-group">
               <label>Période</label>
               <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
                 <option value="all">Tout l'historique</option>
@@ -498,26 +498,26 @@ const AuditLog = () => {
             
             {dateRange === 'custom' && (
               <>
-                <div className="filter-group">
+                <div className="srtb-filter-group">
                   <label>Date de début</label>
                   <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
                 </div>
-                <div className="filter-group">
+                <div className="srtb-filter-group">
                   <label>Date de fin</label>
                   <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
                 </div>
               </>
             )}
           </div>
-          <div className="filters-footer">
-            <span className="result-count">{filteredLogs.length} résultat(s)</span>
+          <div className="srtb-filters-footer">
+            <span className="srtb-result-count">{filteredLogs.length} résultat(s)</span>
           </div>
         </div>
       )}
 
       {/* Tableau */}
-      <div className="audit-table-wrapper">
-        <table className="audit-table">
+      <div className="srtb-audit-table-wrapper">
+        <table className="srtb-audit-table">
           <thead>
             <tr>
               <th>Date & Heure</th>
@@ -534,14 +534,14 @@ const AuditLog = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="9" className="loading-cell">
-                  <div className="loader"></div>
+                <td colSpan="9" className="srtb-loading-cell">
+                  <div className="srtb-loader"></div>
                   <p>Chargement des données...</p>
                  </td>
                </tr>
             ) : currentItems.length === 0 ? (
               <tr>
-                <td colSpan="9" className="empty-cell">
+                <td colSpan="9" className="srtb-empty-cell">
                   <Activity size={48} />
                   <h3>Aucune activité trouvée</h3>
                   <p>Essayez de modifier vos filtres de recherche</p>
@@ -554,69 +554,69 @@ const AuditLog = () => {
                 const actionStyle = getActionStyle(log.type_action);
                 
                 return (
-                  <tr key={log.id} className="audit-row">
+                  <tr key={log.id} className="srtb-audit-row">
                     <td>
-                      <div className="date-cell">
-                        <span className="date-main">{dateInfo.date}</span>
-                        <span className="date-time">{dateInfo.time}</span>
-                        {dateInfo.relative && <span className="date-relative">{dateInfo.relative}</span>}
+                      <div className="srtb-date-cell">
+                        <span className="srtb-date-main">{dateInfo.date}</span>
+                        <span className="srtb-date-time">{dateInfo.time}</span>
+                        {dateInfo.relative && <span className="srtb-date-relative">{dateInfo.relative}</span>}
                       </div>
                     </td>
                     <td>
-                      <div className="user-cell">
-                        <div className="user-avatar" style={{ background: '#4F46E5' }}>
+                      <div className="srtb-user-cell">
+                        <div className="srtb-user-avatar" style={{ background: '#4F46E5' }}>
                           {(log.email_utilisateur || 'S').charAt(0).toUpperCase()}
                         </div>
-                        <div className="user-info">
-                          <span className="user-email">{log.email_utilisateur || 'Système'}</span>
+                        <div className="srtb-user-info">
+                          <span className="srtb-user-email">{log.email_utilisateur || 'Système'}</span>
                         </div>
                       </div>
                     </td>
-                    <td className="user-id-cell">{log.id_utilisateur || '-'}</td>
-                    <td className="role-cell">
-                      <span className="role-badge-small" style={{ background: '#F1F5F9', color: '#475569' }}>
+                    <td className="srtb-user-id-cell">{log.id_utilisateur || '-'}</td>
+                    <td className="srtb-role-cell">
+                      <span className="srtb-role-badge-small" style={{ background: '#F1F5F9', color: '#475569' }}>
                         {log.role_utilisateur || 'system'}
                       </span>
                     </td>
-                    <td className="action-cell">
-                      <span className="action-badge" style={{ background: actionStyle.bg, color: actionStyle.text }}>
+                    <td className="srtb-action-cell">
+                      <span className="srtb-action-badge" style={{ background: actionStyle.bg, color: actionStyle.text }}>
                         {actionStyle.icon} {actionStyle.label}
                       </span>
                     </td>
-                    <td className="module-cell">
-                      <span className="module-badge" style={{ background: moduleStyle.bg, color: moduleStyle.text }}>
+                    <td className="srtb-module-cell">
+                      <span className="srtb-module-badge" style={{ background: moduleStyle.bg, color: moduleStyle.text }}>
                         {moduleStyle.icon} {moduleStyle.label}
                       </span>
                     </td>
-                    <td className="description-cell">
-                      <div className="description-preview">
+                    <td className="srtb-description-cell">
+                      <div className="srtb-description-preview">
                         <strong>{log.email_utilisateur || 'Système'}</strong> a effectué une <strong>{getActionLabel(log.type_action)}</strong> sur {getModuleLabelAvecArticle(log.module)}
-                        {log.identifiant_cible && <span className="target-highlight"> : {log.identifiant_cible}</span>}
+                        {log.identifiant_cible && <span className="srtb-target-highlight"> : {log.identifiant_cible}</span>}
                       </div>
-                      <div className="description-details">
+                      <div className="srtb-description-details">
                         <small>
                           IP: {log.adresse_ip || '0.0.0.0'} | 
                           ID cible: {log.id_cible || 'N/A'}
                         </small>
                       </div>
                     </td>
-                    <td className="status-cell">
+                    <td className="srtb-status-cell">
                       {log.statut === 'SUCCES' ? (
-                        <span className="status-success"><CheckCircle size={12} /> Succès</span>
+                        <span className="srtb-status-success"><CheckCircle size={12} /> Succès</span>
                       ) : (
-                        <span className="status-failed"><XCircle size={12} /> Échec</span>
+                        <span className="srtb-status-failed"><XCircle size={12} /> Échec</span>
                       )}
                     </td>
-                    <td className="actions-cell">
+                    <td className="srtb-actions-cell">
                       <button 
-                        className="view-btn" 
+                        className="srtb-view-btn" 
                         onClick={() => { setSelectedLog(log); setShowDetailsModal(true); }} 
                         title="Consulter"
                       >
                         <Eye size={14} />
                       </button>
                       <button 
-                        className="delete-btn" 
+                        className="srtb-delete-btn" 
                         onClick={() => openDeleteConfirm(log)} 
                         title="Supprimer"
                       >
@@ -633,14 +633,14 @@ const AuditLog = () => {
 
       {/* Pagination */}
       {filteredLogs.length > 0 && (
-        <div className="pagination">
+        <div className="srtb-pagination">
           <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
             <ChevronLeft size={16} /> Début
           </button>
           <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1}>
             <ChevronLeft size={16} />
           </button>
-          <span className="page-info">Page {currentPage} sur {totalPages}</span>
+          <span className="srtb-page-info">Page {currentPage} sur {totalPages}</span>
           <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages}>
             <ChevronRight size={16} />
           </button>
@@ -650,13 +650,13 @@ const AuditLog = () => {
         </div>
       )}
 
-      {/* ========== NOUVELLE MODALE DE DÉTAILS PROFESSIONNELLE ========== */}
+      {/* ========== MODALE DE DÉTAILS PROFESSIONNELLE ========== */}
       {showDetailsModal && selectedLog && (
-        <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
-          <div className="details-modal" onClick={e => e.stopPropagation()}>
-            <div className="details-modal-header">
-              <div className="details-modal-title">
-                <div className="details-icon">
+        <div className="srtb-modal-overlay" onClick={() => setShowDetailsModal(false)}>
+          <div className="srtb-details-modal" onClick={e => e.stopPropagation()}>
+            <div className="srtb-details-modal-header">
+              <div className="srtb-details-modal-title">
+                <div className="srtb-details-icon">
                   <FileText size={20} />
                 </div>
                 <div>
@@ -664,61 +664,61 @@ const AuditLog = () => {
                   <p>ID: #{selectedLog.id} · {new Date(selectedLog.date_creation).toLocaleDateString('fr-FR')}</p>
                 </div>
               </div>
-              <button className="details-modal-close" onClick={() => setShowDetailsModal(false)}>
+              <button className="srtb-details-modal-close" onClick={() => setShowDetailsModal(false)}>
                 <X size={18} />
               </button>
             </div>
 
-            <div className="details-modal-body">
+            <div className="srtb-details-modal-body">
               {/* Section Utilisateur */}
-              <div className="details-card">
-                <div className="details-card-header">
+              <div className="srtb-details-card">
+                <div className="srtb-details-card-header">
                   <User size={16} />
                   <span>Utilisateur</span>
                 </div>
-                <div className="details-card-content">
-                  <div className="details-row">
-                    <div className="details-label">Email</div>
-                    <div className="details-value">{selectedLog.email_utilisateur || 'Système'}</div>
+                <div className="srtb-details-card-content">
+                  <div className="srtb-details-row">
+                    <div className="srtb-details-label">Email</div>
+                    <div className="srtb-details-value">{selectedLog.email_utilisateur || 'Système'}</div>
                   </div>
-                  <div className="details-row">
-                    <div className="details-label">ID Utilisateur</div>
-                    <div className="details-value">{selectedLog.id_utilisateur || 'N/A'}</div>
+                  <div className="srtb-details-row">
+                    <div className="srtb-details-label">ID Utilisateur</div>
+                    <div className="srtb-details-value">{selectedLog.id_utilisateur || 'N/A'}</div>
                   </div>
-                  <div className="details-row">
-                    <div className="details-label">Rôle</div>
-                    <div className="details-value">
-                      <span className="role-tag">{selectedLog.role_utilisateur || 'system'}</span>
+                  <div className="srtb-details-row">
+                    <div className="srtb-details-label">Rôle</div>
+                    <div className="srtb-details-value">
+                      <span className="srtb-role-tag">{selectedLog.role_utilisateur || 'system'}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Section Action */}
-              <div className="details-card">
-                <div className="details-card-header">
+              <div className="srtb-details-card">
+                <div className="srtb-details-card-header">
                   <Activity size={16} />
                   <span>Action</span>
                 </div>
-                <div className="details-card-content">
-                  <div className="details-row">
-                    <div className="details-label">Type</div>
-                    <div className="details-value">
-                      <span className={`action-tag ${selectedLog.type_action?.toLowerCase()}`}>
+                <div className="srtb-details-card-content">
+                  <div className="srtb-details-row">
+                    <div className="srtb-details-label">Type</div>
+                    <div className="srtb-details-value">
+                      <span className={`srtb-action-tag ${selectedLog.type_action?.toLowerCase()}`}>
                         {getActionLabel(selectedLog.type_action)}
                       </span>
                     </div>
                   </div>
-                  <div className="details-row">
-                    <div className="details-label">Module</div>
-                    <div className="details-value">
-                      <span className="module-tag">{getModuleLabel(selectedLog.module)}</span>
+                  <div className="srtb-details-row">
+                    <div className="srtb-details-label">Module</div>
+                    <div className="srtb-details-value">
+                      <span className="srtb-module-tag">{getModuleLabel(selectedLog.module)}</span>
                     </div>
                   </div>
-                  <div className="details-row">
-                    <div className="details-label">Statut</div>
-                    <div className="details-value">
-                      <span className={`status-tag ${selectedLog.statut === 'SUCCES' ? 'success' : 'failed'}`}>
+                  <div className="srtb-details-row">
+                    <div className="srtb-details-label">Statut</div>
+                    <div className="srtb-details-value">
+                      <span className={`srtb-status-tag ${selectedLog.statut === 'SUCCES' ? 'success' : 'failed'}`}>
                         {selectedLog.statut === 'SUCCES' ? '✓ Succès' : '✗ Échec'}
                       </span>
                     </div>
@@ -728,22 +728,22 @@ const AuditLog = () => {
 
               {/* Section Cible */}
               {(selectedLog.identifiant_cible || selectedLog.id_cible) && (
-                <div className="details-card">
-                  <div className="details-card-header">
+                <div className="srtb-details-card">
+                  <div className="srtb-details-card-header">
                     <Target size={16} />
                     <span>Cible</span>
                   </div>
-                  <div className="details-card-content">
+                  <div className="srtb-details-card-content">
                     {selectedLog.identifiant_cible && (
-                      <div className="details-row">
-                        <div className="details-label">Identifiant</div>
-                        <div className="details-value highlight">{selectedLog.identifiant_cible}</div>
+                      <div className="srtb-details-row">
+                        <div className="srtb-details-label">Identifiant</div>
+                        <div className="srtb-details-value highlight">{selectedLog.identifiant_cible}</div>
                       </div>
                     )}
                     {selectedLog.id_cible && (
-                      <div className="details-row">
-                        <div className="details-label">ID Cible</div>
-                        <div className="details-value">{selectedLog.id_cible}</div>
+                      <div className="srtb-details-row">
+                        <div className="srtb-details-label">ID Cible</div>
+                        <div className="srtb-details-value">{selectedLog.id_cible}</div>
                       </div>
                     )}
                   </div>
@@ -751,41 +751,41 @@ const AuditLog = () => {
               )}
 
               {/* Section Description */}
-              <div className="details-card full-width">
-                <div className="details-card-header">
+              <div className="srtb-details-card full-width">
+                <div className="srtb-details-card-header">
                   <MessageIcon size={16} />
                   <span>Description</span>
                 </div>
-                <div className="details-card-content">
-                  <p className="description-text">{selectedLog.description || 'Aucune description'}</p>
+                <div className="srtb-details-card-content">
+                  <p className="srtb-description-text">{selectedLog.description || 'Aucune description'}</p>
                 </div>
               </div>
 
               {/* Section Informations techniques */}
-              <div className="details-card full-width">
-                <div className="details-card-header">
+              <div className="srtb-details-card full-width">
+                <div className="srtb-details-card-header">
                   <Globe size={16} />
                   <span>Informations techniques</span>
                 </div>
-                <div className="details-card-content">
-                  <div className="details-grid-2">
-                    <div className="details-row">
-                      <div className="details-label">Adresse IP</div>
-                      <div className="details-value monospace">{selectedLog.adresse_ip || '0.0.0.0'}</div>
+                <div className="srtb-details-card-content">
+                  <div className="srtb-details-grid-2">
+                    <div className="srtb-details-row">
+                      <div className="srtb-details-label">Adresse IP</div>
+                      <div className="srtb-details-value monospace">{selectedLog.adresse_ip || '0.0.0.0'}</div>
                     </div>
-                    <div className="details-row">
-                      <div className="details-label">Méthode HTTP</div>
-                      <div className="details-value">
-                        <span className="method-tag">{selectedLog.methode_http || 'GET'}</span>
+                    <div className="srtb-details-row">
+                      <div className="srtb-details-label">Méthode HTTP</div>
+                      <div className="srtb-details-value">
+                        <span className="srtb-method-tag">{selectedLog.methode_http || 'GET'}</span>
                       </div>
                     </div>
-                    <div className="details-row full-width">
-                      <div className="details-label">URL</div>
-                      <div className="details-value monospace url">{selectedLog.url || '-'}</div>
+                    <div className="srtb-details-row full-width">
+                      <div className="srtb-details-label">URL</div>
+                      <div className="srtb-details-value monospace url">{selectedLog.url || '-'}</div>
                     </div>
-                    <div className="details-row full-width">
-                      <div className="details-label">Navigateur</div>
-                      <div className="details-value user-agent">{selectedLog.navigateur?.substring(0, 150) || 'Inconnu'}</div>
+                    <div className="srtb-details-row full-width">
+                      <div className="srtb-details-label">Navigateur</div>
+                      <div className="srtb-details-value user-agent">{selectedLog.navigateur?.substring(0, 150) || 'Inconnu'}</div>
                     </div>
                   </div>
                 </div>
@@ -793,16 +793,16 @@ const AuditLog = () => {
 
               {/* Section Changements */}
               {(selectedLog.nouvelles_valeurs || selectedLog.anciennes_valeurs) && (
-                <div className="details-card full-width">
-                  <div className="details-card-header">
+                <div className="srtb-details-card full-width">
+                  <div className="srtb-details-card-header">
                     <Edit size={16} />
                     <span>Changements</span>
                   </div>
-                  <div className="details-card-content changes-container">
+                  <div className="srtb-details-card-content srtb-changes-container">
                     {selectedLog.anciennes_valeurs && (
-                      <div className="changes-column">
-                        <div className="changes-label">Anciennes valeurs</div>
-                        <pre className="changes-pre">{(() => {
+                      <div className="srtb-changes-column">
+                        <div className="srtb-changes-label">Anciennes valeurs</div>
+                        <pre className="srtb-changes-pre">{(() => {
                           try {
                             return JSON.stringify(JSON.parse(selectedLog.anciennes_valeurs), null, 2);
                           } catch {
@@ -812,9 +812,9 @@ const AuditLog = () => {
                       </div>
                     )}
                     {selectedLog.nouvelles_valeurs && (
-                      <div className="changes-column">
-                        <div className="changes-label">Nouvelles valeurs</div>
-                        <pre className="changes-pre">{(() => {
+                      <div className="srtb-changes-column">
+                        <div className="srtb-changes-label">Nouvelles valeurs</div>
+                        <pre className="srtb-changes-pre">{(() => {
                           try {
                             return JSON.stringify(JSON.parse(selectedLog.nouvelles_valeurs), null, 2);
                           } catch {
@@ -829,23 +829,23 @@ const AuditLog = () => {
 
               {/* Message d'erreur */}
               {selectedLog.message_erreur && (
-                <div className="details-card error-card full-width">
-                  <div className="details-card-header">
+                <div className="srtb-details-card error-card full-width">
+                  <div className="srtb-details-card-header">
                     <AlertCircle size={16} />
                     <span>Message d'erreur</span>
                   </div>
-                  <div className="details-card-content">
-                    <p className="error-text">{selectedLog.message_erreur}</p>
+                  <div className="srtb-details-card-content">
+                    <p className="srtb-error-text">{selectedLog.message_erreur}</p>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="details-modal-footer">
-              <button className="btn-secondary" onClick={() => setShowDetailsModal(false)}>
+            <div className="srtb-details-modal-footer">
+              <button className="srtb-btn-secondary" onClick={() => setShowDetailsModal(false)}>
                 Fermer
               </button>
-              <button className="btn-copy" onClick={() => {
+              <button className="srtb-btn-copy" onClick={() => {
                 navigator.clipboard.writeText(JSON.stringify(selectedLog, null, 2));
                 showToast('success', 'Copié');
               }}>
@@ -858,20 +858,20 @@ const AuditLog = () => {
 
       {/* ========== MODALE DE CONFIRMATION TRÈS COURTE ========== */}
       {showConfirmModal && logToDelete && (
-        <div className="modal-overlay" onClick={() => !deleting && setShowConfirmModal(false)}>
-          <div className="confirm-modal-short">
-            <div className="confirm-modal-short-body">
-              <div className="confirm-icon-short">
+        <div className="srtb-modal-overlay" onClick={() => !deleting && setShowConfirmModal(false)}>
+          <div className="srtb-confirm-modal-short">
+            <div className="srtb-confirm-modal-short-body">
+              <div className="srtb-confirm-icon-short">
                 <Trash2 size={24} color="#ef4444" />
               </div>
               <p>Supprimer ce log ?</p>
-              <p className="confirm-warning-short">Action irréversible</p>
+              <p className="srtb-confirm-warning-short">Action irréversible</p>
             </div>
-            <div className="confirm-modal-short-footer">
-              <button className="confirm-btn-cancel-short" onClick={() => setShowConfirmModal(false)} disabled={deleting}>
+            <div className="srtb-confirm-modal-short-footer">
+              <button className="srtb-confirm-btn-cancel-short" onClick={() => setShowConfirmModal(false)} disabled={deleting}>
                 Non
               </button>
-              <button className="confirm-btn-delete-short" onClick={confirmDelete} disabled={deleting}>
+              <button className="srtb-confirm-btn-delete-short" onClick={confirmDelete} disabled={deleting}>
                 {deleting ? '...' : 'Oui'}
               </button>
             </div>

@@ -1,3 +1,4 @@
+// src/components/HistoriqueConnexions.js
 import React, { useState, useEffect } from 'react';
 import { 
   History, 
@@ -375,11 +376,11 @@ const HistoriqueConnexions = () => {
   
   const getRoleBadgeClass = (role) => {
     switch(role) {
-      case 'admin': return 'role-admin';
-      case 'technicien': return 'role-technicien';
-      case 'social': return 'role-social';
-      case 'agent': return 'role-agent';
-      default: return 'role-unknown';
+      case 'admin': return 'hsc-role-admin';
+      case 'technicien': return 'hsc-role-technicien';
+      case 'social': return 'hsc-role-social';
+      case 'agent': return 'hsc-role-agent';
+      default: return 'hsc-role-unknown';
     }
   };
 
@@ -495,104 +496,104 @@ const HistoriqueConnexions = () => {
     const { date, time, relative } = formatDate(connexion.timestamp);
     
     return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
+      <div className="hsc-modal-overlay" onClick={onClose}>
+        <div className="hsc-modal-content" onClick={e => e.stopPropagation()}>
+          <div className="hsc-modal-header">
             <h2>Détails de la connexion</h2>
-            <button className="modal-close" onClick={onClose}>
+            <button className="hsc-modal-close" onClick={onClose}>
               <X size={18} />
             </button>
           </div>
           
-          <div className="modal-body">
-            <div className="details-profile">
-              <div className={`details-avatar ${connexion.user_role || 'unknown'}`}>
+          <div className="hsc-modal-body">
+            <div className="hsc-details-profile">
+              <div className={`hsc-details-avatar ${connexion.user_role || 'unknown'}`}>
                 {connexion.user_email?.charAt(0).toUpperCase() || '?'}
               </div>
-              <div className="details-title">
+              <div className="hsc-details-title">
                 <h3>{connexion.user_email || 'Inconnu'}</h3>
-                <span className={`role-badge ${getRoleBadgeClass(connexion.user_role)}`}>
+                <span className={`hsc-role-badge ${getRoleBadgeClass(connexion.user_role)}`}>
                   {getRoleIcon(connexion.user_role)}
                   {getRoleLabel(connexion.user_role)}
                 </span>
               </div>
             </div>
             
-            <div className="details-grid">
-              <div className="detail-card">
-                <div className="detail-icon">
+            <div className="hsc-details-grid">
+              <div className="hsc-detail-card">
+                <div className="hsc-detail-icon">
                   <Clock size={16} />
                 </div>
-                <div className="detail-content">
-                  <span className="detail-label">Date & Heure</span>
-                  <span className="detail-value">{date}</span>
-                  <span className="detail-sub">{time}</span>
-                  {relative && <span className="detail-badge">{relative}</span>}
+                <div className="hsc-detail-content">
+                  <span className="hsc-detail-label">Date & Heure</span>
+                  <span className="hsc-detail-value">{date}</span>
+                  <span className="hsc-detail-sub">{time}</span>
+                  {relative && <span className="hsc-detail-badge">{relative}</span>}
                 </div>
               </div>
               
-              <div className="detail-card">
-                <div className="detail-icon">
+              <div className="hsc-detail-card">
+                <div className="hsc-detail-icon">
                   <Globe size={16} />
                 </div>
-                <div className="detail-content">
-                  <span className="detail-label">Adresse IP</span>
-                  <span className="detail-value">{connexion.ip_address || '0.0.0.0'}</span>
-                  <span className="detail-sub">{getLocationFlag(connexion.ip_address)}</span>
-                  <button className="copy-btn-small" onClick={() => copyToClipboard(connexion.ip_address)}>
+                <div className="hsc-detail-content">
+                  <span className="hsc-detail-label">Adresse IP</span>
+                  <span className="hsc-detail-value">{connexion.ip_address || '0.0.0.0'}</span>
+                  <span className="hsc-detail-sub">{getLocationFlag(connexion.ip_address)}</span>
+                  <button className="hsc-copy-btn-small" onClick={() => copyToClipboard(connexion.ip_address)}>
                     <Copy size={12} />
                   </button>
                 </div>
               </div>
               
-              <div className="detail-card full-width">
-                <div className="detail-icon">
+              <div className="hsc-detail-card hsc-full-width">
+                <div className="hsc-detail-icon">
                   <Monitor size={16} />
                 </div>
-                <div className="detail-content">
-                  <span className="detail-label">Appareil</span>
-                  <div className="device-detail">
+                <div className="hsc-detail-content">
+                  <span className="hsc-detail-label">Appareil</span>
+                  <div className="hsc-device-detail">
                     {getDeviceIcon(connexion.user_agent)}
                     <span>{getBrowserInfo(connexion.user_agent)}</span>
                   </div>
-                  <div className="user-agent-full">
+                  <div className="hsc-user-agent-full">
                     {connexion.user_agent || 'Inconnu'}
                   </div>
                 </div>
               </div>
               
-              <div className="detail-card">
-                <div className="detail-icon">
+              <div className="hsc-detail-card">
+                <div className="hsc-detail-icon">
                   <Shield size={16} />
                 </div>
-                <div className="detail-content">
-                  <span className="detail-label">Statut</span>
+                <div className="hsc-detail-content">
+                  <span className="hsc-detail-label">Statut</span>
                   {connexion.success ? (
-                    <span className="status-badge success">
+                    <span className="hsc-status-badge hsc-success">
                       <CheckCircle size={14} /> Succès
                     </span>
                   ) : (
-                    <span className="status-badge failed">
+                    <span className="hsc-status-badge hsc-failed">
                       <XCircle size={14} /> Échec
                     </span>
                   )}
                 </div>
               </div>
               
-              <div className="detail-card">
-                <div className="detail-icon">
+              <div className="hsc-detail-card">
+                <div className="hsc-detail-icon">
                   <Key size={16} />
                 </div>
-                <div className="detail-content">
-                  <span className="detail-label">ID Utilisateur</span>
-                  <span className="detail-value">#{connexion.user_id || 'N/A'}</span>
+                <div className="hsc-detail-content">
+                  <span className="hsc-detail-label">ID Utilisateur</span>
+                  <span className="hsc-detail-value">#{connexion.user_id || 'N/A'}</span>
                 </div>
               </div>
             </div>
           </div>
           
-          <div className="modal-footer">
-            <button className="btn-cancel" onClick={onClose}>
+          <div className="hsc-modal-footer">
+            <button className="hsc-btn-cancel" onClick={onClose}>
               Fermer
             </button>
           </div>
@@ -601,14 +602,14 @@ const HistoriqueConnexions = () => {
     );
   };
 
-  // ========== MODAL STATISTIQUES (AVEC SCROLL CORRIGÉ) ==========
+  // ========== MODAL STATISTIQUES ==========
   const StatsModal = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
     
     return (
-      <div className="modal-overlay" onClick={onClose}>
+      <div className="hsc-modal-overlay" onClick={onClose}>
         <div 
-          className="modal-content large" 
+          className="hsc-modal-content hsc-large" 
           onClick={e => e.stopPropagation()}
           style={{ 
             maxHeight: '80vh',
@@ -616,114 +617,114 @@ const HistoriqueConnexions = () => {
             flexDirection: 'column'
           }}
         >
-          <div className="modal-header" style={{ flexShrink: 0 }}>
+          <div className="hsc-modal-header" style={{ flexShrink: 0 }}>
             <h2>Statistiques détaillées</h2>
-            <button className="modal-close" onClick={onClose}>
+            <button className="hsc-modal-close" onClick={onClose}>
               <X size={18} />
             </button>
           </div>
           
           <div 
-            className="modal-body" 
+            className="hsc-modal-body" 
             style={{ 
               overflowY: 'auto',
               padding: '24px',
               flex: 1
             }}
           >
-            <div className="stats-overview">
-              <div className="stats-card primary">
-                <div className="stats-icon">
+            <div className="hsc-stats-overview">
+              <div className="hsc-stats-card hsc-primary">
+                <div className="hsc-stats-icon">
                   <Activity size={24} />
                 </div>
-                <div className="stats-content">
-                  <span className="stats-label">Taux de réussite</span>
-                  <span className="stats-value">{baseStats.successRate}%</span>
-                  <div className="stats-progress">
-                    <div className="progress-bar" style={{ width: `${baseStats.successRate}%` }}></div>
+                <div className="hsc-stats-content">
+                  <span className="hsc-stats-label">Taux de réussite</span>
+                  <span className="hsc-stats-value">{baseStats.successRate}%</span>
+                  <div className="hsc-stats-progress">
+                    <div className="hsc-progress-bar" style={{ width: `${baseStats.successRate}%` }}></div>
                   </div>
                 </div>
               </div>
               
-              <div className="stats-card">
-                <div className="stats-icon">
+              <div className="hsc-stats-card">
+                <div className="hsc-stats-icon">
                   <Users size={24} />
                 </div>
-                <div className="stats-content">
-                  <span className="stats-label">Utilisateurs uniques</span>
-                  <span className="stats-value">{baseStats.uniqueUsers}</span>
+                <div className="hsc-stats-content">
+                  <span className="hsc-stats-label">Utilisateurs uniques</span>
+                  <span className="hsc-stats-value">{baseStats.uniqueUsers}</span>
                 </div>
               </div>
               
-              <div className="stats-card">
-                <div className="stats-icon">
+              <div className="hsc-stats-card">
+                <div className="hsc-stats-icon">
                   <TrendingUp size={24} />
                 </div>
-                <div className="stats-content">
-                  <span className="stats-label">Moyenne/jour</span>
-                  <span className="stats-value">{baseStats.averagePerDay}</span>
+                <div className="hsc-stats-content">
+                  <span className="hsc-stats-label">Moyenne/jour</span>
+                  <span className="hsc-stats-value">{baseStats.averagePerDay}</span>
                 </div>
               </div>
             </div>
             
-            <div className="stats-grid">
-              <div className="stat-box">
-                <span className="stat-box-label">Aujourd'hui</span>
-                <span className="stat-box-value">{baseStats.today}</span>
-                <span className="stat-box-change">
+            <div className="hsc-stats-grid">
+              <div className="hsc-stat-box">
+                <span className="hsc-stat-box-label">Aujourd'hui</span>
+                <span className="hsc-stat-box-value">{baseStats.today}</span>
+                <span className="hsc-stat-box-change">
                   {baseStats.today > 0 ? 'Actif' : 'Calme'}
                 </span>
               </div>
               
-              <div className="stat-box">
-                <span className="stat-box-label">Cette semaine</span>
-                <span className="stat-box-value">{baseStats.week}</span>
-                <span className="stat-box-sub">connexions</span>
+              <div className="hsc-stat-box">
+                <span className="hsc-stat-box-label">Cette semaine</span>
+                <span className="hsc-stat-box-value">{baseStats.week}</span>
+                <span className="hsc-stat-box-sub">connexions</span>
               </div>
               
-              <div className="stat-box">
-                <span className="stat-box-label">Ce mois</span>
-                <span className="stat-box-value">{baseStats.month}</span>
-                <span className="stat-box-sub">connexions</span>
+              <div className="hsc-stat-box">
+                <span className="hsc-stat-box-label">Ce mois</span>
+                <span className="hsc-stat-box-value">{baseStats.month}</span>
+                <span className="hsc-stat-box-sub">connexions</span>
               </div>
               
-              <div className="stat-box">
-                <span className="stat-box-label">Total</span>
-                <span className="stat-box-value">{baseStats.total}</span>
-                <span className="stat-box-sub">connexions</span>
+              <div className="hsc-stat-box">
+                <span className="hsc-stat-box-label">Total</span>
+                <span className="hsc-stat-box-value">{baseStats.total}</span>
+                <span className="hsc-stat-box-sub">connexions</span>
               </div>
             </div>
             
-            <div className="stats-chart">
+            <div className="hsc-stats-chart">
               <h3>Répartition par rôle</h3>
-              <div className="role-distribution">
+              <div className="hsc-role-distribution">
                 {['admin', 'technicien', 'social', 'agent', 'inconnu'].map(role => {
                   const count = connexions.filter(c => c.user_role === role).length;
                   const percentage = baseStats.total > 0 ? Math.round((count / baseStats.total) * 100) : 0;
                   
                   return (
-                    <div key={role} className="role-dist-item">
-                      <div className="role-dist-label">
+                    <div key={role} className="hsc-role-dist-item">
+                      <div className="hsc-role-dist-label">
                         {getRoleIcon(role)}
                         {getRoleLabel(role)}
                       </div>
-                      <div className="role-dist-bar">
-                        <div className="dist-bar-fill" style={{ width: `${percentage}%` }}></div>
+                      <div className="hsc-role-dist-bar">
+                        <div className="hsc-dist-bar-fill" style={{ width: `${percentage}%` }}></div>
                       </div>
-                      <span className="role-dist-percent">{percentage}%</span>
+                      <span className="hsc-role-dist-percent">{percentage}%</span>
                     </div>
                   );
                 })}
               </div>
             </div>
             
-            <div className="stats-insights">
+            <div className="hsc-stats-insights">
               <h3>
                 <Sparkles size={16} />
                 Insights
               </h3>
-              <div className="insights-grid">
-                <div className="insight-item">
+              <div className="hsc-insights-grid">
+                <div className="hsc-insight-item">
                   <Activity size={14} />
                   <span>
                     {baseStats.successRate > 90 ? 'Excellent taux de connexion' : 
@@ -731,7 +732,7 @@ const HistoriqueConnexions = () => {
                      'Taux de connexion à améliorer'}
                   </span>
                 </div>
-                <div className="insight-item">
+                <div className="hsc-insight-item">
                   <TrendingUp size={14} />
                   <span>
                     {baseStats.trend === 'hausse' ? 'Activité en hausse' : 
@@ -739,13 +740,13 @@ const HistoriqueConnexions = () => {
                      'Activité stable'}
                   </span>
                 </div>
-                <div className="insight-item">
+                <div className="hsc-insight-item">
                   <Users size={14} />
                   <span>
                     {baseStats.uniqueUsers} utilisateur{baseStats.uniqueUsers > 1 ? 's' : ''} actif{baseStats.uniqueUsers > 1 ? 's' : ''}
                   </span>
                 </div>
-                <div className="insight-item">
+                <div className="hsc-insight-item">
                   <Calendar size={14} />
                   <span>
                     Moyenne: {baseStats.averagePerDay} connexions/jour
@@ -755,8 +756,8 @@ const HistoriqueConnexions = () => {
             </div>
           </div>
           
-          <div className="modal-footer" style={{ flexShrink: 0 }}>
-            <button className="btn-cancel" onClick={onClose}>
+          <div className="hsc-modal-footer" style={{ flexShrink: 0 }}>
+            <button className="hsc-btn-cancel" onClick={onClose}>
               Fermer
             </button>
           </div>
@@ -770,23 +771,23 @@ const HistoriqueConnexions = () => {
     if (!isOpen) return null;
     
     return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content small" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
+      <div className="hsc-modal-overlay" onClick={onClose}>
+        <div className="hsc-modal-content hsc-small" onClick={e => e.stopPropagation()}>
+          <div className="hsc-modal-header">
             <h2>Exporter les données</h2>
-            <button className="modal-close" onClick={onClose}>
+            <button className="hsc-modal-close" onClick={onClose}>
               <X size={18} />
             </button>
           </div>
           
-          <div className="modal-body">
-            <p className="export-info">
+          <div className="hsc-modal-body">
+            <p className="hsc-export-info">
               <FileText size={16} />
               {filteredConnexions.length} connexions à exporter
             </p>
             
-            <div className="export-options">
-              <button className="export-option" onClick={() => onExport('csv')}>
+            <div className="hsc-export-options">
+              <button className="hsc-export-option" onClick={() => onExport('csv')}>
                 <Download size={20} />
                 <div>
                   <strong>CSV</strong>
@@ -794,7 +795,7 @@ const HistoriqueConnexions = () => {
                 </div>
               </button>
               
-              <button className="export-option" onClick={() => onExport('excel')}>
+              <button className="hsc-export-option" onClick={() => onExport('excel')}>
                 <Download size={20} />
                 <div>
                   <strong>Excel</strong>
@@ -802,7 +803,7 @@ const HistoriqueConnexions = () => {
                 </div>
               </button>
               
-              <button className="export-option" onClick={() => onExport('pdf')}>
+              <button className="hsc-export-option" onClick={() => onExport('pdf')}>
                 <Download size={20} />
                 <div>
                   <strong>PDF</strong>
@@ -812,8 +813,8 @@ const HistoriqueConnexions = () => {
             </div>
           </div>
           
-          <div className="modal-footer">
-            <button className="btn-cancel" onClick={onClose}>
+          <div className="hsc-modal-footer">
+            <button className="hsc-btn-cancel" onClick={onClose}>
               Annuler
             </button>
           </div>
@@ -827,33 +828,33 @@ const HistoriqueConnexions = () => {
     if (!isOpen || !connexion) return null;
     
     return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content small" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
+      <div className="hsc-modal-overlay" onClick={onClose}>
+        <div className="hsc-modal-content hsc-small" onClick={e => e.stopPropagation()}>
+          <div className="hsc-modal-header">
             <h2>Confirmer la suppression</h2>
-            <button className="modal-close" onClick={onClose}>
+            <button className="hsc-modal-close" onClick={onClose}>
               <X size={18} />
             </button>
           </div>
           
-          <div className="modal-body">
-            <div className="delete-icon">
+          <div className="hsc-modal-body">
+            <div className="hsc-delete-icon">
               <AlertCircle size={48} />
             </div>
-            <p className="delete-message">
+            <p className="hsc-delete-message">
               Êtes-vous sûr de vouloir supprimer cette connexion ?
             </p>
-            <p className="delete-details">
+            <p className="hsc-delete-details">
               <strong>{connexion.user_email}</strong> - {formatDate(connexion.timestamp).date}
             </p>
-            <p className="delete-warning">Cette action est irréversible.</p>
+            <p className="hsc-delete-warning">Cette action est irréversible.</p>
           </div>
           
-          <div className="modal-footer">
-            <button className="btn-cancel" onClick={onClose}>
+          <div className="hsc-modal-footer">
+            <button className="hsc-btn-cancel" onClick={onClose}>
               Annuler
             </button>
-            <button className="btn-delete" onClick={onConfirm}>
+            <button className="hsc-btn-delete" onClick={onConfirm}>
               <Trash2 size={16} />
               Supprimer
             </button>
@@ -866,20 +867,20 @@ const HistoriqueConnexions = () => {
   // ========== RENDU PRINCIPAL ==========
   
   return (
-    <div className="historique-container">
+    <div className="hsc-historique-container">
       
       {/* ========== BACKGROUND ========== */}
-      <div className="bg-pattern"></div>
+      <div className="hsc-bg-pattern"></div>
 
       {/* ========== HEADER ========== */}
-      <div className="historique-header">
-        <div className="header-left">
-          <div className="header-icon-wrapper">
+      <div className="hsc-historique-header">
+        <div className="hsc-header-left">
+          <div className="hsc-header-icon-wrapper">
             <History size={24} />
           </div>
-          <div className="header-title">
+          <div className="hsc-header-title">
             <h1>Historique des connexions</h1>
-            <div className="header-greeting">
+            <div className="hsc-header-greeting">
               <Sparkles size={12} />
               <span>{greeting}, {(() => {
                 const userData = localStorage.getItem('user');
@@ -896,13 +897,13 @@ const HistoriqueConnexions = () => {
           </div>
         </div>
 
-        <div className="header-right">
-          <div className="datetime-display">
-            <div className="time-display">
+        <div className="hsc-header-right">
+          <div className="hsc-datetime-display">
+            <div className="hsc-time-display">
               <Clock size={14} />
               <span>{currentTime.toLocaleTimeString('fr-FR')}</span>
             </div>
-            <div className="date-display">
+            <div className="hsc-date-display">
               <Calendar size={14} />
               <span>{currentTime.toLocaleDateString('fr-FR', { 
                 weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' 
@@ -910,13 +911,13 @@ const HistoriqueConnexions = () => {
             </div>
           </div>
           
-          <div className="live-indicator">
-            <span className="live-dot"></span>
+          <div className="hsc-live-indicator">
+            <span className="hsc-live-dot"></span>
             <span>Live</span>
           </div>
           
           <button 
-            className="header-btn stats-btn"
+            className="hsc-header-btn hsc-stats-btn"
             onClick={() => setShowStatsModal(true)}
             title="Statistiques"
           >
@@ -925,7 +926,7 @@ const HistoriqueConnexions = () => {
           </button>
           
           <button 
-            className="header-btn export-btn"
+            className="hsc-header-btn hsc-export-btn"
             onClick={() => setShowExportModal(true)}
             title="Exporter"
           >
@@ -934,7 +935,7 @@ const HistoriqueConnexions = () => {
           </button>
           
           <button 
-            className="header-btn refresh-btn"
+            className="hsc-header-btn hsc-refresh-btn"
             onClick={handleRefresh}
             title="Actualiser"
           >
@@ -942,7 +943,7 @@ const HistoriqueConnexions = () => {
           </button>
           
           <button 
-            className="header-btn back-btn"
+            className="hsc-header-btn hsc-back-btn"
             onClick={handleBack}
             title="Retour"
           >
@@ -950,7 +951,7 @@ const HistoriqueConnexions = () => {
           </button>
           
           <button 
-            className="header-btn logout-btn"
+            className="hsc-header-btn hsc-logout-btn"
             onClick={handleLogout}
             title="Déconnexion"
           >
@@ -960,94 +961,94 @@ const HistoriqueConnexions = () => {
       </div>
 
       {/* ========== STATS RAPIDES ========== */}
-      <div className="quick-stats">
-        <div className="quick-stat-card">
-          <div className="quick-stat-icon">
+      <div className="hsc-quick-stats">
+        <div className="hsc-quick-stat-card">
+          <div className="hsc-quick-stat-icon">
             <Activity size={18} />
           </div>
-          <div className="quick-stat-content">
-            <span className="quick-stat-label">Taux de succès</span>
-            <span className="quick-stat-value">{baseStats.successRate}%</span>
+          <div className="hsc-quick-stat-content">
+            <span className="hsc-quick-stat-label">Taux de succès</span>
+            <span className="hsc-quick-stat-value">{baseStats.successRate}%</span>
           </div>
         </div>
         
-        <div className="quick-stat-card">
-          <div className="quick-stat-icon">
+        <div className="hsc-quick-stat-card">
+          <div className="hsc-quick-stat-icon">
             <Users size={18} />
           </div>
-          <div className="quick-stat-content">
-            <span className="quick-stat-label">Utilisateurs uniques</span>
-            <span className="quick-stat-value">{baseStats.uniqueUsers}</span>
+          <div className="hsc-quick-stat-content">
+            <span className="hsc-quick-stat-label">Utilisateurs uniques</span>
+            <span className="hsc-quick-stat-value">{baseStats.uniqueUsers}</span>
           </div>
         </div>
         
-        <div className="quick-stat-card">
-          <div className="quick-stat-icon">
+        <div className="hsc-quick-stat-card">
+          <div className="hsc-quick-stat-icon">
             <Clock size={18} />
           </div>
-          <div className="quick-stat-content">
-            <span className="quick-stat-label">Aujourd'hui</span>
-            <span className="quick-stat-value">{baseStats.today}</span>
+          <div className="hsc-quick-stat-content">
+            <span className="hsc-quick-stat-label">Aujourd'hui</span>
+            <span className="hsc-quick-stat-value">{baseStats.today}</span>
           </div>
         </div>
         
-        <div className="quick-stat-card">
-          <div className="quick-stat-icon">
+        <div className="hsc-quick-stat-card">
+          <div className="hsc-quick-stat-icon">
             <TrendingUp size={18} />
           </div>
-          <div className="quick-stat-content">
-            <span className="quick-stat-label">Cette semaine</span>
-            <span className="quick-stat-value">{baseStats.week}</span>
+          <div className="hsc-quick-stat-content">
+            <span className="hsc-quick-stat-label">Cette semaine</span>
+            <span className="hsc-quick-stat-value">{baseStats.week}</span>
           </div>
         </div>
         
-        <div className="quick-stat-card">
-          <div className="quick-stat-icon">
+        <div className="hsc-quick-stat-card">
+          <div className="hsc-quick-stat-icon">
             <Calendar size={18} />
           </div>
-          <div className="quick-stat-content">
-            <span className="quick-stat-label">Ce mois</span>
-            <span className="quick-stat-value">{baseStats.month}</span>
+          <div className="hsc-quick-stat-content">
+            <span className="hsc-quick-stat-label">Ce mois</span>
+            <span className="hsc-quick-stat-value">{baseStats.month}</span>
           </div>
         </div>
         
-        <div className="quick-stat-card">
-          <div className="quick-stat-icon">
+        <div className="hsc-quick-stat-card">
+          <div className="hsc-quick-stat-icon">
             <Zap size={18} />
           </div>
-          <div className="quick-stat-content">
-            <span className="quick-stat-label">Total</span>
-            <span className="quick-stat-value">{baseStats.total}</span>
+          <div className="hsc-quick-stat-content">
+            <span className="hsc-quick-stat-label">Total</span>
+            <span className="hsc-quick-stat-value">{baseStats.total}</span>
           </div>
         </div>
       </div>
 
       {/* ========== FILTRES ========== */}
-      <div className="filters-section">
-        <div className="search-wrapper">
-          <Search size={16} className="search-icon" />
+      <div className="hsc-filters-section">
+        <div className="hsc-search-wrapper">
+          <Search size={16} className="hsc-search-icon" />
           <input
             type="text"
-            className="search-input"
+            className="hsc-search-input"
             placeholder="Rechercher par email, IP, rôle..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           {searchTerm && (
-            <button className="clear-btn" onClick={() => setSearchTerm('')}>
+            <button className="hsc-clear-btn" onClick={() => setSearchTerm('')}>
               <X size={14} />
             </button>
           )}
         </div>
 
         <button 
-          className={`filter-btn ${showFilters ? 'active' : ''}`}
+          className={`hsc-filter-btn ${showFilters ? 'hsc-active' : ''}`}
           onClick={() => setShowFilters(!showFilters)}
         >
           <Filter size={16} />
           <span>Filtres</span>
           {(selectedRole !== 'all' || selectedStatus !== 'all' || dateRange !== 'all') && (
-            <span className="filter-badge">
+            <span className="hsc-filter-badge">
               {[selectedRole !== 'all', selectedStatus !== 'all', dateRange !== 'all'].filter(Boolean).length}
             </span>
           )}
@@ -1056,8 +1057,8 @@ const HistoriqueConnexions = () => {
 
       {/* ========== PANNEAU DE FILTRES ========== */}
       {showFilters && (
-        <div className="filters-panel">
-          <div className="filters-header">
+        <div className="hsc-filters-panel">
+          <div className="hsc-filters-header">
             <h3>Filtres avancés</h3>
             <button onClick={() => {
               setSelectedRole('all');
@@ -1070,8 +1071,8 @@ const HistoriqueConnexions = () => {
             </button>
           </div>
           
-          <div className="filters-grid">
-            <div className="filter-group">
+          <div className="hsc-filters-grid">
+            <div className="hsc-filter-group">
               <label>Rôle</label>
               <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)}>
                 <option value="all">Tous les rôles</option>
@@ -1082,7 +1083,7 @@ const HistoriqueConnexions = () => {
               </select>
             </div>
 
-            <div className="filter-group">
+            <div className="hsc-filter-group">
               <label>Statut</label>
               <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)}>
                 <option value="all">Tous</option>
@@ -1091,7 +1092,7 @@ const HistoriqueConnexions = () => {
               </select>
             </div>
 
-            <div className="filter-group">
+            <div className="hsc-filter-group">
               <label>Période</label>
               <select value={dateRange} onChange={(e) => setDateRange(e.target.value)}>
                 <option value="all">Tout l'historique</option>
@@ -1104,7 +1105,7 @@ const HistoriqueConnexions = () => {
 
             {dateRange === 'custom' && (
               <>
-                <div className="filter-group">
+                <div className="hsc-filter-group">
                   <label>Du</label>
                   <input 
                     type="date" 
@@ -1112,7 +1113,7 @@ const HistoriqueConnexions = () => {
                     onChange={(e) => setStartDate(e.target.value)}
                   />
                 </div>
-                <div className="filter-group">
+                <div className="hsc-filter-group">
                   <label>Au</label>
                   <input 
                     type="date" 
@@ -1124,8 +1125,8 @@ const HistoriqueConnexions = () => {
             )}
           </div>
           
-          <div className="filters-footer">
-            <span className="filter-result">
+          <div className="hsc-filters-footer">
+            <span className="hsc-filter-result">
               {filteredConnexions.length} résultat{filteredConnexions.length > 1 ? 's' : ''}
             </span>
           </div>
@@ -1133,29 +1134,29 @@ const HistoriqueConnexions = () => {
       )}
 
       {/* ========== CONTENU PRINCIPAL ========== */}
-      <div className="content-wrapper">
+      <div className="hsc-content-wrapper">
         {loading ? (
-          <div className="loading-container">
-            <div className="loader-spinner"></div>
+          <div className="hsc-loading-container">
+            <div className="hsc-loader-spinner"></div>
             <h3>Chargement</h3>
             <p>Récupération des données...</p>
           </div>
         ) : error ? (
-          <div className="error-container">
+          <div className="hsc-error-container">
             <AlertCircle size={40} />
             <h3>Erreur</h3>
             <p>{error}</p>
-            <button className="retry-btn" onClick={fetchHistorique}>
+            <button className="hsc-retry-btn" onClick={fetchHistorique}>
               <RefreshCw size={14} />
               Réessayer
             </button>
           </div>
         ) : filteredConnexions.length === 0 ? (
-          <div className="empty-container">
+          <div className="hsc-empty-container">
             <History size={48} />
             <h3>Aucune connexion</h3>
             <p>Aucune connexion ne correspond à vos critères.</p>
-            <button className="reset-filters-btn" onClick={() => {
+            <button className="hsc-reset-filters-btn" onClick={() => {
               setSearchTerm('');
               setSelectedRole('all');
               setSelectedStatus('all');
@@ -1167,15 +1168,15 @@ const HistoriqueConnexions = () => {
         ) : (
           <>
             {/* ========== TABLEAU ========== */}
-            <div className="table-wrapper">
-              <table className="historique-table">
+            <div className="hsc-table-wrapper">
+              <table className="hsc-historique-table">
                 <thead>
                   <tr>
                     <th>Utilisateur</th>
                     <th>Rôle</th>
                     <th>Date & Heure</th>
                     <th>IP</th>
-                    <th>navigateur</th>
+                    <th>Navigateur</th>
                     <th>Statut</th>
                     <th>Actions</th>
                   </tr>
@@ -1186,45 +1187,45 @@ const HistoriqueConnexions = () => {
                     return (
                       <tr
                         key={item.id || index}
-                        className="historique-row"
+                        className="hsc-historique-row"
                         onClick={() => handleViewDetails(item)}
                       >
                         <td>
-                          <div className="user-cell">
-                            <div className={`user-avatar ${item.user_role || 'unknown'}`}>
+                          <div className="hsc-user-cell">
+                            <div className={`hsc-user-avatar ${item.user_role || 'unknown'}`}>
                               {item.user_email?.charAt(0).toUpperCase() || '?'}
                             </div>
-                            <div className="user-info">
-                              <span className="user-email">{item.user_email || 'Inconnu'}</span>
-                              <span className="user-id">ID: {item.user_id || 'N/A'}</span>
+                            <div className="hsc-user-info">
+                              <span className="hsc-user-email">{item.user_email || 'Inconnu'}</span>
+                              <span className="hsc-user-id">ID: {item.user_id || 'N/A'}</span>
                             </div>
                           </div>
                         </td>
                         
                         <td>
-                          <span className={`role-badge ${getRoleBadgeClass(item.user_role)}`}>
+                          <span className={`hsc-role-badge ${getRoleBadgeClass(item.user_role)}`}>
                             {getRoleIcon(item.user_role)}
                             {getRoleLabel(item.user_role)}
                           </span>
                         </td>
                         
                         <td>
-                          <div className="date-cell">
-                            <span className="date-main">{date}</span>
-                            <span className="date-time">{time}</span>
-                            {relative && <span className="date-relative">{relative}</span>}
+                          <div className="hsc-date-cell">
+                            <span className="hsc-date-main">{date}</span>
+                            <span className="hsc-date-time">{time}</span>
+                            {relative && <span className="hsc-date-relative">{relative}</span>}
                           </div>
                         </td>
                         
                         <td>
-                          <div className="ip-cell">
-                            <span className="ip-address">{item.ip_address || '0.0.0.0'}</span>
-                            <span className="ip-location">{getLocationFlag(item.ip_address)}</span>
+                          <div className="hsc-ip-cell">
+                            <span className="hsc-ip-address">{item.ip_address || '0.0.0.0'}</span>
+                            <span className="hsc-ip-location">{getLocationFlag(item.ip_address)}</span>
                           </div>
                         </td>
                         
                         <td>
-                          <div className="device-cell">
+                          <div className="hsc-device-cell">
                             {getDeviceIcon(item.user_agent)}
                             <span>{getBrowserInfo(item.user_agent)}</span>
                           </div>
@@ -1232,12 +1233,12 @@ const HistoriqueConnexions = () => {
                         
                         <td>
                           {item.success ? (
-                            <span className="status-badge success">
+                            <span className="hsc-status-badge hsc-success">
                               <CheckCircle size={12} />
                               Succès
                             </span>
                           ) : (
-                            <span className="status-badge failed">
+                            <span className="hsc-status-badge hsc-failed">
                               <XCircle size={12} />
                               Échec
                             </span>
@@ -1245,9 +1246,9 @@ const HistoriqueConnexions = () => {
                         </td>
                         
                         <td>
-                          <div className="action-buttons">
+                          <div className="hsc-action-buttons">
                             <button 
-                              className="view-btn"
+                              className="hsc-view-btn"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleViewDetails(item);
@@ -1257,7 +1258,7 @@ const HistoriqueConnexions = () => {
                               <Eye size={14} />
                             </button>
                             <button 
-                              className="delete-btn"
+                              className="hsc-delete-btn"
                               onClick={(e) => handleDeleteClick(e, item)}
                               title="Supprimer"
                             >
@@ -1273,21 +1274,21 @@ const HistoriqueConnexions = () => {
             </div>
 
             {/* ========== PAGINATION ========== */}
-            <div className="pagination-container">
-              <div className="pagination-info">
+            <div className="hsc-pagination-container">
+              <div className="hsc-pagination-info">
                 {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredConnexions.length)} sur {filteredConnexions.length}
               </div>
               
-              <div className="pagination-controls">
+              <div className="hsc-pagination-controls">
                 <button
-                  className={`pagination-arrow ${currentPage === 1 ? 'disabled' : ''}`}
+                  className={`hsc-pagination-arrow ${currentPage === 1 ? 'hsc-disabled' : ''}`}
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={currentPage === 1}
                 >
                   <ChevronLeft size={16} />
                 </button>
                 
-                <div className="pagination-pages">
+                <div className="hsc-pagination-pages">
                   {[...Array(totalPages)].map((_, i) => {
                     const pageNum = i + 1;
                     if (
@@ -1298,21 +1299,21 @@ const HistoriqueConnexions = () => {
                       return (
                         <button
                           key={pageNum}
-                          className={`pagination-page ${currentPage === pageNum ? 'active' : ''}`}
+                          className={`hsc-pagination-page ${currentPage === pageNum ? 'hsc-active' : ''}`}
                           onClick={() => setCurrentPage(pageNum)}
                         >
                           {pageNum}
                         </button>
                       );
                     } else if (pageNum === currentPage - 3 || pageNum === currentPage + 3) {
-                      return <span key={pageNum} className="pagination-ellipsis">...</span>;
+                      return <span key={pageNum} className="hsc-pagination-ellipsis">...</span>;
                     }
                     return null;
                   })}
                 </div>
                 
                 <button
-                  className={`pagination-arrow ${currentPage === totalPages ? 'disabled' : ''}`}
+                  className={`hsc-pagination-arrow ${currentPage === totalPages ? 'hsc-disabled' : ''}`}
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                   disabled={currentPage === totalPages}
                 >

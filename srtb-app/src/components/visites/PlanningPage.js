@@ -1,9 +1,9 @@
 // frontend/components/visites/PlanningPage.jsx
 import React, { useState, useEffect , useRef, useCallback, useMemo } from 'react';
-import { 
-  Calendar, Clock, User, FileText, CheckCircle, XCircle, AlertCircle, Info, 
-  RefreshCw, ChevronLeft, ChevronRight, X, Filter, TrendingUp, Mail, Lock, 
-  History, Eye, Zap, Shield, Briefcase, Building, Search, Sliders, 
+import {
+  Calendar, Clock, User, FileText, CheckCircle, XCircle, AlertCircle, Info,
+  RefreshCw, ChevronLeft, ChevronRight, X, Filter, TrendingUp, Mail, Lock,
+  History, Eye, Zap, Shield, Briefcase, Building, Search, Sliders,
   ChevronDown, ChevronUp, Edit2, Award, ArrowLeftRight, Send, Users, Stethoscope,
   CalendarPlus, CalendarX, CalendarSync, UserPlus
 } from 'lucide-react';
@@ -19,12 +19,8 @@ const cx = (...classes) => classes.filter(Boolean).map(c => `${PREFIX}${c}`).joi
 const getNumeroSemaine = (date) => moment(date).isoWeek();
 
 const getLundiSemaine = (numeroSemaine, annee) => {
-  const date = new Date(annee, 0, 4);
-  const jour = date.getDay();
-  const decalage = (jour === 0 ? 6 : jour - 1);
-  date.setDate(date.getDate() - decalage);
-  date.setDate(date.getDate() + (numeroSemaine - 1) * 7);
-  return date.toISOString().split('T')[0];
+  const date = moment().year(annee).isoWeek(numeroSemaine).startOf('isoWeek');
+  return date.format('YYYY-MM-DD');
 };
 
 const formatDate = (date) => date ? date.split('-').reverse().join('/') : '';
@@ -47,18 +43,18 @@ const Button = ({ variant = 'primary', size = 'md', icon: Icon, children, loadin
 };
 
 const Badge = ({ variant = 'default', icon: IconComponent, children, size = 'sm', className = '' }) => {
-  const variants = { 
-    default: 'badge-default', 
-    primary: 'badge-primary', 
-    success: 'badge-success', 
-    warning: 'badge-warning', 
-    danger: 'badge-danger', 
-    info: 'badge-info', 
-    purple: 'badge-purple' 
+  const variants = {
+    default: 'badge-default',
+    primary: 'badge-primary',
+    success: 'badge-success',
+    warning: 'badge-warning',
+    danger: 'badge-danger',
+    info: 'badge-info',
+    purple: 'badge-purple'
   };
-  
+ 
   const iconSize = size === 'sm' ? 10 : size === 'md' ? 12 : 14;
-  
+ 
   return (
     <span className={`${cx('badge', variants[variant], `badge-${size}`)} ${className}`}>
       {IconComponent && <IconComponent size={iconSize} />}
@@ -83,18 +79,18 @@ const PlanningPage = () => {
   // ========== ÉTATS ==========
   const aujourdhui = new Date();
   const semaineActuelle = getNumeroSemaine(aujourdhui);
-  
+ 
   // Données
   const [loading, setLoading] = useState(true);
   const [planning, setPlanning] = useState([]);
   const [agents, setAgents] = useState([]);
   const [notification, setNotification] = useState({ show: false, type: 'info', title: '', message: '' });
   const [semaineCourante, setSemaineCourante] = useState({
-    numero: semaineActuelle,
-    annee: aujourdhui.getFullYear(),
-    dateDebut: getLundiSemaine(semaineActuelle, aujourdhui.getFullYear())
-  });
-  
+  numero: semaineActuelle,
+  annee: aujourdhui.getFullYear(),
+  dateDebut: getLundiSemaine(semaineActuelle, aujourdhui.getFullYear())
+});
+ 
   // Filtres et affichage
   const [showFilters, setShowFilters] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -103,12 +99,12 @@ const PlanningPage = () => {
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('');
   const [expandedCards, setExpandedCards] = useState(new Set());
   const [showHistorique, setShowHistorique] = useState(null);
-  
+ 
   // Génération planning
   const [generationLoading, setGenerationLoading] = useState(false);
   const [showGenererPlanningModal, setShowGenererPlanningModal] = useState(false);
   const [generationData, setGenerationData] = useState({ semaineCible: null, anneeCible: null, lundiCible: null });
-  
+ 
   // Reprogrammation manuelle
   const [showReprogramModal, setShowReprogramModal] = useState(false);
   const [planningToReprogram, setPlanningToReprogram] = useState(null);
@@ -122,7 +118,7 @@ const PlanningPage = () => {
   const [showAutoReprogramModal, setShowAutoReprogramModal] = useState(false);
   const [autoReprogramItem, setAutoReprogramItem] = useState(null);
   const [autoReprogramLoading, setAutoReprogramLoading] = useState(false);
-  
+ 
   // Annulation
   const [showAnnulationModal, setShowAnnulationModal] = useState(false);
   const [planningToAnnuler, setPlanningToAnnuler] = useState(null);
@@ -136,21 +132,21 @@ const PlanningPage = () => {
   const [creneauxDisponiblesReprog, setCreneauxDisponiblesReprog] = useState([]);
   const [loadingReprogJours, setLoadingReprogJours] = useState(false);
   const [loadingReprogCreneaux, setLoadingReprogCreneaux] = useState(false);
-  
+ 
   // Convocation simple
   const [showConvocationModal, setShowConvocationModal] = useState(false);
   const [convocationToSend, setConvocationToSend] = useState(null);
   const [convocationLoading, setConvocationLoading] = useState(false);
-  
+ 
   // Convocation groupée
   const [showGroupeConvocationModal, setShowGroupeConvocationModal] = useState(false);
   const [groupeConvocationCount, setGroupeConvocationCount] = useState(0);
   const [groupeConvocationLoading, setGroupeConvocationLoading] = useState(false);
-  
+ 
   // Aperçu convocation
   const [showConvocationPreview, setShowConvocationPreview] = useState(false);
   const [convocationToPreview, setConvocationToPreview] = useState(null);
-  
+ 
   // Visite
   const [showVisiteModal, setShowVisiteModal] = useState(false);
   const [visiteToComplete, setVisiteToComplete] = useState(null);
@@ -200,7 +196,7 @@ const confirmerReaffectation = async () => {
     showNotification({ type: 'error', title: '❌', message: 'Veuillez sélectionner un agent' });
     return;
   }
-  
+ 
   setReaffectLoading(true);
   try {
     const token = localStorage.getItem('token');
@@ -215,30 +211,30 @@ const confirmerReaffectation = async () => {
         motif: reaffectMotif || 'Réaffectation manuelle'
       })
     });
-    
+   
     const data = await response.json();
-    
+   
     if (data.success) {
       showNotification({ type: 'success', title: '✅', message: data.message });
       setShowReaffectModal(false);
-      
+     
       // ✅ AJOUTER LA NOUVELLE CARTE DIRECTEMENT
       if (data.planning) {
         setPlanning(prevPlanning => {
           // Supprimer l'ancienne carte "libérée" si elle existe (matricule_agent === 0)
-          const withoutOld = prevPlanning.filter(p => 
-            !(p.date_visite === reaffectCreneau.date && 
-              p.heure_visite === reaffectCreneau.heure && 
+          const withoutOld = prevPlanning.filter(p =>
+            !(p.date_visite === reaffectCreneau.date &&
+              p.heure_visite === reaffectCreneau.heure &&
               p.matricule_agent === 0)
           );
           // Ajouter la nouvelle
           return [...withoutOld, data.planning];
         });
       }
-      
+     
       // Rafraîchir
       await fetchPlanningSemaine();
-      
+     
     } else {
       showNotification({ type: 'error', title: '❌', message: data.message });
     }
@@ -253,7 +249,7 @@ const confirmerReaffectationAvecAgent = async (agent) => {
   setReaffectLoading(true);
   try {
     const token = localStorage.getItem('token');
-    
+   
     // ✅ Ajouter l'ID du planning original (le créneau libéré)
     const body = {
       date_visite: reaffectCreneau.date,
@@ -263,17 +259,17 @@ const confirmerReaffectationAvecAgent = async (agent) => {
       motif: reaffectMotif || `Réaffectation - Agent prioritaire`,
       id_planning_original: reaffectCreneau.id_planning  // ← AJOUTER
     };
-    
+   
     console.log('📤 Envoi réaffectation:', body);
-    
+   
     const response = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/confirmer-reaffectation`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
-    
+   
     const data = await response.json();
-    
+   
     if (data.success) {
       showNotification({ type: 'success', title: '✅', message: data.message });
       setShowReaffectModal(false);
@@ -295,25 +291,26 @@ const confirmerReaffectationAvecAgent = async (agent) => {
   const creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
   const creneauxAffichage = ['08:00', '08:30', '09:00', '09:30'];
   const datesSemaine = joursSemaine.map((_, i) => {
-    const date = new Date(semaineCourante.dateDebut);
-    date.setDate(date.getDate() + i + 1);
-    return date.toISOString().split('T')[0];
-  });
+  const date = new Date(semaineCourante.dateDebut);
+  date.setDate(date.getDate() + i + 1);
+  if (isNaN(date.getTime())) return '';
+  return date.toISOString().split('T')[0];
+});
 
   // ========== FONCTIONS DE CHARGEMENT ==========
   const fetchAgents = async () => {
   try {
     const token = localStorage.getItem('token');
-    const res = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`, { 
-      headers: { 'Authorization': `Bearer ${token}` } 
+    const res = await fetch(`${process.env.REACT_APP_API_URL}/api/agents`, {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
     const data = await res.json();
     console.log('📋 Agents chargés:', data.agents?.length);
     if (data.success) {
       setAgents(data.agents);
     }
-  } catch (err) { 
-    console.error(err); 
+  } catch (err) {
+    console.error(err);
   }
 };
 
@@ -322,28 +319,28 @@ const confirmerReaffectationAvecAgent = async (agent) => {
     const token = localStorage.getItem('token');
     const semaine = parseInt(semaineCourante.numero);
     const annee = parseInt(semaineCourante.annee);
-    
+   
     console.log(`📡 Chargement planning semaine ${semaine}/${annee}`);
-    
+   
     const url = `${process.env.REACT_APP_API_URL}/api/planning/${semaine}/${annee}`;
     const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
     const data = await res.json();
-    
+   
     if (data.success) {
       console.log(`📊 ${data.planning?.length || 0} visites reçues:`);
       data.planning?.forEach(p => {
         console.log(`   - ${p.date_visite} ${p.heure_visite} | ${p.type_visite} | Agent: ${p.matricule_agent}`);
       });
-      
+     
       const planningWithData = (data.planning || []).map(p => ({
         ...p,
         a_des_actions: p.historique?.length > 0 || false
       }));
       setPlanning(planningWithData);
     }
-  } catch (err) { 
+  } catch (err) {
     console.error('Erreur fetch planning:', err);
-    setPlanning([]); 
+    setPlanning([]);
   }
 };
 
@@ -378,11 +375,11 @@ const chargerAgentsPrioritaires = async () => {
       });
       const data = await res.json();
       if (data.success) {
-        setPlanning(prev => prev.map(p => 
-          p.id_planning === idPlanning 
-            ? { 
-                ...p, 
-                action_details: data.visite.action_details, 
+        setPlanning(prev => prev.map(p =>
+          p.id_planning === idPlanning
+            ? {
+                ...p,
+                action_details: data.visite.action_details,
                 historique: data.visite.historique,
                 reprogrammation_details: data.visite.reprogrammation_details
               }
@@ -397,7 +394,7 @@ const chargerAgentsPrioritaires = async () => {
   // ========== FONCTIONS CALENDRIER INTELLIGENT (UNE SEULE FOIS) ==========
   const chargerJoursDisponiblesReprog = async (mois, annee, matricule) => {
     if (!matricule) return;
-    
+   
     try {
       const token = localStorage.getItem('token');
       const url = `${process.env.REACT_APP_API_URL}/api/creneaux/jours-disponibles?mois=${mois + 1}&annee=${annee}&matricule_agent=${matricule}`;
@@ -413,7 +410,7 @@ const chargerAgentsPrioritaires = async () => {
 
   const chargerCreneauxDisponiblesReprog = async (date, matricule, idExclu) => {
     if (!matricule || !date) return;
-    
+   
     try {
       const token = localStorage.getItem('token');
       const url = `${process.env.REACT_APP_API_URL}/api/creneaux/creneaux-disponibles?date=${date}&matricule_agent=${matricule}&id_planning_exclu=${idExclu}`;
@@ -429,22 +426,22 @@ const chargerAgentsPrioritaires = async () => {
 
   const chargerDonnees = async () => {
     setLoading(true);
-    try { 
-      await Promise.all([fetchAgents(), fetchPlanningSemaine()]); 
-    } catch (error) { 
-      showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur de chargement' }); 
-    } finally { 
-      setLoading(false); 
+    try {
+      await Promise.all([fetchAgents(), fetchPlanningSemaine()]);
+    } catch (error) {
+      showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur de chargement' });
+    } finally {
+      setLoading(false);
     }
   };
-  
+ 
   useEffect(() => { chargerDonnees(); }, [semaineCourante]);
   useEffect(() => {
   const handleRefresh = () => {
     console.log('🔄 Rafraîchissement du planning après modification');
     fetchPlanningSemaine();
   };
-  
+ 
   window.addEventListener('refresh-planning', handleRefresh);
   return () => window.removeEventListener('refresh-planning', handleRefresh);
 }, []);
@@ -674,7 +671,7 @@ const getAgentNom = useCallback((matricule) => {
   const formatHistoriqueDetails = (item) => {
     if (!item.details) return null;
     const details = item.details;
-    
+   
     if (item.type_action === 'REPROGRAMMEE') {
       return (
         <div className={cx('historique-details')}>
@@ -695,7 +692,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     if (item.type_action === 'ANNULEE' && details?.raison === 'accident') {
       return (
         <div className={cx('historique-details')}>
@@ -711,7 +708,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     if (details.type === 'prolongation_inaptitude') {
       return (
         <div className={cx('historique-details')}>
@@ -730,7 +727,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     if (details.type === 'reclassement_inapte_temp_avec_controle' || details.type === 'programmation_visite_controle') {
       return (
         <div className={cx('historique-details')}>
@@ -746,7 +743,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     if (item.type_action === 'PROGRAMMATION' && details?.type === 'programmation_visite_controle') {
       return (
         <div className={cx('historique-details')}>
@@ -762,14 +759,14 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     return null;
   };
 
   const getDetailsDisplay = (item) => {
     if (!item.details) return null;
     const d = item.details;
-    
+   
     if (d.type === 'periodique_effectuee') {
       return (
         <div className={cx('historique-details')}>
@@ -781,7 +778,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     if (d.type === 'periodique_annulee_accident') {
       return (
         <div className={cx('historique-details')}>
@@ -792,7 +789,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     if (d.type === 'reprise_apte') {
       return (
         <div className={cx('historique-details')}>
@@ -803,7 +800,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     if (d.type === 'reprise_inapte_temp_prolongation') {
       return (
         <div className={cx('historique-details')}>
@@ -818,7 +815,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     if (d.type === 'reclassement_inapte_temp_avec_controle') {
       return (
         <div className={cx('historique-details')}>
@@ -832,7 +829,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     if (d.type === 'reclassement_apte') {
       return (
         <div className={cx('historique-details')}>
@@ -843,7 +840,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     if (d.type === 'reclassement_inapte_definitif') {
       return (
         <div className={cx('historique-details')}>
@@ -854,7 +851,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     if (d.type === 'embauche_apte') {
       return (
         <div className={cx('historique-details')}>
@@ -866,7 +863,7 @@ const getAgentNom = useCallback((matricule) => {
         </div>
       );
     }
-    
+   
     return null;
   };
 
@@ -874,11 +871,11 @@ const getAgentNom = useCallback((matricule) => {
   const toggleCardExpand = (id) => {
     const newExpanded = new Set(expandedCards);
     const isExpanding = !newExpanded.has(id);
-    
+   
     if (isExpanding) {
       fetchVisiteDetails(id);
     }
-    
+   
     newExpanded.has(id) ? newExpanded.delete(id) : newExpanded.add(id);
     setExpandedCards(newExpanded);
   };
@@ -889,7 +886,7 @@ const getAgentNom = useCallback((matricule) => {
     let anneeCible = semaineCourante.annee;
     if (semaineCible > 52) { semaineCible = 1; anneeCible++; }
     const lundiCible = getLundiSemaine(semaineCible, anneeCible);
-    
+   
     setGenerationData({ semaineCible, anneeCible, lundiCible });
     setShowGenererPlanningModal(true);
   };
@@ -898,7 +895,7 @@ const getAgentNom = useCallback((matricule) => {
     const { semaineCible, anneeCible, lundiCible } = generationData;
     setGenerationLoading(true);
     setShowGenererPlanningModal(false);
-    
+   
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/generer`, {
@@ -951,7 +948,7 @@ const getAgentNom = useCallback((matricule) => {
     if (!autoReprogramItem) return;
     setAutoReprogramLoading(true);
     setShowAutoReprogramModal(false);
-    
+   
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/${autoReprogramItem.id_planning}/reprogrammer-auto`, {
@@ -986,7 +983,7 @@ const getAgentNom = useCallback((matricule) => {
 
     setReprogramLoading(true);
     const result = await verifierDisponibiliteCreneau(nouvelleDate, nouvelleHeure, planningToReprogram.id_planning);
-    
+   
     if (!result.disponible) {
       let title = '⚠️ Créneau non disponible';
       if (result.message.includes('EFFECTUÉE')) title = '❌ Visite déjà effectuée';
@@ -994,7 +991,7 @@ const getAgentNom = useCallback((matricule) => {
       else if (result.message.includes('REPORTÉE')) title = '⚠️ Visite reportée';
       else if (result.message.includes('BLOQUÉ')) title = '🔒 Créneau bloqué';
       else if (result.message.includes('PROGRAMMÉ')) title = '📅 Créneau déjà programmé';
-      
+     
       showNotification({ type: 'error', title: title, message: result.message });
       setReprogramLoading(false);
       return;
@@ -1103,7 +1100,7 @@ const getAgentNom = useCallback((matricule) => {
     if (!convocationToSend) return;
     setConvocationLoading(true);
     setShowConvocationModal(false);
-    
+   
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/envoyer-convocation`, {
@@ -1127,9 +1124,9 @@ const getAgentNom = useCallback((matricule) => {
   };
 
   const handleEnvoyerToutesConvocations = () => {
-    const aEnvoyer = planning.filter(p => 
-      !p.convocation_envoyee && 
-      p.statut === 'Programmé' && 
+    const aEnvoyer = planning.filter(p =>
+      !p.convocation_envoyee &&
+      p.statut === 'Programmé' &&
       !p.visite_effectuee &&
       (p.type_visite === 'Périodique' || p.type_visite === 'Reprise')
     );
@@ -1142,17 +1139,17 @@ const getAgentNom = useCallback((matricule) => {
   };
 
   const confirmerEnvoiToutesConvocations = async () => {
-    const aEnvoyer = planning.filter(p => 
-      !p.convocation_envoyee && 
-      p.statut === 'Programmé' && 
+    const aEnvoyer = planning.filter(p =>
+      !p.convocation_envoyee &&
+      p.statut === 'Programmé' &&
       !p.visite_effectuee &&
       (p.type_visite === 'Périodique' || p.type_visite === 'Reprise')
     );
     if (aEnvoyer.length === 0) return;
-    
+   
     setGroupeConvocationLoading(true);
     setShowGroupeConvocationModal(false);
-    
+   
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/envoyer-convocations-groupees`, {
@@ -1181,21 +1178,21 @@ const handleIndisponible = (item) => {
   const dateVisite = new Date(item.date_visite);
   const aujourdhui = new Date();
   aujourdhui.setHours(0, 0, 0, 0);
-  
+ 
   // Calculer la différence en jours (sans tenir compte des heures)
   const diffTime = dateVisite.getTime() - aujourdhui.getTime();
   const diffJours = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+ 
   console.log('📅 Vérification délai indisponibilité:');
   console.log(`   Date visite: ${item.date_visite}`);
   console.log(`   Aujourd'hui: ${aujourdhui.toISOString().split('T')[0]}`);
   console.log(`   Différence: ${diffJours} jours`);
-  
+ 
   // Si la visite est aujourd'hui (J0) ou demain (J1) ou déjà passée (J-1, J-2...)
   if (diffJours < 2) {
     let message = '';
     let titre = '❌ Action impossible';
-    
+   
     if (diffJours === 1) {
       message = `⚠️ Impossible de déclarer l'indisponibilité pour une visite prévue DEMAIN (J-1).\n\n` +
                 `📋 Règle: La déclaration d'indisponibilité doit être faite au moins 2 jours ouvrables avant la visite.\n\n` +
@@ -1214,16 +1211,16 @@ const handleIndisponible = (item) => {
                 `📋 Cette visite est déjà passée.\n\n` +
                 `🔄 Si la visite n'a pas été effectuée, utilisez le bouton "Reprogrammer" ou "Auto" pour la reporter.`;
     }
-    
-    showNotification({ 
-      type: 'error', 
-      title: titre, 
+   
+    showNotification({
+      type: 'error',
+      title: titre,
       message: message,
       duration: 8000
     });
     return;
   }
-  
+ 
   // Si délai OK (>= J-2), ouvrir le modal
   console.log('✅ Délai respecté (>= J-2) - Ouverture du modal');
   setPlanningIndisponible(item);
@@ -1242,12 +1239,12 @@ const handleIndisponible = (item) => {
 
   const confirmerIndisponible = async () => {
     if (!planningIndisponible) return;
-    
+   
     if (indisponibleMode === 'manuel' && (!nouvelleDate || !nouvelleHeure)) {
       showNotification({ type: 'error', title: '❌', message: 'Date et heure requises pour le mode manuel' });
       return;
     }
-    
+   
     if (!reprogramMotif?.trim()) {
       showNotification({ type: 'error', title: '❌', message: 'Motif requis' });
       return;
@@ -1260,20 +1257,20 @@ const handleIndisponible = (item) => {
         motif: reprogramMotif,
         mode: indisponibleMode
       };
-      
+     
       if (indisponibleMode === 'manuel') {
         body.nouvelle_date = nouvelleDate;
         body.nouvelle_heure = nouvelleHeure;
       }
-      
+     
       const response = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/${planningIndisponible.id_planning}/reprogrammer-indisponible`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      
+     
       const data = await response.json();
-      
+     
       if (data.success) {
         let message = data.message;
         if (data.data?.reaffectation) {
@@ -1324,9 +1321,9 @@ const handleIndisponible = (item) => {
     reporte: planning.filter(p => p.statut === 'Reporté').length,
     annule: planning.filter(p => p.statut === 'Annulé').length,
     convocationsEnvoyees: planning.filter(p => p.convocation_envoyee).length,
-    convocationsRestantes: planning.filter(p => 
-      !p.convocation_envoyee && 
-      p.statut === 'Programmé' && 
+    convocationsRestantes: planning.filter(p =>
+      !p.convocation_envoyee &&
+      p.statut === 'Programmé' &&
       !p.visite_effectuee &&
       (p.type_visite === 'Périodique' || p.type_visite === 'Reprise')
     ).length
@@ -1365,7 +1362,7 @@ const handleIndisponible = (item) => {
             <button onClick={onClose}><X size={14} /></button>
           </div>
         </div>
-        
+       
         <div className={cx('popup-content')}>
           {Object.entries(groupedHistory).map(([date, items]) => (
             <div key={date} className={cx('historique-groupe')}>
@@ -1390,16 +1387,16 @@ const handleIndisponible = (item) => {
                         <span>{new Date(item.date_action).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
-                    
+                   
                     {item.message_formate && (
                       <div className={cx('historique-message')}>
                         {item.message_formate}
                       </div>
                     )}
-                    
+                   
                     {getDetailsDisplay(item)}
                     {!getDetailsDisplay(item) && formatHistoriqueDetails(item)}
-                    
+                   
                     {!formatHistoriqueDetails(item) && item.type_action === 'EFFECTUEE' && (
                       <div className={cx('historique-details')}>
                         {item.resultat && (
@@ -1415,7 +1412,7 @@ const handleIndisponible = (item) => {
                         )}
                       </div>
                     )}
-                    
+                   
                     {!formatHistoriqueDetails(item) && item.type_action === 'ANNULEE' && item.motif_action && (
                       <div className={cx('historique-details')}>
                         <div className={cx('detail-text', 'danger')}>
@@ -1423,7 +1420,7 @@ const handleIndisponible = (item) => {
                         </div>
                       </div>
                     )}
-                    
+                   
                     {item.motif_action && item.type_action !== 'ANNULEE' && !item.message_formate?.includes(item.motif_action) && !formatHistoriqueDetails(item) && (
                       <div className={cx('historique-motif')}>
                         <FileText size={10} /> {item.motif_action}
@@ -1435,7 +1432,7 @@ const handleIndisponible = (item) => {
             </div>
           ))}
         </div>
-        
+       
         <div className={cx('popup-footer')}>
           <Button variant="ghost" size="sm" onClick={onClose}>Fermer</Button>
         </div>
@@ -1448,7 +1445,7 @@ const handleIndisponible = (item) => {
     const isExpanded = expandedCards.has(visite.id_planning);
     const agent = getAgentDetails(visite.matricule_agent);
     const actionDetailsDisplay = getActionDetailsDisplay(visite);
-    
+   
     const shouldShow = (value) => {
       return value !== null && value !== undefined && value !== 0 && value !== '';
     };
@@ -1483,20 +1480,20 @@ const handleIndisponible = (item) => {
             </button>
           </div>
         </div>
-        
+       
         <div className={cx('visit-card-body')}>
           <div className={cx('visit-datetime')}>
             <div><Calendar size={14} /> {formatDate(visite.date_visite)}</div>
             <div><Clock size={14} /> {visite.heure_visite?.substring(0,5)}</div>
           </div>
-          
+         
           <div className={cx('visit-badges')}>
             {getTypeVisiteBadge(visite.type_visite)}
             {getPeriodiciteBadge(visite.matricule_agent)}
             {getSourceBadge(visite.source_planification, visite.motif_reprogrammation)}
             {visite.convocation_envoyee && <Badge variant="success" icon={Mail}>Convocation envoyée</Badge>}
           </div>
-          
+         
           {agent && shouldShow(agent.code_agence) && (
             <div className={cx('visit-details')}>
               <span><Building size={12} /> Agence {agent.code_agence}</span>
@@ -1504,13 +1501,13 @@ const handleIndisponible = (item) => {
               <span><History size={12} /> Dernière visite: {getDerniereVisite(visite.matricule_agent)}</span>
             </div>
           )}
-          
+         
           {actionDetailsDisplay && (
             <div className={cx('action-details-wrapper')}>
               {actionDetailsDisplay}
             </div>
           )}
-          
+         
           {visite.reprogrammee && visite.creneau_bloque && !actionDetailsDisplay && (
             <div className={cx('reprogram-info')}>
               <div><RefreshCw size={12} /> <strong>Reprogrammé</strong></div>
@@ -1532,45 +1529,45 @@ const handleIndisponible = (item) => {
           </div>
         )}
         </div>
-        
+       
         <div className={cx('visit-card-actions')}>
   {!visite.visite_effectuee && visite.statut === 'Programmé' && !visite.creneau_bloque && (
     <>
       <Button variant="success" size="sm" icon={CheckCircle} onClick={() => handleEnregistrerVisite(visite)}>Effectuer</Button>
       <Button variant="warning" size="sm" icon={Calendar} onClick={() => handleReprogrammerManuel(visite)}>Reprogrammer</Button>
       <Button variant="info" size="sm" icon={Zap} onClick={() => handleReprogrammerAuto(visite)}>Auto</Button>
-      
+     
       {/* ✅ MODIFIER ICI - Ajouter la condition */}
       {typesAutorisesIndisponible.includes(visite.type_visite) && (
-        <Button 
-          variant="warning" 
-          size="sm" 
-          icon={AlertCircle} 
+        <Button
+          variant="warning"
+          size="sm"
+          icon={AlertCircle}
           onClick={() => handleIndisponible(visite)}
           title="Déclaration d'indisponibilité (uniquement si déclarée au moins 2 jours avant la visite)"
         >
           Indisponible
         </Button>
       )}
-      
+     
       {visite.type_visite === 'Reprise' && (
         <Button variant="danger" size="sm" icon={XCircle} onClick={() => handleAnnulerVisite(visite)}>Annuler</Button>
       )}
     </>
   )}
 
-          
-          {!visite.visite_effectuee && visite.statut === 'Programmé' && !visite.convocation_envoyee && !visite.creneau_bloque && 
+         
+          {!visite.visite_effectuee && visite.statut === 'Programmé' && !visite.convocation_envoyee && !visite.creneau_bloque &&
            (visite.type_visite === 'Périodique' || visite.type_visite === 'Reprise') && (
             <>
               <Button variant="info" size="sm" icon={Eye} onClick={() => { setConvocationToPreview(visite); setShowConvocationPreview(true); }}>Aperçu</Button>
               <Button variant="success" size="sm" icon={Mail} onClick={() => handleEnvoyerConvocation(visite)}>Envoyer</Button>
             </>
           )}
-          
-          
+         
+         
         </div>
-        
+       
         {visite.visite_effectuee && (
           <div className={cx('visit-completed-badge')}>
             <CheckCircle size={14} /> Effectuée le {formatDate(visite.date_visite)}
@@ -1625,13 +1622,13 @@ const handleIndisponible = (item) => {
     </div>
     <button className={cx('week-nav-btn')} onClick={() => changerSemaine(1)}><ChevronRight size={18} /></button>
   </div>
-  
+ 
   <div className={cx('search-bar')}>
     <Search size={16} />
     <input type="text" placeholder="Rechercher un agent..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
     {searchTerm && <button onClick={() => setSearchTerm('')}><X size={14} /></button>}
   </div>
-  
+ 
   <Button variant={showFilters ? 'primary' : 'outline'} icon={Filter} onClick={() => setShowFilters(!showFilters)}>Filtres</Button>
   {stats.convocationsRestantes > 0 && (
     <Button variant="success" icon={Mail} onClick={handleEnvoyerToutesConvocations}>Envoyer {stats.convocationsRestantes} convoc.</Button>
@@ -1690,20 +1687,7 @@ const handleIndisponible = (item) => {
         <StatCard title="Convocations" value={stats.convocationsEnvoyees} icon={Mail} variant="info" />
       </div>
 
-      {/* LÉGENDE */}
-      <div className={cx('legend-bar')}>
-        <div className={cx('legend-item')}><span className={`${cx('legend-dot')} programme`}></span><span>Programmé</span></div>
-        <div className={cx('legend-item')}><span className={`${cx('legend-dot')} effectue`}></span><span>Effectué</span></div>
-        <div className={cx('legend-item')}><span className={`${cx('legend-dot')} reporte`}></span><span>Reporté</span></div>
-        <div className={cx('legend-item')}><span className={`${cx('legend-dot')} annule`}></span><span>Annulé</span></div>
-        <div className={cx('legend-item')}><span className={`${cx('legend-dot')} bloque`}></span><span>Bloqué</span></div>
-        <div className={cx('legend-divider')}></div>
-        <div className={cx('legend-item')}><Badge variant="info" size="sm">Auto</Badge><span>Auto</span></div>
-        <div className={cx('legend-item')}><Badge variant="purple" size="sm">Manuel</Badge><span>Manuel</span></div>
-        <div className={cx('legend-item')}><Badge variant="primary" size="sm">Périodique</Badge><span>Périodique</span></div>
-        <div className={cx('legend-item')}><Badge variant="warning" size="sm">Reprise</Badge><span>Reprise</span></div>
-        <div className={cx('legend-item')}><Badge variant="info" size="sm">Contrôle auto</Badge><span>Contrôle auto</span></div>
-      </div>
+      
 
       {/* PLANNING GRID */}
       {loading ? (
@@ -1738,7 +1722,7 @@ const handleIndisponible = (item) => {
                 const visite = filteredPlanning.find(v => v.date_visite === dateStr && v.heure_visite === creneau);
                 const bloque = planning.find(v => v.date_visite === dateStr && v.heure_visite === creneau && v.creneau_bloque);
                 const vide = planning.find(v => v.date_visite === dateStr && v.heure_visite === creneau && v.matricule_agent === 0);
-                
+               
                 return (
                   <div key={dIdx} className={cx('planning-cell')}>
                     {visite && visite.matricule_agent !== 0 ? (
@@ -1749,11 +1733,11 @@ const handleIndisponible = (item) => {
   <div className={cx('empty-slot', 'libre')}>
     <Clock size={20} />
     <span>Libéré</span>
-    <Button 
-      variant="success" 
-      size="sm" 
-      icon={UserPlus} 
-      onClick={() => handleReaffecterCreneau(dateStr, creneau, vide.id_planning)} 
+    <Button
+      variant="success"
+      size="sm"
+      icon={UserPlus}
+      onClick={() => handleReaffecterCreneau(dateStr, creneau, vide.id_planning)}
       style={{ marginTop: 8 }}
     >
       Réaffecter
@@ -1815,7 +1799,7 @@ const handleIndisponible = (item) => {
           <p><strong>Type:</strong> {planningToReprogram.type_visite}</p>
           <p><strong>Actuelle:</strong> {formatDate(planningToReprogram.date_visite)} à {planningToReprogram.heure_visite?.substring(0,5)}</p>
         </div>
-        
+       
         <div className={cx('form-group', 'full-width')}>
           <label><Calendar size={14} /> Nouvelle date *</label>
           <div className={cx('mois-navigation')}>
@@ -1837,7 +1821,7 @@ const handleIndisponible = (item) => {
               chargerJoursDisponiblesReprog(newMois, newAnnee, planningToReprogram.matricule_agent);
             }}>▶</button>
           </div>
-          
+         
           {loadingReprogJours ? (
             <div className={cx('loading-creneaux')}>Chargement des jours disponibles...</div>
           ) : (
@@ -1869,7 +1853,7 @@ const handleIndisponible = (item) => {
             </div>
           )}
         </div>
-        
+       
         {nouvelleDate && (
           <div className={cx('form-group')}>
             <label><Clock size={14} /> Nouvelle heure *</label>
@@ -1893,7 +1877,7 @@ const handleIndisponible = (item) => {
             )}
           </div>
         )}
-        
+       
         <div className={cx('form-group')}>
           <label>Motif de reprogrammation *</label>
           <textarea rows="3" value={reprogramMotif} onChange={(e) => setReprogramMotif(e.target.value)} placeholder="Congé maladie, absence, formation, etc." />
@@ -2134,30 +2118,30 @@ const handleIndisponible = (item) => {
         <h2>Déclaration d'indisponibilité</h2>
         <button className={cx('modal-close')} onClick={() => setShowIndisponibleModal(false)}><X size={18} /></button>
       </div>
-      
+     
       <div className={cx('modal-body')}>
         <div className={cx('current-visite-info')}>
           <p><strong>👤 Agent:</strong> {getAgentNom(planningIndisponible.matricule_agent)}</p>
           <p><strong>📅 Date actuelle:</strong> {formatDate(planningIndisponible.date_visite)} à {planningIndisponible.heure_visite?.substring(0,5)}</p>
           <p><strong>📋 Type:</strong> {planningIndisponible.type_visite}</p>
         </div>
-        
+       
         <div className={cx('info-message', 'warning')}>
           <AlertCircle size={16} />
           <span>⚠️ Le créneau actuel sera <strong>libéré</strong> et proposé à d'autres agents.</span>
         </div>
-        
+       
         <div className={cx('form-group')}>
           <label>Mode de traitement</label>
           <div className={cx('mode-selector')}>
-            <button 
+            <button
               type="button"
               className={`${cx('mode-btn')} ${indisponibleMode === 'manuel' ? 'active' : ''}`}
               onClick={() => setIndisponibleMode('manuel')}
             >
                Choisir une nouvelle date
             </button>
-            <button 
+            <button
               type="button"
               className={`${cx('mode-btn')} ${indisponibleMode === 'auto' ? 'active' : ''}`}
               onClick={() => setIndisponibleMode('auto')}
@@ -2166,7 +2150,7 @@ const handleIndisponible = (item) => {
             </button>
           </div>
         </div>
-        
+       
         {indisponibleMode === 'manuel' ? (
           <>
             <div className={cx('form-group', 'full-width')}>
@@ -2190,7 +2174,7 @@ const handleIndisponible = (item) => {
                   chargerJoursDisponiblesReprog(newMois, newAnnee, planningIndisponible.matricule_agent);
                 }}>▶</button>
               </div>
-              
+             
               {loadingReprogJours ? (
                 <div className={cx('loading-creneaux')}>Chargement...</div>
               ) : (
@@ -2222,7 +2206,7 @@ const handleIndisponible = (item) => {
                 </div>
               )}
             </div>
-            
+           
             {nouvelleDate && (
               <div className={cx('form-group')}>
                 <label><Clock size={14} /> Nouvelle heure</label>
@@ -2260,13 +2244,13 @@ const handleIndisponible = (item) => {
             </div>
           </div>
         )}
-        
+       
         <div className={cx('form-group')}>
           <label>Motif de l'indisponibilité</label>
           <textarea rows={3} value={reprogramMotif} onChange={(e) => setReprogramMotif(e.target.value)} placeholder="Ex: Congé maladie, Formation, Mission, etc." />
         </div>
       </div>
-      
+     
       <div className={cx('modal-footer')}>
         <Button variant="secondary" onClick={() => setShowIndisponibleModal(false)}>Annuler</Button>
         <Button variant="warning" icon={indisponibleMode === 'auto' ? Zap : Calendar} loading={indisponibleLoading} onClick={confirmerIndisponible}>
@@ -2287,18 +2271,18 @@ const handleIndisponible = (item) => {
           <X size={18} />
         </button>
       </div>
-      
+     
       <div className={cx('modal-body')}>
         <div className={cx('creneau-info')}>
           <p><strong>📅 Date:</strong> {formatDate(reaffectCreneau.date)}</p>
           <p><strong>⏰ Heure:</strong> {reaffectCreneau.heure.substring(0,5)}</p>
         </div>
-        
+       
         <div className={cx('info-message', 'info')}>
           <Info size={16} />
           <span>Sélectionnez un agent parmi la liste des prioritaires</span>
         </div>
-        
+       
         {loadingAgents ? (
           <div className={cx('loading-state')}>
             <div className={cx('spinner')}></div>
@@ -2315,7 +2299,7 @@ const handleIndisponible = (item) => {
           <div className={cx('agents-list')}>
             <h4>Agents prioritaires ({agentsPrioritaires.length})</h4>
             {agentsPrioritaires.map((agent, idx) => (
-              <div 
+              <div
                 key={agent.matricule}
                 className={`${cx('agent-item')} ${selectedAgentReaffect?.matricule === agent.matricule ? 'selected' : ''}`}
                 onClick={() => setSelectedAgentReaffect(agent)}
@@ -2343,23 +2327,23 @@ const handleIndisponible = (item) => {
             ))}
           </div>
         )}
-        
+       
         <div className={cx('form-group')}>
           <label>Motif de la réaffectation (optionnel)</label>
-          <textarea 
-            rows={2} 
-            value={reaffectMotif} 
+          <textarea
+            rows={2}
+            value={reaffectMotif}
             onChange={(e) => setReaffectMotif(e.target.value)}
             placeholder="Ex: Réaffectation suite à indisponibilité"
           />
         </div>
       </div>
-      
+     
       <div className={cx('modal-footer')}>
         <Button variant="secondary" onClick={() => setShowReaffectModal(false)}>Annuler</Button>
-        <Button 
-          variant="success" 
-          icon={UserPlus} 
+        <Button
+          variant="success"
+          icon={UserPlus}
           loading={reaffectLoading}
           disabled={!selectedAgentReaffect || reaffectLoading}
           onClick={() => {
