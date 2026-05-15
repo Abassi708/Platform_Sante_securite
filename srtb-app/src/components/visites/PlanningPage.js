@@ -170,6 +170,8 @@ const [reaffectMotif, setReaffectMotif] = useState('');
 const [agentsPrioritaires, setAgentsPrioritaires] = useState([]);
 const [loadingAgents, setLoadingAgents] = useState(false);
 const [selectedAgentReaffect, setSelectedAgentReaffect] = useState(null);
+const joursDisponiblesCache = useRef(new Map());
+const creneauxDisponiblesCache = useRef(new Map());
 
  const typesAutorisesIndisponible = ['Périodique', 'Reprise'];
 
@@ -392,37 +394,113 @@ const chargerAgentsPrioritaires = async () => {
   };
 
   // ========== FONCTIONS CALENDRIER INTELLIGENT (UNE SEULE FOIS) ==========
-  const chargerJoursDisponiblesReprog = async (mois, annee, matricule) => {
-    if (!matricule) return;
-   
-    try {
-      const token = localStorage.getItem('token');
-      const url = `${process.env.REACT_APP_API_URL}/api/creneaux/jours-disponibles?mois=${mois + 1}&annee=${annee}&matricule_agent=${matricule}`;
-      const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-      const data = await response.json();
-      if (data.success) {
-        setJoursDisponiblesReprog(data.jours.filter(j => j.creneauxDisponibles > 0));
-      }
-    } catch (err) {
+const chargerJoursDisponiblesReprog = async (mois, annee, matricule) => {
+  if (!matricule) return;
+  
+  const cacheKey = `${matricule}-${mois}-${annee}`;
+  
+  // Vérifier le cache
+  if (joursDisponiblesCache.current.has(cacheKey)) {
+    const cached = joursDisponiblesCache.current.get(cacheKey);
+    // Cache valide 5 minutes
+    if (Date.now() - cached.timestamp < 5 * 60 * 1000) {
+      console.log('📦 Utilisation du cache pour les jours disponibles');
+      setJoursDisponiblesReprog(cached.data);
+      setLoadingReprogJours(false);
+      return;
+    }
+  }
+  
+  try {
+    const token = localStorage.getItem('token');
+    const url = `${process.env.REACT_APP_API_URL}/api/creneaux/jours-disponibles?mois=${mois + 1}&annee=${annee}&matricule_agent=${matricule}`;
+    
+    // Timeout de 10 secondes maximum
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    
+    const response = await fetch(url, { 
+      headers: { 'Authorization': `Bearer ${token}` },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    const data = await response.json();
+    
+    if (data.success) {
+      const jours = data.jours.filter(j => j.creneauxDisponibles > 0);
+      setJoursDisponiblesReprog(jours);
+      
+      // Mettre en cache
+      joursDisponiblesCache.current.set(cacheKey, {
+        data: jours,
+        timestamp: Date.now()
+      });
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      console.error('Timeout chargement jours disponibles');
+    } else {
       console.error('Erreur chargement jours:', err);
     }
-  };
+    setJoursDisponiblesReprog([]);
+  } finally {
+    setLoadingReprogJours(false);
+  }
+};
 
-  const chargerCreneauxDisponiblesReprog = async (date, matricule, idExclu) => {
-    if (!matricule || !date) return;
-   
-    try {
-      const token = localStorage.getItem('token');
-      const url = `${process.env.REACT_APP_API_URL}/api/creneaux/creneaux-disponibles?date=${date}&matricule_agent=${matricule}&id_planning_exclu=${idExclu}`;
-      const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-      const data = await response.json();
-      if (data.success) {
-        setCreneauxDisponiblesReprog(data.creneaux);
-      }
-    } catch (err) {
+const chargerCreneauxDisponiblesReprog = async (date, matricule, idExclu) => {
+  if (!matricule || !date) return;
+  
+  const cacheKey = `${matricule}-${date}-${idExclu || 'none'}`;
+  
+  // Vérifier le cache (valide 1 minute pour les créneaux)
+  if (creneauxDisponiblesCache.current.has(cacheKey)) {
+    const cached = creneauxDisponiblesCache.current.get(cacheKey);
+    if (Date.now() - cached.timestamp < 60 * 1000) {
+      console.log('📦 Utilisation du cache pour les créneaux');
+      setCreneauxDisponiblesReprog(cached.data);
+      setLoadingReprogCreneaux(false);
+      return;
+    }
+  }
+  
+  setLoadingReprogCreneaux(true);
+  
+  try {
+    const token = localStorage.getItem('token');
+    const url = `${process.env.REACT_APP_API_URL}/api/creneaux/creneaux-disponibles?date=${date}&matricule_agent=${matricule}&id_planning_exclu=${idExclu}`;
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    
+    const response = await fetch(url, { 
+      headers: { 'Authorization': `Bearer ${token}` },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    const data = await response.json();
+    
+    if (data.success) {
+      setCreneauxDisponiblesReprog(data.creneaux);
+      
+      // Mettre en cache
+      creneauxDisponiblesCache.current.set(cacheKey, {
+        data: data.creneaux,
+        timestamp: Date.now()
+      });
+    }
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      console.error('Timeout chargement créneaux');
+    } else {
       console.error('Erreur chargement créneaux:', err);
     }
-  };
+  } finally {
+    setLoadingReprogCreneaux(false);
+  }
+};
 
   const chargerDonnees = async () => {
     setLoading(true);
@@ -463,11 +541,27 @@ const getAgentNom = useCallback((matricule) => {
   const getAgentDetails = useCallback((matricule) => agents.find(a => a.matricule_agent === matricule), [agents]);
 
   const getDerniereVisite = useCallback((matricule) => {
-    const agent = agents.find(a => a.matricule_agent === matricule);
-    if (!agent?.date_derniere_visite) return 'Jamais';
-    const periodicite = agent.periodicite_jours === 180 ? '6 mois' : '1 an';
-    return `${new Date(agent.date_derniere_visite).toLocaleDateString('fr-FR')} (${periodicite})`;
-  }, [agents]);
+  const agent = agents.find(a => a.matricule_agent === matricule);
+  
+  // ✅ Cas où l'agent n'existe pas ou matricule = 0
+  if (!agent || matricule === 0 || matricule === '0') {
+    return 'Aucune donnée';
+  }
+  
+  // ✅ Pas de date de dernière visite
+  if (!agent.date_derniere_visite) {
+    return 'Jamais';
+  }
+  
+  // ✅ Vérifier que la date est valide
+  const dateDerniere = new Date(agent.date_derniere_visite);
+  if (isNaN(dateDerniere.getTime())) {
+    return 'Date invalide';
+  }
+  
+  const periodicite = agent.periodicite_jours === 180 ? '6 mois' : '1 an';
+  return `${dateDerniere.toLocaleDateString('fr-FR')} (${periodicite})`;
+}, [agents]);
 
 
 
@@ -511,14 +605,21 @@ const getAgentNom = useCallback((matricule) => {
   }, [agents]);
 
   const getSourceBadge = (source, motif) => {
-    if (source === 'manuel') {
-      return <Badge variant="purple" icon={Edit2}>Manuel</Badge>;
-    }
-    if (motif && motif.includes('Visite de contrôle automatique')) {
-      return <Badge variant="info" icon={Zap}>Contrôle auto</Badge>;
-    }
+  
+  const sourceClean = source?.toString().toLowerCase() || '';
+  
+  if (sourceClean === 'manuel' || sourceClean === 'manual') {
+    return <Badge variant="purple" icon={Edit2}> Manuel</Badge>;
+  }
+  if (sourceClean === 'auto' || sourceClean === 'automatique') {
     return <Badge variant="info" icon={Zap}>Auto</Badge>;
-  };
+  }
+  if (motif && motif.includes('Visite de contrôle automatique')) {
+    return <Badge variant="info" icon={Zap}> Contrôle auto</Badge>;
+  }
+  // Valeur par défaut au lieu de "0"
+  return <Badge variant="default" icon={Info}> Non spécifié</Badge>;
+};
 
   const getStatusBadge = (statut, effectuee, bloque) => {
     if (bloque) return <Badge variant="default" icon={Lock}>Bloqué</Badge>;
@@ -748,13 +849,13 @@ const getAgentNom = useCallback((matricule) => {
       return (
         <div className={cx('historique-details')}>
           <div className={cx('detail-text', 'info')}>
-            🤖 Programmation automatique d'une visite de contrôle
+             Programmation automatique d'une visite de contrôle
           </div>
           <div className={cx('detail-text')}>
-            📅 Suite à inaptitude temporaire jusqu'au {formatDate(details.date_fin_inaptitude)}
+            Suite à inaptitude temporaire jusqu'au {formatDate(details.date_fin_inaptitude)}
           </div>
           <div className={cx('detail-text', 'highlight')}>
-            🎯 Visite de contrôle: {formatDate(details.date_visite_controle)} {details.heure_visite_controle?.substring(0,5)}
+             Visite de contrôle: {formatDate(details.date_visite_controle)} {details.heure_visite_controle?.substring(0,5)}
           </div>
         </div>
       );
@@ -1028,29 +1129,32 @@ const getAgentNom = useCallback((matricule) => {
     setShowVisiteModal(true);
   };
 
-  const confirmerEnregistrementVisite = async () => {
-    if (!visiteToComplete) return;
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/${visiteToComplete.id_planning}/effectuer`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(visiteFormData)
-      });
-      const data = await res.json();
-      if (data.success) {
-        showNotification({ type: 'success', title: '✅ Visite effectuée', message: 'Visite enregistrée avec succès' });
-        setShowVisiteModal(false);
-        setVisiteToComplete(null);
-        fetchPlanningSemaine();
-        fetchAgents();
-      } else {
-        showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
-      }
-    } catch (err) {
-      showNotification({ type: 'error', title: '❌ Erreur', message: 'Erreur lors de l\'enregistrement' });
+const confirmerEnregistrementVisite = async () => {
+  if (!visiteToComplete) return;
+  try {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${process.env.REACT_APP_API_URL}/api/planning/${visiteToComplete.id_planning}/effectuer`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(visiteFormData)
+    });
+    const data = await res.json();
+    if (data.success) {
+      showNotification({ type: 'success', title: '✅ Visite effectuée', message: 'Visite enregistrée avec succès' });
+      setShowVisiteModal(false);
+      setVisiteToComplete(null);
+      // ✅ FORCER LE RAFRAÎCHISSEMENT COMPLET
+      fetchPlanningSemaine();
+      fetchAgents();
+      // ✅ AJOUTER UN RAFRAÎCHISSEMENT DE LA PAGE DES VISITES MANUELLES
+      window.dispatchEvent(new CustomEvent('refresh-visites-manuelles'));
+    } else {
+      showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
     }
-  };
+  } catch (err) {
+    console.error('Erreur:', err);
+  }
+};
 
   // ========== ANNULATION ==========
   const handleAnnulerVisite = (item) => {
@@ -1171,28 +1275,21 @@ const getAgentNom = useCallback((matricule) => {
     }
   };
 
-  // ========== GESTION INDISPONIBILITÉ ==========
+  
   // ========== GESTION INDISPONIBILITÉ (AVEC VÉRIFICATION DU DÉLAI) ==========
-const handleIndisponible = (item) => {
+const handleIndisponible = async (item) => {
   // Vérifier si l'agent a déclaré son indisponibilité en avance (>= J-2)
   const dateVisite = new Date(item.date_visite);
   const aujourdhui = new Date();
   aujourdhui.setHours(0, 0, 0, 0);
- 
-  // Calculer la différence en jours (sans tenir compte des heures)
+  
   const diffTime = dateVisite.getTime() - aujourdhui.getTime();
   const diffJours = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
- 
-  console.log('📅 Vérification délai indisponibilité:');
-  console.log(`   Date visite: ${item.date_visite}`);
-  console.log(`   Aujourd'hui: ${aujourdhui.toISOString().split('T')[0]}`);
-  console.log(`   Différence: ${diffJours} jours`);
- 
-  // Si la visite est aujourd'hui (J0) ou demain (J1) ou déjà passée (J-1, J-2...)
+  
   if (diffJours < 2) {
     let message = '';
     let titre = '❌ Action impossible';
-   
+    
     if (diffJours === 1) {
       message = `⚠️ Impossible de déclarer l'indisponibilité pour une visite prévue DEMAIN (J-1).\n\n` +
                 `📋 Règle: La déclaration d'indisponibilité doit être faite au moins 2 jours ouvrables avant la visite.\n\n` +
@@ -1211,7 +1308,7 @@ const handleIndisponible = (item) => {
                 `📋 Cette visite est déjà passée.\n\n` +
                 `🔄 Si la visite n'a pas été effectuée, utilisez le bouton "Reprogrammer" ou "Auto" pour la reporter.`;
     }
-   
+    
     showNotification({
       type: 'error',
       title: titre,
@@ -1220,9 +1317,8 @@ const handleIndisponible = (item) => {
     });
     return;
   }
- 
-  // Si délai OK (>= J-2), ouvrir le modal
-  console.log('✅ Délai respecté (>= J-2) - Ouverture du modal');
+  
+  // Ouvrir le modal IMMÉDIATEMENT
   setPlanningIndisponible(item);
   setNouvelleDate('');
   setNouvelleHeure('');
@@ -1234,7 +1330,16 @@ const handleIndisponible = (item) => {
   setAnneeActuelleReprog(new Date().getFullYear());
   setJoursDisponiblesReprog([]);
   setCreneauxDisponiblesReprog([]);
-  chargerJoursDisponiblesReprog(new Date().getMonth(), new Date().getFullYear(), item.matricule_agent);
+  setLoadingReprogJours(true);
+  
+  // Chargement en arrière-plan sans bloquer l'interface
+  setTimeout(async () => {
+    try {
+      await chargerJoursDisponiblesReprog(new Date().getMonth(), new Date().getFullYear(), item.matricule_agent);
+    } catch (err) {
+      console.error('Erreur chargement jours:', err);
+    }
+  }, 50);
 };
 
   const confirmerIndisponible = async () => {
@@ -1466,11 +1571,17 @@ const handleIndisponible = (item) => {
             </div>
             <div>
               <div className={cx('agent-name')}>
-                {getAgentNom(visite.matricule_agent).replace('Agent 0', 'Agent ?')}
-              </div>
-              <div className={cx('agent-matricule')}>
-                {visite.matricule_agent ? `#${visite.matricule_agent}` : '#?'}
-              </div>
+  {visite.matricule_agent === 0 || visite.matricule_agent === '0' 
+    ? 'Créneau libre' 
+    : getAgentNom(visite.matricule_agent)
+  }
+</div>
+<div className={cx('agent-matricule')}>
+  {visite.matricule_agent && visite.matricule_agent !== 0 && visite.matricule_agent !== '0' 
+    ? `#${visite.matricule_agent}` 
+    : '#À attribuer'
+  }
+</div>
             </div>
           </div>
           <div className={cx('visit-card-header-right')}>
@@ -1494,13 +1605,25 @@ const handleIndisponible = (item) => {
             {visite.convocation_envoyee && <Badge variant="success" icon={Mail}>Convocation envoyée</Badge>}
           </div>
          
-          {agent && shouldShow(agent.code_agence) && (
-            <div className={cx('visit-details')}>
-              <span><Building size={12} /> Agence {agent.code_agence}</span>
-              <span className={cx('visit-details-separator')}>•</span>
-              <span><History size={12} /> Dernière visite: {getDerniereVisite(visite.matricule_agent)}</span>
-            </div>
-          )}
+          {agent && (
+  <div className={cx('visit-details')}>
+    {/* ✅ Agence - ne pas afficher si null ou 0 */}
+    {agent.code_agence && agent.code_agence !== 0 && agent.code_agence !== '0' && (
+      <>
+        <span><Building size={12} /> Agence {agent.code_agence}</span>
+        <span className={cx('visit-details-separator')}>•</span>
+      </>
+    )}
+    {/* ✅ Dernière visite - formater correctement */}
+    <span><History size={12} /> Dernière visite: {
+      getDerniereVisite(visite.matricule_agent) === '0' || 
+      getDerniereVisite(visite.matricule_agent) === 'Jamais 0' ||
+      getDerniereVisite(visite.matricule_agent) === '0 jours'
+        ? 'Aucune visite'
+        : getDerniereVisite(visite.matricule_agent)
+    }</span>
+  </div>
+)}
          
           {actionDetailsDisplay && (
             <div className={cx('action-details-wrapper')}>
@@ -1633,7 +1756,14 @@ const handleIndisponible = (item) => {
   {stats.convocationsRestantes > 0 && (
     <Button variant="success" icon={Mail} onClick={handleEnvoyerToutesConvocations}>Envoyer {stats.convocationsRestantes} convoc.</Button>
   )}
-  <Button variant="primary" icon={RefreshCw} loading={generationLoading} onClick={handleGenererPlanning}>Générer semaine suivante</Button>
+  <Button 
+  variant="primary" 
+  icon={RefreshCw} 
+  loading={generationLoading}
+  onClick={handleGenererPlanning}
+>
+  {generationLoading ? 'Génération en cours...' : 'Générer semaine suivante'}
+</Button>
 </div>
       </div>
 

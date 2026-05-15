@@ -142,8 +142,7 @@ const SocialAccidents = () => {
     search: '',
     statut: 'all',
     gravite: 'all',
-    dateDebut: '',
-    dateFin: '',
+    dateAccident: '',
     agent: 'all'
   });
   const [sa2_showFilters, setSa2_showFilters] = useState(false);
@@ -254,12 +253,9 @@ const SocialAccidents = () => {
       filtered = filtered.filter(a => a.matricule_agent === parseInt(sa2_filters.agent));
     }
 
-    if (sa2_filters.dateDebut && sa2_filters.dateFin) {
-      filtered = filtered.filter(a => {
-        const date = new Date(a.date_accident);
-        return date >= new Date(sa2_filters.dateDebut) && date <= new Date(sa2_filters.dateFin);
-      });
-    }
+    if (sa2_filters.dateAccident) {
+  filtered = filtered.filter(a => a.date_accident === sa2_filters.dateAccident);
+}
 
     setSa2_filteredAccidents(filtered);
     setSa2_currentPage(1);
@@ -800,68 +796,64 @@ const SocialAccidents = () => {
               </div>
 
               {sa2_showFilters && (
-                <div className="sa2_filters-grid">
-                  <div className="sa2_filter-group">
-                    <label>Recherche</label>
-                    <input
-                      type="text"
-                      placeholder="N° accident, lieu, agent..."
-                      value={sa2_filters.search}
-                      onChange={(e) => setSa2_filters({...sa2_filters, search: e.target.value})}
-                    />
-                  </div>
+  <div className="sa2_filters-grid">
+    <div className="sa2_filter-group">
+      <label>Recherche</label>
+      <input
+        type="text"
+        placeholder="N° accident, lieu..."
+        value={sa2_filters.search}
+        onChange={(e) => setSa2_filters({...sa2_filters, search: e.target.value})}
+      />
+    </div>
 
-                  <div className="sa2_filter-group">
-                    <label>Statut</label>
-                    <select value={sa2_filters.statut} onChange={(e) => setSa2_filters({...sa2_filters, statut: e.target.value})}>
-                      <option value="all">Tous</option>
-                      <option value="brouillon">Brouillon</option>
-                      <option value="declare">Déclaré</option>
-                    </select>
-                  </div>
+    <div className="sa2_filter-group">
+      <label>Statut</label>
+      <select value={sa2_filters.statut} onChange={(e) => setSa2_filters({...sa2_filters, statut: e.target.value})}>
+        <option value="all">Tous</option>
+        <option value="brouillon">Brouillon</option>
+        <option value="declare">Déclaré</option>
+      </select>
+    </div>
 
-                  <div className="sa2_filter-group">
-                    <label>Gravité</label>
-                    <select value={sa2_filters.gravite} onChange={(e) => setSa2_filters({...sa2_filters, gravite: e.target.value})}>
-                      <option value="all">Toutes</option>
-                      <option value="Faible">Faible</option>
-                      <option value="Moyenne">Moyenne</option>
-                      <option value="Élevée">Élevée</option>
-                      <option value="Critique">Critique</option>
-                    </select>
-                  </div>
+    <div className="sa2_filter-group">
+      <label>Gravité</label>
+      <select value={sa2_filters.gravite} onChange={(e) => setSa2_filters({...sa2_filters, gravite: e.target.value})}>
+        <option value="all">Toutes</option>
+        <option value="Faible">Faible</option>
+        <option value="Moyenne">Moyenne</option>
+        <option value="Élevée">Élevée</option>
+        <option value="Critique">Critique</option>
+      </select>
+    </div>
 
-                  <div className="sa2_filter-group">
-                    <label>Agent</label>
-                    <select value={sa2_filters.agent} onChange={(e) => setSa2_filters({...sa2_filters, agent: e.target.value})}>
-                      <option value="all">Tous les agents</option>
-                      {sa2_agents.map(agent => (
-                        <option key={agent.matricule_agent} value={agent.matricule_agent}>
-                          {agent.nom} {agent.prenom}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+    {/* ✅ NOUVEAU FILTRE DATE D'ACCIDENT (un seul champ) */}
+    <div className="sa2_filter-group">
+      <label>Date d'accident</label>
+      <input
+        type="date"
+        value={sa2_filters.dateAccident}
+        onChange={(e) => setSa2_filters({...sa2_filters, dateAccident: e.target.value})}
+      />
+    </div>
 
-                  <div className="sa2_filter-group">
-                    <label>Date début</label>
-                    <input
-                      type="date"
-                      value={sa2_filters.dateDebut}
-                      onChange={(e) => setSa2_filters({...sa2_filters, dateDebut: e.target.value})}
-                    />
-                  </div>
-
-                  <div className="sa2_filter-group">
-                    <label>Date fin</label>
-                    <input
-                      type="date"
-                      value={sa2_filters.dateFin}
-                      onChange={(e) => setSa2_filters({...sa2_filters, dateFin: e.target.value})}
-                    />
-                  </div>
-                </div>
-              )}
+    {/* ✅ FILTRE AGENT AVEC AgentSearchInput (remplace la liste déroulante) */}
+    <div className="sa2_filter-group sa2_filter-agent">
+      <label>Agent</label>
+      <AgentSearchInput
+        value={sa2_filters.agent}
+        onChange={(matricule) => setSa2_filters({...sa2_filters, agent: matricule || 'all'})}
+        onSelect={(agent) => setSa2_filters({...sa2_filters, agent: agent?.matricule_agent || 'all'})}
+        placeholder="Rechercher un agent..."
+      />
+      {sa2_filters.agent && sa2_filters.agent !== 'all' && (
+        <button onClick={() => setSa2_filters({...sa2_filters, agent: 'all'})} className="sa2_filter-clear">
+          <X size={14} />
+        </button>
+      )}
+    </div>
+  </div>
+)}
 
               <div className="sa2_filters-footer">
                 <span className="sa2_filter-result">
@@ -869,7 +861,7 @@ const SocialAccidents = () => {
                 </span>
                 {Object.values(sa2_filters).some(v => v && v !== 'all' && v !== '') && (
                   <button className="sa2_clear-filters" onClick={() => setSa2_filters({
-                    search: '', statut: 'all', gravite: 'all', dateDebut: '', dateFin: '', agent: 'all'
+                    search: '', statut: 'all', gravite: 'all', dateAccident: '', agent: 'all'
                   })}>
                     <FilterX size={14} />
                     Effacer les filtres

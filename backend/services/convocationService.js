@@ -271,6 +271,138 @@ async verifierEtEnvoyerConvocations() {
       return [];
     }
   }
+
+  async getConvocationsAPreparer() {
+  try {
+    const today = new Date();
+    const dateJ7 = new Date();
+    dateJ7.setDate(today.getDate() + 7);
+    const dateJ14 = new Date();
+    dateJ14.setDate(today.getDate() + 14);
+    
+    // Formater les dates en YYYY-MM-DD
+    const dateJ7Str = dateJ7.toISOString().split('T')[0];
+    const dateJ14Str = dateJ14.toISOString().split('T')[0];
+    
+    console.log(`📅 Recherche convocations à préparer entre ${dateJ7Str} et ${dateJ14Str}`);
+    
+    const plannings = await Planning.findAll({
+      where: {
+        date_visite: {
+          [Op.between]: [dateJ7Str, dateJ14Str]
+        },
+        convocation_envoyee: false,
+        statut: 'Programmé',
+        type_visite: { [Op.in]: ['Périodique', 'Reprise'] }
+      },
+      attributes: ['id_planning', 'matricule_agent', 'date_visite', 'heure_visite', 'type_visite'],
+      raw: true
+    });
+    
+    if (plannings.length === 0) {
+      console.log('📭 Aucune convocation à préparer trouvée');
+      return [];
+    }
+    
+    console.log(`📋 ${plannings.length} convocation(s) à préparer trouvée(s)`);
+    
+    // Récupérer les informations des agents
+    const matricules = [...new Set(plannings.map(p => p.matricule_agent))];
+    const agents = await Agent.findAll({
+      where: { matricule_agent: { [Op.in]: matricules } },
+      attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence'],
+      raw: true
+    });
+    
+    const agentsMap = new Map();
+    agents.forEach(agent => agentsMap.set(agent.matricule_agent, agent));
+    
+    // Ajouter les noms des agents
+    const planningsWithNames = plannings.map(p => ({
+      ...p,
+      agent_nom: agentsMap.get(p.matricule_agent)?.nom || 'Inconnu',
+      agent_prenom: agentsMap.get(p.matricule_agent)?.prenom || '',
+      code_agence: agentsMap.get(p.matricule_agent)?.code_agence || 'N/A'
+    }));
+    
+    return planningsWithNames;
+    
+  } catch (error) {
+    console.error('❌ Erreur getConvocationsAPreparer:', error);
+    return [];
+  }
+}
+
+/**
+ * Récupère les statistiques des convocations
+ */
+async getStatsConvocations() {
+  try {
+    // Total des convocations envoyées
+    const total_envoyees = await ConvocationLog.count();
+    
+    // Convocation envoyées cette semaine
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const total_envoyees_semaine = await ConvocationLog.count({
+      where: {
+        date_convocation: {
+          [Op.gte]: startOfWeek
+        }
+      }
+    });
+    
+    // ✅ CORRECTION ICI - Ne pas modifier la date originale
+    const todayForJ7 = new Date();
+    const dateJ7 = new Date(todayForJ7);
+    dateJ7.setDate(todayForJ7.getDate() + 7);
+    const dateJ14 = new Date(todayForJ7);
+    dateJ14.setDate(todayForJ7.getDate() + 14);
+    
+    const a_envoyer_j7 = await Planning.count({
+      where: {
+        date_visite: {
+          [Op.between]: [dateJ7.toISOString().split('T')[0], dateJ14.toISOString().split('T')[0]]
+        },
+        convocation_envoyee: false,
+        statut: 'Programmé',
+        type_visite: { [Op.in]: ['Périodique', 'Reprise'] }
+      }
+    });
+    
+    // Total des convocations en attente (toutes dates confondues)
+    const total_attente = await Planning.count({
+      where: {
+        convocation_envoyee: false,
+        statut: 'Programmé',
+        type_visite: { [Op.in]: ['Périodique', 'Reprise'] },
+        date_visite: {
+          [Op.gte]: new Date().toISOString().split('T')[0]
+        }
+      }
+    });
+    
+    return {
+      total_envoyees,
+      total_envoyees_semaine,
+      a_envoyer_j7,
+      total_attente
+    };
+    
+  } catch (error) {
+    console.error('❌ Erreur getStatsConvocations:', error);
+    return {
+      total_envoyees: 0,
+      total_envoyees_semaine: 0,
+      a_envoyer_j7: 0,
+      total_attente: 0
+    };
+  }
+}
+
 }
 
 module.exports = new ConvocationService();

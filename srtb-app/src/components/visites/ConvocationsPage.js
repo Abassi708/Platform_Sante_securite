@@ -812,4 +812,4 @@ const ConvocationsPage = () => {
   );
 };
 
-export default ConvocationsPage;
+export default ConvocationsPage; 

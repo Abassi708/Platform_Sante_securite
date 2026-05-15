@@ -8,16 +8,15 @@ import {
   TrendingUp, Calendar as CalendarIcon, Briefcase, Shield, Zap,
   UserSearch, ChevronsLeft, ChevronsRight, BarChart3, PieChart,
   MoreHorizontal, Download, Mail, Phone, MapPin, Building2,
-  Star, TrendingDown, MinusCircle, ArrowRight, Dot
+  Star, TrendingDown, MinusCircle, ArrowRight, Dot, Edit2 
 } from 'lucide-react';
 import AgentSearchInput from '../common/AgentSearchInput';
 import '../../styles/HistoriqueVisites.css';
 
 // ============================================
-// FONCTIONS DE FORMATAGE DE DATES CORRIGÉES (sans décalage horaire)
+// FONCTIONS DE FORMATAGE DE DATES
 // ============================================
 
-// Formatage simple YYYY-MM-DD -> DD/MM/YYYY
 const formatDateFr = (dateStr) => {
   if (!dateStr) return '';
   if (typeof dateStr === 'string' && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
@@ -29,7 +28,6 @@ const formatDateFr = (dateStr) => {
   return date.toLocaleDateString('fr-FR');
 };
 
-// Formatage avec heure pour les timestamps (created_at)
 const formatDateTimeFr = (dateStr) => {
   if (!dateStr) return '';
   const date = new Date(dateStr);
@@ -43,7 +41,6 @@ const formatDateTimeFr = (dateStr) => {
   });
 };
 
-// Formatage long avec jour de la semaine (pour les détails)
 const formatDateVisiteLong = (dateStr) => {
   if (!dateStr) return '';
   if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
@@ -67,15 +64,13 @@ const formatDateVisiteLong = (dateStr) => {
   });
 };
 
-// Alias pour compatibilité
 const formatDate = formatDateTimeFr;
 const formatDateSimple = formatDateFr;
 
 // ============================================
-// SOUS-COMPOSANTS PROFESSIONNELS
+// SOUS-COMPOSANTS
 // ============================================
 
-// Carte de statistique réutilisable
 const StatCard = ({ title, value, icon: Icon, color, trend, trendValue }) => (
   <div className="hv-stat-card-premium" style={{ '--accent-color': color }}>
     <div className="hv-stat-card-header">
@@ -96,19 +91,18 @@ const StatCard = ({ title, value, icon: Icon, color, trend, trendValue }) => (
   </div>
 );
 
-// Badge de statut
 const StatusBadge = ({ type, value, size = 'md' }) => {
   const configs = {
     'Apte': { class: 'hv-status-apte', icon: CheckCircle },
-    'Apte avec réserves': { class: 'hv-status-reserves', icon: AlertCircle },
     'Inapte temporaire': { class: 'hv-status-temporaire', icon: AlertTriangle },
     'Inapte définitif': { class: 'hv-status-definitif', icon: XCircle },
     'PROGRAMMATION': { class: 'hv-status-programmation', icon: Calendar },
+    'SAISIE_MANUELLE': { class: 'hv-status-programmation', icon: PenTool },
     'EFFECTUEE': { class: 'hv-status-effectuee', icon: CheckCircle },
     'REPROGRAMMEE': { class: 'hv-status-reprogrammee', icon: Repeat },
     'ANNULEE': { class: 'hv-status-annulee', icon: XCircle },
     'REAFFECTEE': { class: 'hv-status-reaffectee', icon: Users },
-    'SAISIE_MANUELLE': { class: 'hv-status-saisie', icon: PenTool }
+    'MODIFICATION': { class: 'hv-status-modification', icon: Edit2 } 
   };
   
   const config = configs[type] || { class: 'hv-status-default', icon: Info };
@@ -122,7 +116,6 @@ const StatusBadge = ({ type, value, size = 'md' }) => {
   );
 };
 
-// Badge de type de visite
 const VisitTypeBadge = ({ type }) => {
   const types = {
     'Périodique': { icon: Calendar, color: '#4361ee' },
@@ -140,7 +133,6 @@ const VisitTypeBadge = ({ type }) => {
   );
 };
 
-// Carte d'action dans la timeline
 const ActionCard = ({ action, onViewDetails, viewMode }) => {
   const actionColor = getActionColorStatic(action.type_action);
   const resultatConfig = getResultatConfigStatic(action.resultat);
@@ -206,7 +198,6 @@ const ActionCard = ({ action, onViewDetails, viewMode }) => {
   );
 };
 
-// Helpers statiques pour les couleurs
 const getActionColorStatic = (action) => {
   const colors = {
     'PROGRAMMATION': '#4361ee',
@@ -214,7 +205,8 @@ const getActionColorStatic = (action) => {
     'REPROGRAMMEE': '#f59f00',
     'ANNULEE': '#e63946',
     'REAFFECTEE': '#9c36b5',
-    'SAISIE_MANUELLE': '#9c36b5'
+    'SAISIE_MANUELLE': '#9c36b5',
+    'MODIFICATION': '#f59f00'
   };
   return colors[action] || '#6c757d';
 };
@@ -285,7 +277,8 @@ const HistoriqueVisites = () => {
       'REPROGRAMMEE': 'Reprogrammation',
       'ANNULEE': 'Annulation',
       'REAFFECTEE': 'Réaffectation',
-      'SAISIE_MANUELLE': 'Saisie manuelle'
+      'SAISIE_MANUELLE': 'Saisie manuelle',
+      'MODIFICATION': 'Modification'
     };
     return labels[action] || action;
   }, []);
@@ -297,7 +290,8 @@ const HistoriqueVisites = () => {
       'REPROGRAMMEE': '🔄',
       'ANNULEE': '✗',
       'REAFFECTEE': '👥',
-      'SAISIE_MANUELLE': '✏️'
+      'SAISIE_MANUELLE': '✏️',
+      'MODIFICATION': '✏️'
     };
     return icons[action] || '📋';
   }, []);
@@ -324,20 +318,19 @@ const HistoriqueVisites = () => {
           actionIcon: getActionIcon(item.type_action)
         }));
         
-        // Application des filtres
-        if (planningFilters.dateUnique) {
+        if (planningFilters.dateUnique && planningFilters.dateUnique !== '') {
           actions = actions.filter(a => a.date_visite === planningFilters.dateUnique);
         }
-        if (planningFilters.filterTypeVisite !== 'all') {
+        if (planningFilters.filterTypeVisite && planningFilters.filterTypeVisite !== 'all') {
           actions = actions.filter(a => a.type_visite === planningFilters.filterTypeVisite);
         }
-        if (planningFilters.filterResultat !== 'all') {
+        if (planningFilters.filterResultat && planningFilters.filterResultat !== 'all') {
           actions = actions.filter(a => a.resultat === planningFilters.filterResultat);
         }
-        if (planningFilters.filterAction !== 'all') {
+        if (planningFilters.filterAction && planningFilters.filterAction !== 'all') {
           actions = actions.filter(a => a.type_action === planningFilters.filterAction);
         }
-        if (planningFilters.searchTerm) {
+        if (planningFilters.searchTerm && planningFilters.searchTerm !== '') {
           const searchLower = planningFilters.searchTerm.toLowerCase();
           actions = actions.filter(a => 
             (a.visiteAgent?.nom?.toLowerCase().includes(searchLower)) ||
@@ -379,20 +372,19 @@ const HistoriqueVisites = () => {
           actionIcon: getActionIcon(item.type_action)
         }));
         
-        // Application des filtres
-        if (formulaireFilters.dateUnique) {
+        if (formulaireFilters.dateUnique && formulaireFilters.dateUnique !== '') {
           actions = actions.filter(a => a.date_visite === formulaireFilters.dateUnique);
         }
-        if (formulaireFilters.filterTypeVisite !== 'all') {
+        if (formulaireFilters.filterTypeVisite && formulaireFilters.filterTypeVisite !== 'all') {
           actions = actions.filter(a => a.type_visite === formulaireFilters.filterTypeVisite);
         }
-        if (formulaireFilters.filterResultat !== 'all') {
+        if (formulaireFilters.filterResultat && formulaireFilters.filterResultat !== 'all') {
           actions = actions.filter(a => a.resultat === formulaireFilters.filterResultat);
         }
-        if (formulaireFilters.filterAction !== 'all') {
+        if (formulaireFilters.filterAction && formulaireFilters.filterAction !== 'all') {
           actions = actions.filter(a => a.type_action === formulaireFilters.filterAction);
         }
-        if (formulaireFilters.searchTerm) {
+        if (formulaireFilters.searchTerm && formulaireFilters.searchTerm !== '') {
           const searchLower = formulaireFilters.searchTerm.toLowerCase();
           actions = actions.filter(a => 
             (a.visiteAgent?.nom?.toLowerCase().includes(searchLower)) ||
@@ -511,7 +503,8 @@ const HistoriqueVisites = () => {
     const actions = historiqueAgent;
     if (!Array.isArray(actions)) return { 
       total: 0, effectuees: 0, reprogrammations: 0, annulations: 0, 
-      reaffectations: 0, programmations: 0, periodiques: 0, reprises: 0
+      reaffectations: 0, programmations: 0, periodiques: 0, reprises: 0,
+      modifications: 0, reclassements: 0, embauches: 0, saisies: 0
     };
     
     return {
@@ -521,8 +514,12 @@ const HistoriqueVisites = () => {
       annulations: actions.filter(a => a.type_action === 'ANNULEE').length,
       reaffectations: actions.filter(a => a.type_action === 'REAFFECTEE').length,
       programmations: actions.filter(a => a.type_action === 'PROGRAMMATION').length,
+      saisies: actions.filter(a => a.type_action === 'SAISIE_MANUELLE').length,
+      modifications: actions.filter(a => a.type_action === 'MODIFICATION').length,
       periodiques: actions.filter(a => a.type_visite === 'Périodique').length,
-      reprises: actions.filter(a => a.type_visite === 'Reprise').length
+      reprises: actions.filter(a => a.type_visite === 'Reprise').length,
+      reclassements: actions.filter(a => a.type_visite === 'Reclassement').length,
+      embauches: actions.filter(a => a.type_visite === 'Embauche').length
     };
   };
 
@@ -614,31 +611,69 @@ const HistoriqueVisites = () => {
     setCurrentPageFormulaire(1);
   };
 
-  // ========== STATISTIQUES GLOBALES ==========
-  const getGlobalStats = () => {
-    const actions = activeTab === 'planning' ? historiqueActionsPlanning : historiqueActionsFormulaire;
-    if (!Array.isArray(actions)) return { 
-      total: 0, effectuees: 0, reprogrammations: 0, annulations: 0, saisies: 0,
-      periodiques: 0, reprises: 0, reclassements: 0, embauches: 0, 
-      aptes: 0, inaptesTemp: 0, inaptesDef: 0 
-    };
-    
-    return {
-      total: actions.length,
-      effectuees: actions.filter(a => a.type_action === 'EFFECTUEE').length,
-      reprogrammations: actions.filter(a => a.type_action === 'REPROGRAMMEE').length,
-      annulations: actions.filter(a => a.type_action === 'ANNULEE').length,
-      saisies: actions.filter(a => a.type_action === 'SAISIE_MANUELLE').length,
-      programmations: actions.filter(a => a.type_action === 'PROGRAMMATION').length,
-      periodiques: actions.filter(a => a.type_visite === 'Périodique').length,
-      reprises: actions.filter(a => a.type_visite === 'Reprise').length,
-      reclassements: actions.filter(a => a.type_visite === 'Reclassement').length,
-      embauches: actions.filter(a => a.type_visite === 'Embauche').length,
-      aptes: actions.filter(a => a.resultat === 'Apte' && a.type_action === 'EFFECTUEE').length,
-      inaptesTemp: actions.filter(a => a.resultat === 'Inapte temporaire' && a.type_action === 'EFFECTUEE').length,
-      inaptesDef: actions.filter(a => a.resultat === 'Inapte définitif' && a.type_action === 'EFFECTUEE').length
-    };
+// ========== STATISTIQUES GLOBALES (CORRIGÉ) ==========
+const getGlobalStats = () => {
+  const actions = activeTab === 'planning' ? historiqueActionsPlanning : historiqueActionsFormulaire;
+  
+  if (!Array.isArray(actions) || actions.length === 0) { 
+    if (activeTab === 'planning') {
+      return { 
+        total: 0, effectuees: 0, programmations: 0, saisies: 0,
+        reprogrammations: 0, annulations: 0, reaffectations: 0, modifications: 0,
+        periodiques: 0, reprises: 0, reclassements: 0, embauches: 0, 
+        aptes: 0, inaptesTemp: 0, inaptesDef: 0 
+      };
+    } else {
+      return { 
+        total: 0, effectuees: 0, programmations: 0, saisies: 0,
+        reprogrammations: 0, modifications: 0,
+        periodiques: 0, reprises: 0, reclassements: 0, embauches: 0, 
+        aptes: 0, inaptesTemp: 0, inaptesDef: 0 
+      };
+    }
+  }
+  
+  // ✅ Distinction claire :
+  // - programmations = type_action === 'PROGRAMMATION' (créations auto du système)
+  // - saisies = type_action === 'SAISIE_MANUELLE' (créations manuelles utilisateur)
+  
+  const programmationsCount = actions.filter(a => a.type_action === 'PROGRAMMATION').length;
+  const saisiesCount = actions.filter(a => a.type_action === 'SAISIE_MANUELLE').length;
+  
+  const commonStats = {
+    total: actions.length,
+    effectuees: actions.filter(a => a.type_action === 'EFFECTUEE').length,
+    reprogrammations: actions.filter(a => a.type_action === 'REPROGRAMMEE').length,
+    periodiques: actions.filter(a => a.type_visite === 'Périodique').length,
+    reprises: actions.filter(a => a.type_visite === 'Reprise').length,
+    reclassements: actions.filter(a => a.type_visite === 'Reclassement').length,
+    embauches: actions.filter(a => a.type_visite === 'Embauche').length,
+    aptes: actions.filter(a => a.resultat === 'Apte' && a.type_action === 'EFFECTUEE').length,
+    inaptesTemp: actions.filter(a => a.resultat === 'Inapte temporaire' && a.type_action === 'EFFECTUEE').length,
+    inaptesDef: actions.filter(a => a.resultat === 'Inapte définitif' && a.type_action === 'EFFECTUEE').length
   };
+  
+  if (activeTab === 'planning') {
+    return {
+      ...commonStats,
+      programmations: programmationsCount,
+      saisies: 0,
+      annulations: actions.filter(a => a.type_action === 'ANNULEE').length,
+      reaffectations: actions.filter(a => a.type_action === 'REAFFECTEE').length,
+      modifications: 0
+    };
+  } else {
+    // FORMULAIRE : les deux sont distincts
+    return {
+      ...commonStats,
+      programmations: programmationsCount,  // ← Visites auto (post-contrôle)
+      saisies: saisiesCount,                // ← Visites manuelles utilisateur
+      modifications: actions.filter(a => a.type_action === 'MODIFICATION').length,
+      annulations: 0,
+      reaffectations: 0
+    };
+  }
+};
 
   const globalStats = getGlobalStats();
 
@@ -678,7 +713,6 @@ const HistoriqueVisites = () => {
           </div>
           
           <div className="hv-modal-body-premium">
-            {/* Section Agent */}
             <div className="hv-details-agent-premium">
               <div className="hv-agent-avatar-premium">
                 {agentNom.charAt(0)}{agentPrenom.charAt(0)}
@@ -696,7 +730,6 @@ const HistoriqueVisites = () => {
               </div>
             </div>
             
-            {/* Grille d'informations */}
             <div className="hv-details-grid-premium">
               <div className="hv-detail-card-premium">
                 <div className="hv-detail-icon"><Calendar size={16} /></div>
@@ -749,7 +782,6 @@ const HistoriqueVisites = () => {
               </div>
             </div>
             
-            {/* Décision médicale */}
             {item.resultat && (
               <div className={`hv-decision-section-premium ${resultatConfig.class}`}>
                 <div className="hv-decision-icon-premium">
@@ -762,7 +794,6 @@ const HistoriqueVisites = () => {
               </div>
             )}
             
-            {/* Motif */}
             {item.motif_action && (
               <div className="hv-motif-section-premium">
                 <h4>Motif de l'action</h4>
@@ -772,7 +803,6 @@ const HistoriqueVisites = () => {
               </div>
             )}
             
-            {/* Prochaine visite */}
             {item.details && item.details.prochaine_visite && (
               <div className="hv-next-visit-premium">
                 <CalendarIcon size={16} />
@@ -853,46 +883,34 @@ const HistoriqueVisites = () => {
         </div>
       </div>
 
-      {/* STATS CARTES PREMIUM - UNIQUEMENT POUR PLANNING/FORMULAIRE */}
+      {/* STATS SECTION - SANS "Total saisies" et SANS "Par type de visite" */}
       {(activeTab === 'planning' || activeTab === 'formulaire') && (
         <>
-          <div className="hv-stats-grid-premium">
-            <StatCard title="Total actions" value={globalStats.total} icon={Activity} color="#4361ee" />
-            <StatCard title="Visites effectuées" value={globalStats.effectuees} icon={CheckCircle} color="#2b9348" trend="up" trendValue="+12%" />
-            <StatCard title="Reprogrammations" value={globalStats.reprogrammations} icon={Repeat} color="#f59f00" />
-            <StatCard title="Saisies manuelles" value={globalStats.saisies} icon={PenTool} color="#9c36b5" />
-          </div>
-          
-          <div className="hv-stats-secondary-premium">
-            <div className="hv-stat-group-premium">
-              <span className="hv-stat-group-title">Par type de visite</span>
-              <div className="hv-type-stats-premium">
-                <div className="hv-type-stat-item">
-                  <span className="hv-type-dot hv-periodic" />
-                  <span>Périodiques</span>
-                  <strong>{globalStats.periodiques}</strong>
-                </div>
-                <div className="hv-type-stat-item">
-                  <span className="hv-type-dot hv-reprise" />
-                  <span>Reprises</span>
-                  <strong>{globalStats.reprises}</strong>
-                </div>
-                <div className="hv-type-stat-item">
-                  <span className="hv-type-dot hv-reclassement" />
-                  <span>Reclassements</span>
-                  <strong>{globalStats.reclassements}</strong>
-                </div>
-                <div className="hv-type-stat-item">
-                  <span className="hv-type-dot hv-embauche" />
-                  <span>Embauches</span>
-                  <strong>{globalStats.embauches}</strong>
-                </div>
-              </div>
+          {activeTab === 'planning' ? (
+            <div className="hv-stats-grid-premium" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+              <StatCard title="Total actions" value={globalStats.total} icon={Activity} color="#4361ee" />
+              <StatCard title="Visites effectuées" value={globalStats.effectuees} icon={CheckCircle} color="#2b9348" />
+              <StatCard title="Programmations" value={globalStats.programmations} icon={Calendar} color="#4361ee" />
+              <StatCard title="Reprogrammations" value={globalStats.reprogrammations || 0} icon={Repeat} color="#f59f00" />
+              <StatCard title="Annulations" value={globalStats.annulations || 0} icon={XCircle} color="#e63946" />
+              <StatCard title="Réaffectations" value={globalStats.reaffectations || 0} icon={Users} color="#9c36b5" />
             </div>
-            
+          ) : (
+             <div className="hv-stats-grid-premium" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+    <StatCard title="Total actions" value={globalStats.total} icon={Activity} color="#4361ee" />
+    <StatCard title="Visites effectuées" value={globalStats.effectuees} icon={CheckCircle} color="#2b9348" />
+    <StatCard title="Programmations" value={globalStats.programmations} icon={Calendar} color="#4361ee" />
+    <StatCard title="Saisies" value={globalStats.saisies} icon={PenTool} color="#9c36b5" />
+    <StatCard title="Reprogrammations" value={globalStats.reprogrammations || 0} icon={Repeat} color="#f59f00" />
+    <StatCard title="Modifications" value={globalStats.modifications || 0} icon={Edit2} color="#f59f00" />
+  </div>
+)}
+          
+          {/* UNIQUEMENT "Par résultat" - Plus de "Par type de visite" */}
+          <div className="hv-stats-secondary-premium" style={{ gridTemplateColumns: 'repeat(1, 1fr)', display: 'grid', gap: '16px', marginTop: '16px' }}>
             <div className="hv-stat-group-premium">
               <span className="hv-stat-group-title">Par résultat</span>
-              <div className="hv-result-stats-premium">
+              <div className="hv-result-stats-premium" style={{ display: 'flex', gap: '12px' }}>
                 <div className="hv-result-stat-item hv-apte">
                   <CheckCircle size={14} />
                   <span>Aptes</span>
@@ -1086,54 +1104,54 @@ const HistoriqueVisites = () => {
           </div>
 
           {showFilters && (
-            <div className="hv-filters-premium">
-              <div className="hv-filters-header-premium">
-                <div className="hv-filters-title">
-                  <Filter size={16} />
-                  <h4>Filtres avancés</h4>
-                </div>
-                <button className="hv-reset-premium" onClick={resetFormulaireFilters}>
-                  <RefreshCw size={14} /> Réinitialiser
-                </button>
-              </div>
-              <div className="hv-filters-grid-premium">
-                <div className="hv-filter-premium">
-                  <label>Date de visite</label>
-                  <input type="date" value={formulaireFilters.dateUnique} onChange={(e) => updateFormulaireFilter('dateUnique', e.target.value)} />
-                </div>
-                <div className="hv-filter-premium">
-                  <label>Type de visite</label>
-                  <select value={formulaireFilters.filterTypeVisite} onChange={(e) => updateFormulaireFilter('filterTypeVisite', e.target.value)}>
-                    <option value="all">Tous les types</option>
-                    <option value="Périodique">Périodique</option>
-                    <option value="Reprise">Reprise</option>
-                    <option value="Reclassement">Reclassement</option>
-                    <option value="Embauche">Embauche</option>
-                  </select>
-                </div>
-                <div className="hv-filter-premium">
-                  <label>Résultat médical</label>
-                  <select value={formulaireFilters.filterResultat} onChange={(e) => updateFormulaireFilter('filterResultat', e.target.value)}>
-                    <option value="all">Tous les résultats</option>
-                    <option value="Apte">Apte</option>
-                    <option value="Inapte temporaire">Inapte temporaire</option>
-                    <option value="Inapte définitif">Inapte définitif</option>
-                  </select>
-                </div>
-                <div className="hv-filter-premium">
-                  <label>Type d'action</label>
-                  <select value={formulaireFilters.filterAction} onChange={(e) => updateFormulaireFilter('filterAction', e.target.value)}>
-                    <option value="all">Toutes les actions</option>
-                    <option value="PROGRAMMATION">Programmation</option>
-                    <option value="EFFECTUEE">Effectuée</option>
-                    <option value="REPROGRAMMEE">Reprogrammation</option>
-                    <option value="ANNULEE">Annulation</option>
-                    <option value="REAFFECTEE">Réaffectation</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
+  <div className="hv-filters-premium">
+    <div className="hv-filters-header-premium">
+      <div className="hv-filters-title">
+        <Filter size={16} />
+        <h4>Filtres avancés</h4>
+      </div>
+      <button className="hv-reset-premium" onClick={resetFormulaireFilters}>
+        <RefreshCw size={14} /> Réinitialiser
+      </button>
+    </div>
+    <div className="hv-filters-grid-premium">
+      <div className="hv-filter-premium">
+        <label>Date de visite</label>
+        <input type="date" value={formulaireFilters.dateUnique} onChange={(e) => updateFormulaireFilter('dateUnique', e.target.value)} />
+      </div>
+      <div className="hv-filter-premium">
+        <label>Type de visite</label>
+        <select value={formulaireFilters.filterTypeVisite} onChange={(e) => updateFormulaireFilter('filterTypeVisite', e.target.value)}>
+          <option value="all">Tous les types</option>
+          <option value="Périodique">Périodique</option>
+          <option value="Reprise">Reprise</option>
+          <option value="Reclassement">Reclassement</option>
+          <option value="Embauche">Embauche</option>
+        </select>
+      </div>
+      <div className="hv-filter-premium">
+        <label>Résultat médical</label>
+        <select value={formulaireFilters.filterResultat} onChange={(e) => updateFormulaireFilter('filterResultat', e.target.value)}>
+          <option value="all">Tous les résultats</option>
+          <option value="Apte">Apte</option>
+          <option value="Inapte temporaire">Inapte temporaire</option>
+          <option value="Inapte définitif">Inapte définitif</option>
+        </select>
+      </div>
+      <div className="hv-filter-premium">
+        <label>Type d'action</label>
+        <select value={formulaireFilters.filterAction} onChange={(e) => updateFormulaireFilter('filterAction', e.target.value)}>
+          <option value="all">Toutes les actions</option>
+          <option value="PROGRAMMATION">Programmation</option>
+          <option value="SAISIE_MANUELLE">Saisie manuelle</option>
+          <option value="EFFECTUEE"> Effectuée</option>
+          <option value="REPROGRAMMEE"> Reprogrammation</option>
+          <option value="MODIFICATION"> Modification</option>
+        </select>
+      </div>
+    </div>
+  </div>
+)}
 
           <div className="hv-content-premium">
             {loading ? (
@@ -1228,7 +1246,7 @@ const HistoriqueVisites = () => {
                   <span><Building2 size={12} /> Agence: {selectedAgentDetail.code_agence || 'Non spécifiée'}</span>
                 </div>
               </div>
-              <div className="hv-profile-stats-premium">
+              <div className="hv-profile-stats-premium" style={{ gridTemplateColumns: 'repeat(7, 1fr)', display: 'grid', gap: '12px' }}>
                 <div className="hv-profile-stat">
                   <span className="hv-stat-number">{agentStats.total}</span>
                   <span className="hv-stat-label">Total actions</span>
@@ -1238,8 +1256,24 @@ const HistoriqueVisites = () => {
                   <span className="hv-stat-label">Effectuées</span>
                 </div>
                 <div className="hv-profile-stat">
-                  <span className="hv-stat-number hv-warning">{agentStats.programmations}</span>
-                  <span className="hv-stat-label">Programmations</span>
+                  <span className="hv-stat-number hv-primary">{agentStats.programmations}</span>
+                  <span className="hv-stat-label">Programmations auto</span>
+                </div>
+                <div className="hv-profile-stat">
+                  <span className="hv-stat-number hv-purple">{agentStats.saisies}</span>
+                  <span className="hv-stat-label">Saisies manuelles</span>
+                </div>
+                <div className="hv-profile-stat">
+                  <span className="hv-stat-number hv-warning">{agentStats.reprogrammations}</span>
+                  <span className="hv-stat-label">Reprogrammations</span>
+                </div>
+                <div className="hv-profile-stat">
+                  <span className="hv-stat-number hv-info">{agentStats.modifications}</span>
+                  <span className="hv-stat-label">Modifiées</span>
+                </div>
+                <div className="hv-profile-stat">
+                  <span className="hv-stat-number hv-purple">{agentStats.reaffectations}</span>
+                  <span className="hv-stat-label">Réaffectations</span>
                 </div>
                 <div className="hv-profile-stat">
                   <span className="hv-stat-number hv-danger">{agentStats.annulations}</span>

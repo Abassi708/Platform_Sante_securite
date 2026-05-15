@@ -699,82 +699,97 @@ router.put('/visites/:id', protect, async (req, res) => {
   try {
     const { id } = req.params;
     const { date_visite, heure_visite, type_visite, medecin, observation } = req.body;
-    
-    // 1. Trouver la visite existante
-    const visite = await Visite.findByPk(id);
-    if (!visite) {
+
+    // 1. Trouver la visite existante (on ne la modifie PAS)
+    const visiteOriginale = await Visite.findByPk(id);
+    if (!visiteOriginale) {
       return res.status(404).json({ success: false, message: 'Visite non trouvée' });
     }
-    
-    // 2. Vérifier que c'est une visite manuelle
-    if (visite.source !== 'FORMULAIRE' && visite.source_originale !== 'manuel') {
+
+    if (visiteOriginale.source !== 'FORMULAIRE' && visiteOriginale.source_originale !== 'manuel') {
       return res.status(403).json({ 
         success: false, 
         message: 'Seules les visites saisies manuellement peuvent être modifiées' 
       });
     }
+
+    // Sauvegarder les anciennes valeurs
+    const ancienneDate = visiteOriginale.date_visite;
+    const ancienneHeure = visiteOriginale.heure_visite;
+    const ancienType = visiteOriginale.type_visite;
+    const ancienMedecin = visiteOriginale.medecin;
+    const ancienneObservation = visiteOriginale.observation;
     
-    // 3. Sauvegarder l'ancienne date pour comparaison
-    const ancienneDate = visite.date_visite;
-    const ancienneHeure = visite.heure_visite;
-    
-    // 4. METTRE À JOUR la visite existante (au lieu d'en créer une nouvelle)
-    await visite.update({
-      date_visite: date_visite || visite.date_visite,
-      heure_visite: heure_visite || visite.heure_visite,
-      type_visite: type_visite || visite.type_visite,
-      medecin: medecin || visite.medecin,
-      observation: observation || visite.observation
+    const nouvelleDate = date_visite || visiteOriginale.date_visite;
+    const nouvelleHeure = heure_visite || visiteOriginale.heure_visite;
+    const nouveauType = type_visite || visiteOriginale.type_visite;
+    const nouveauMedecin = medecin || visiteOriginale.medecin;
+    const nouvelleObservation = observation || visiteOriginale.observation;
+
+    // ✅ 2. CRÉER UNE NOUVELLE LIGNE D'HISTORIQUE (type_action: 'MODIFICATION')
+    // Ceci garde la trace de l'ancienne version
+    await Visite.create({
+      matricule_agent: visiteOriginale.matricule_agent,
+      date_visite: nouvelleDate,
+      heure_visite: nouvelleHeure,
+      type_visite: nouveauType,
+      medecin: nouveauMedecin,
+      observation: nouvelleObservation,
+      id_planning: visiteOriginale.id_planning,
+      type_action: 'MODIFICATION',  // ← Trace de modification
+      ancien_statut: null,
+      nouveau_statut: 'Programmé',
+      motif_action: `Modification - Ancienne: ${ancienneDate} ${ancienneHeure?.substring(0,5)} (${ancienType}) → Nouvelle: ${nouvelleDate} ${nouvelleHeure?.substring(0,5)} (${nouveauType})`,
+      details_action: JSON.stringify({
+        ancienne_date: ancienneDate,
+        ancienne_heure: ancienneHeure,
+        ancien_type: ancienType,
+        ancien_medecin: ancienMedecin,
+        ancienne_observation: ancienneObservation,
+        nouvelle_date: nouvelleDate,
+        nouvelle_heure: nouvelleHeure,
+        nouveau_type: nouveauType,
+        nouveau_medecin: nouveauMedecin,
+        nouvelle_observation: nouvelleObservation,
+        date_modification: new Date().toISOString()
+      }),
+      source: 'FORMULAIRE',
+      created_by: req.user.id,
+      source_originale: 'manuel'
     });
-    
-    // 5. Mettre à jour le planning associé
-    if (visite.id_planning) {
-      const planning = await Planning.findByPk(visite.id_planning);
+
+    // ✅ 3. METTRE À JOUR la visite originale avec les nouvelles valeurs
+    await visiteOriginale.update({
+      date_visite: nouvelleDate,
+      heure_visite: nouvelleHeure,
+      type_visite: nouveauType,
+      medecin: nouveauMedecin,
+      observation: nouvelleObservation
+    });
+
+    // 4. Mettre à jour le planning associé
+    if (visiteOriginale.id_planning) {
+      const planning = await Planning.findByPk(visiteOriginale.id_planning);
       if (planning) {
-        const nouvelleSemaine = planningService.getNumeroSemaine(new Date(date_visite));
-        const nouvelleAnnee = new Date(date_visite).getFullYear();
+        const nouvelleSemaine = planningService.getNumeroSemaine(new Date(nouvelleDate));
+        const nouvelleAnnee = new Date(nouvelleDate).getFullYear();
         
         await planning.update({
-          date_visite: date_visite || planning.date_visite,
-          heure_visite: heure_visite || planning.heure_visite,
-          type_visite: type_visite || planning.type_visite,
+          date_visite: nouvelleDate,
+          heure_visite: nouvelleHeure,
+          type_visite: nouveauType,
           semaine: nouvelleSemaine,
           annee: nouvelleAnnee
         });
-        
-        // 6. Ajouter une trace de modification dans l'historique
-        await Visite.create({
-          matricule_agent: visite.matricule_agent,
-          date_visite: date_visite,
-          heure_visite: heure_visite,
-          type_visite: type_visite || visite.type_visite,
-          medecin: medecin || visite.medecin,
-          observation: observation || visite.observation,
-          id_planning: visite.id_planning,
-          type_action: 'MODIFICATION',
-          ancien_statut: null,
-          nouveau_statut: 'Programmé',
-          motif_action: `Modification manuelle - Ancienne date: ${ancienneDate} ${ancienneHeure} → Nouvelle: ${date_visite} ${heure_visite}`,
-          details_action: JSON.stringify({
-            ancienne_date: ancienneDate,
-            ancienne_heure: ancienneHeure,
-            nouvelle_date: date_visite,
-            nouvelle_heure: heure_visite,
-            modification_effectuee: true
-          }),
-          source: 'FORMULAIRE',
-          created_by: req.user.id,
-          source_originale: 'manuel'
-        });
       }
     }
-    
-    console.log(`✅ Visite #${id} modifiée avec succès`);
-    
+
+    console.log(`✅ Visite #${id} modifiée - Historique conservé`);
+
     res.json({ 
       success: true, 
       message: 'Visite modifiée avec succès',
-      visite: visite
+      visite: visiteOriginale
     });
     
   } catch (error) {
@@ -783,8 +798,6 @@ router.put('/visites/:id', protect, async (req, res) => {
   }
 });
 // ========== RÉCUPÉRER TOUTES LES VISITES MANUELLES ==========
-
-
 router.get('/visites', protect, async (req, res) => {
   try {
     const { page = 1, limit = 20, search, type, resultat, dateDebut, dateFin, agentId, onlyManual = 'true' } = req.query;
@@ -792,20 +805,20 @@ router.get('/visites', protect, async (req, res) => {
     
     let whereClause = {};
     
-    // ✅ FILTRE STRICT : UNIQUEMENT les visites MANUELLES
     if (onlyManual === 'true') {
       whereClause.source_originale = 'manuel';
     }
     
     if (type && type !== 'all') whereClause.type_visite = type;
     if (resultat && resultat !== 'all') whereClause.resultat = resultat;
-    if (agentId && agentId !== 'all') whereClause.matricule_agent = agentId;
-    
+    if (agentId && agentId !== 'all' && agentId !== '') {
+      whereClause.matricule_agent = agentId;
+    }
     if (dateDebut && dateFin) {
       whereClause.date_visite = { [Op.between]: [dateDebut, dateFin] };
     }
     
-    const { count, rows } = await Visite.findAndCountAll({
+        const { count, rows } = await Visite.findAndCountAll({
       where: whereClause,
       order: [['date_visite', 'DESC'], ['created_at', 'DESC']],
       limit: parseInt(limit),
@@ -813,8 +826,60 @@ router.get('/visites', protect, async (req, res) => {
       raw: true
     });
     
+    // ✅ Pour chaque visite, récupérer la dernière action associée
+    const visitesAvecAction = await Promise.all(rows.map(async (visite) => {
+      // Chercher si une action EFFECTUEE existe pour ce planning
+      if (visite.id_planning) {
+        const actionEffectuee = await Visite.findOne({
+          where: {
+            id_planning: visite.id_planning,
+            type_action: 'EFFECTUEE'
+          },
+          attributes: ['type_action', 'resultat', 'medecin', 'observation', 'created_at'],
+          order: [['created_at', 'DESC']],
+          raw: true
+        });
+        
+        if (actionEffectuee) {
+          return {
+            ...visite,
+            type_action: actionEffectuee.type_action,
+            resultat: actionEffectuee.resultat,
+            medecin: actionEffectuee.medecin,
+            observation: actionEffectuee.observation,
+            date_action: actionEffectuee.created_at
+          };
+        }
+      }
+      return visite;
+    }));
+
+    
+    // ✅ Récupérer le nombre de modifications pour chaque visite
+    const matriculesVisites = rows.map(v => v.matricule_visite);
+    const modificationsCount = await Visite.findAll({
+      where: {
+        type_action: 'MODIFICATION',
+        visite_originale_id: { [Op.in]: matriculesVisites }
+      },
+      attributes: ['visite_originale_id', [Visite.sequelize.fn('COUNT', '*'), 'count']],
+      group: ['visite_originale_id'],
+      raw: true
+    });
+    
+    const modifMap = new Map();
+    modificationsCount.forEach(m => {
+      modifMap.set(m.visite_originale_id, parseInt(m.count));
+    });
+    
+    // Enrichir les visites avec le compteur
+    const visitesEnrichies = rows.map(v => ({
+      ...v,
+      modifications_count: modifMap.get(v.matricule_visite) || 0
+    }));
+    
     // Récupérer les agents
-    const matricules = [...new Set(rows.map(v => v.matricule_agent))];
+    const matricules = [...new Set(visitesEnrichies.map(v => v.matricule_agent))];
     let agentsMap = new Map();
     
     if (matricules.length > 0) {
@@ -826,7 +891,7 @@ router.get('/visites', protect, async (req, res) => {
       agents.forEach(agent => agentsMap.set(agent.matricule_agent, agent));
     }
     
-    const visitesEnrichies = rows.map(v => ({
+    const resultatsFinaux = visitesEnrichies.map(v => ({
       ...v,
       visiteAgent: agentsMap.get(v.matricule_agent) || null
     }));
@@ -836,7 +901,7 @@ router.get('/visites', protect, async (req, res) => {
       total: count,
       page: parseInt(page),
       totalPages: Math.ceil(count / limit),
-      visites: visitesEnrichies
+      visites: resultatsFinaux
     });
     
   } catch (error) {
@@ -1210,7 +1275,7 @@ router.get('/planning/verifier-visite-existante', protect, async (req, res) => {
   }
 });
 
-// ========== MARQUER UNE VISITE COMME EFFECTUÉE (CORRIGÉ - MISE À JOUR AU LIEU DE CRÉATION) ==========
+// ========== MARQUER UNE VISITE COMME EFFECTUÉE ==========
 router.patch('/planning/:id/effectuer', protect, async (req, res) => {
   console.log('🔴 Backend reçu - duree_inaptitude:', req.body.duree_inaptitude);
   console.log('🔴 Body complet:', req.body);
@@ -1310,6 +1375,7 @@ router.patch('/planning/:id/effectuer', protect, async (req, res) => {
       else if (resultat === 'Inapte temporaire') {
         const dureeSupplementaire = duree_inaptitude || 15;
         const ancienneDateFin = agent.date_fin_inaptitude ? new Date(agent.date_fin_inaptitude) : new Date();
+        const ancienneDateFinStr = ancienneDateFin.toISOString().split('T')[0];
         const nouvelleDateFin = new Date(ancienneDateFin);
         nouvelleDateFin.setDate(ancienneDateFin.getDate() + dureeSupplementaire);
         const nouvelleDateFinStr = nouvelleDateFin.toISOString().split('T')[0];
@@ -1372,51 +1438,125 @@ router.patch('/planning/:id/effectuer', protect, async (req, res) => {
           }
         }
         
-        const creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
-        let heureTrouvee = null;
-        
-        for (const heure of creneaux) {
-          const creneauOccupe = await Planning.findOne({
-            where: {
-              date_visite: dateRepriseFinaleStr,
-              heure_visite: heure,
-              statut: 'Programmé',
-              visite_effectuee: false
-            }
-          });
-          
-          const creneauBloque = await Planning.findOne({
-            where: {
-              date_visite: dateRepriseFinaleStr,
-              heure_visite: heure,
-              creneau_bloque: true
-            }
-          });
-          
-          const creneauAnnule = await Planning.findOne({
-            where: {
-              date_visite: dateRepriseFinaleStr,
-              heure_visite: heure,
-              statut: 'Annulé'
-            }
-          });
-          
-          if (!creneauOccupe && !creneauBloque && !creneauAnnule) {
-            heureTrouvee = heure;
-            break;
-          }
-        }
-        
-        if (!heureTrouvee) {
-          heureTrouvee = '09:00:00';
-          console.log(`   ⚠️ Aucun créneau trouvé, utilisation de 09:00:00 par défaut`);
-        }
+        // Recherche d'un créneau disponible (avec vérification complète)
+const creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
+let heureTrouvee = null;
+
+for (const heure of creneaux) {
+  // ✅ Vérifier si le créneau existe
+  const planningExistant = await Planning.findOne({
+    where: {
+      date_visite: dateRepriseFinaleStr,
+      heure_visite: heure
+    }
+  });
+  
+  let disponible = true;
+  let raison = '';
+  
+  if (planningExistant) {
+    // VISITE DÉJÀ EFFECTUÉE
+    if (planningExistant.visite_effectuee === true) {
+      disponible = false;
+      raison = 'Une visite a déjà été EFFECTUÉE sur ce créneau';
+    }
+    // CRÉNEAU BLOQUÉ (ancienne reprogrammation)
+    else if (planningExistant.creneau_bloque === true) {
+      disponible = false;
+      raison = 'Ce créneau est BLOQUÉ (ancienne reprogrammation)';
+    }
+    // VISITE ANNULÉE
+    else if (planningExistant.statut === 'Annulé') {
+      disponible = false;
+      raison = 'Une visite a été ANNULÉE sur ce créneau';
+    }
+    // VISITE REPORTÉE
+    else if (planningExistant.statut === 'Reporté') {
+      disponible = false;
+      raison = 'Une visite a été REPORTÉE sur ce créneau';
+    }
+    // CRÉNEAU OCCUPÉ PAR UN AUTRE AGENT
+    else if (planningExistant.statut === 'Programmé' && 
+             planningExistant.matricule_agent !== agent.matricule_agent &&
+             planningExistant.visite_effectuee === false) {
+      const autreAgent = await Agent.findByPk(planningExistant.matricule_agent);
+      raison = `Créneau occupé par ${autreAgent?.nom} ${autreAgent?.prenom} (${planningExistant.type_visite})`;
+      disponible = false;
+    }
+    // C'est la visite qu'on est en train de modifier (on peut la remplacer)
+    else if (planningExistant.id_planning === planning.id_planning) {
+      disponible = true;
+      raison = 'C\'est la visite actuelle (sera remplacée)';
+    }
+  }
+  
+  if (disponible) {
+    heureTrouvee = heure;
+    console.log(`   ✅ Créneau trouvé: ${dateRepriseFinaleStr} à ${heure.substring(0,5)}`);
+    break;
+  } else {
+    console.log(`   ❌ ${dateRepriseFinaleStr} ${heure.substring(0,5)}: ${raison}`);
+  }
+}
+
+if (!heureTrouvee) {
+  console.log(`   ⚠️ Aucun créneau disponible le ${dateRepriseFinaleStr}, recherche autre jour...`);
+  // Ici, logique pour chercher un autre jour
+}
         
         await agent.update({
           date_fin_inaptitude: nouvelleDateFinStr,
           date_prochaine_inaptitude: dateRepriseFinaleStr
         });
+
+        // ✅ 1. METTRE À JOUR la visite actuelle
+        const visiteActuelle = await Visite.findOne({
+          where: { id_planning: planning.id_planning }
+        });
         
+        if (visiteActuelle) {
+          await visiteActuelle.update({
+            medecin: medecin || 'Dr. Mahmoud Khelifi',
+            observation: observation || '',
+            resultat: 'Inapte temporaire',
+            type_action: 'EFFECTUEE',
+            ancien_statut: ancienStatut,
+            nouveau_statut: 'Effectué',
+            motif_action: `Visite de reprise effectuée - Inapte temporaire - Prolongation de ${dureeSupplementaire} jours`,
+            details_action: JSON.stringify({
+              type: 'reprise_inapte_temp_prolongation',
+              duree_supplementaire: dureeSupplementaire,
+              ancienne_date_fin_inaptitude: ancienneDateFinStr,
+              nouvelle_date_fin_inaptitude: nouvelleDateFinStr
+            })
+          });
+        } else {
+          await Visite.create({
+            matricule_agent: agent.matricule_agent,
+            date_visite: planning.date_visite,
+            heure_visite: planning.heure_visite,
+            type_visite: 'Reprise',
+            medecin: medecin || 'Dr. Mahmoud Khelifi',
+            observation: observation || '',
+            resultat: 'Inapte temporaire',
+            id_planning: planning.id_planning,
+            type_action: 'EFFECTUEE',
+            ancien_statut: ancienStatut,
+            nouveau_statut: 'Effectué',
+            motif_action: `Visite de reprise effectuée - Inapte temporaire - Prolongation de ${dureeSupplementaire} jours`,
+            details_action: JSON.stringify({
+              type: 'reprise_inapte_temp_prolongation',
+              duree_supplementaire: dureeSupplementaire,
+              ancienne_date_fin_inaptitude: ancienneDateFinStr,
+              nouvelle_date_fin_inaptitude: nouvelleDateFinStr
+            }),
+            source: 'PLANNING',
+            created_by: req.user.id,
+            source_originale: 'auto'
+          });
+        }
+
+        // ✅ 2. Gérer la visite périodique existante
         const visitePeriodiqueExistante = await Planning.findOne({
           where: {
             matricule_agent: agent.matricule_agent,
@@ -1477,7 +1617,26 @@ router.patch('/planning/:id/effectuer', protect, async (req, res) => {
             console.log(`   ✅ Visite périodique reprogrammée au ${datePeriodiqueStr}`);
           }
         }
+
+        // ✅ 3. CRÉER la nouvelle visite de reprise
+        console.log(`🔍 Création nouvelle visite: ${dateRepriseFinaleStr} à ${heureTrouvee}`);
         
+        const verifFinale = await Planning.findOne({
+  where: {
+    date_visite: dateRepriseFinaleStr,
+    heure_visite: heureTrouvee,
+    visite_effectuee: true  // ← Vérifier spécifiquement les visites effectuées
+  }
+});
+
+if (verifFinale) {
+  console.log(`❌ CRÉNEAU INDISPONIBLE: Une visite EFFECTUÉE existe déjà à ${dateRepriseFinaleStr} ${heureTrouvee}`);
+  return res.status(409).json({ 
+    success: false, 
+    message: 'Le créneau choisi a déjà une visite effectuée. Veuillez réessayer.' 
+  });
+}
+
         const nouvelleReprisePlanning = await Planning.create({
           matricule_agent: agent.matricule_agent,
           date_visite: dateRepriseFinaleStr,
@@ -1491,7 +1650,35 @@ router.patch('/planning/:id/effectuer', protect, async (req, res) => {
           convocation_envoyee: false,
           motif_reprogrammation: `Nouvelle visite de reprise suite à prolongation d'inaptitude (${dureeSupplementaire} jours)`,
           source_planification: 'auto',
+          source_originale: 'auto',
           visite_originale_id: planning.id_planning
+        });
+        
+        // ✅ 4. CRÉER l'HISTORIQUE pour la NOUVELLE visite
+        await Visite.create({
+          matricule_agent: agent.matricule_agent,
+          date_visite: dateRepriseFinaleStr,
+          heure_visite: heureTrouvee,
+          type_visite: 'Reprise',
+          medecin: 'Dr. Mahmoud Khelifi',
+          observation: `Nouvelle visite de reprise programmée suite à prolongation d'inaptitude de ${dureeSupplementaire} jours`,
+          id_planning: nouvelleReprisePlanning.id_planning,
+          type_action: 'PROGRAMMATION',
+          ancien_statut: null,
+          nouveau_statut: 'Programmé',
+          motif_action: `Programmation automatique - Nouvelle reprise après prolongation d'inaptitude`,
+          details_action: JSON.stringify({
+            type: 'programmation_nouvelle_reprise',
+            duree_supplementaire: dureeSupplementaire,
+            ancienne_date_fin_inaptitude: ancienneDateFinStr,
+            nouvelle_date_fin_inaptitude: nouvelleDateFinStr,
+            date_nouvelle_reprise: dateRepriseFinaleStr,
+            heure_nouvelle_reprise: heureTrouvee,
+            visite_originale_id: planning.id_planning
+          }),
+          source: 'PLANNING',
+          created_by: req.user.id,
+          source_originale: 'auto'
         });
         
         detailsAction = {
@@ -1502,7 +1689,7 @@ router.patch('/planning/:id/effectuer', protect, async (req, res) => {
           observation: observation || '',
           resultat: 'Inapte temporaire',
           duree_supplementaire: dureeSupplementaire,
-          ancienne_date_fin_inaptitude: ancienneDateFin.toISOString().split('T')[0],
+          ancienne_date_fin_inaptitude: ancienneDateFinStr,
           nouvelle_date_fin_inaptitude: nouvelleDateFinStr,
           date_prochaine_reprise: dateRepriseFinaleStr,
           heure_prochaine_reprise: heureTrouvee.substring(0,5),
@@ -1511,320 +1698,325 @@ router.patch('/planning/:id/effectuer', protect, async (req, res) => {
         
         console.log(`⚠️ Agent ${agent.nom} ${agent.prenom} : Reprise avec INAPTE TEMPORAIRE - Prolongation jusqu'au ${nouvelleDateFinStr}`);
         console.log(`📅 Nouvelle visite de reprise prévue le ${dateRepriseFinaleStr} à ${heureTrouvee.substring(0,5)}`);
+        console.log(`✅ NOUVELLE VISITE DE REPRISE CRÉÉE: ID ${nouvelleReprisePlanning.id_planning}`);
       }
     }
     
-    // ========== RECLASSEMENT ==========
-    else if (planning.type_visite === 'Reclassement') {
-      const dateVisite = planning.date_visite;
-      const [year, month, day] = dateVisite.split('-');
-      const dateDebut = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
-      
-      if (resultat === 'Inapte définitif') {
-        const periodicite = planningService.calculerPeriodicite(agent);
-        const dateProchaine = new Date(dateDebut);
-        dateProchaine.setUTCDate(dateDebut.getUTCDate() + periodicite);
-        const dateProchaineStr = dateProchaine.toISOString().split('T')[0];
-        
-        await agent.update({
-          statut: 'inactif',
-          date_debut_reclassement: dateVisite,
-          date_fin_reclassement: null,
-          date_prochaine_reclassement: null,
-          date_derniere_visite: dateVisite,
-          date_prochaine_visite: dateProchaineStr,
-          date_debut_inaptitude: null,
-          date_fin_inaptitude: null
-        });
-        
-        detailsAction = {
-          type: 'reclassement_inapte_definitif',
-          date_visite: dateVisite,
-          heure_visite: planning.heure_visite?.substring(0,5),
-          medecin: medecin || 'Dr. Mahmoud Khelifi',
-          observation: observation || '',
-          resultat: 'Inapte définitif',
-          periodicite_jours: periodicite,
-          periodicite_texte: periodicite === 180 ? '6 mois' : '1 an',
-          date_derniere_visite_mise_a_jour: dateVisite,
-          date_prochaine_visite_theorique: dateProchaineStr,
-          message: `⚠️ L'agent a été déclaré INAPTE DÉFINITIF lors de la visite de reclassement du ${formatDate(dateVisite)}. Cette date devient sa dernière visite médicale.`
-        };
-        
-        console.log(`❌ Agent ${agent.nom} ${agent.prenom} : INAPTE DÉFINITIF - Dernière visite mise à jour au ${dateVisite}`);
-      } 
-      else if (resultat === 'Inapte temporaire') {
-        const duree = duree_inaptitude || 30;
-        const dateFin = new Date(dateDebut);
-        dateFin.setUTCDate(dateDebut.getUTCDate() + duree);
-        const dateFinStr = dateFin.toISOString().split('T')[0];
-        
-        const dateControle = new Date(dateFin);
-        dateControle.setUTCDate(dateFin.getUTCDate() - 3);
-        let dateControleValide = new Date(dateControle);
-        let joursRecherche = 0;
-        const maxJours = 10;
-        
-        while (!(await planningService.estJourOuvre(dateControleValide)) && joursRecherche < maxJours) {
-          dateControleValide.setDate(dateControle.getDate() - (joursRecherche + 1));
-          joursRecherche++;
-        }
-        
-        if (!(await planningService.estJourOuvre(dateControleValide))) {
-          dateControleValide = new Date(dateControle);
-          joursRecherche = 0;
-          while (!(await planningService.estJourOuvre(dateControleValide)) && joursRecherche < maxJours) {
-            dateControleValide.setDate(dateControle.getDate() + joursRecherche + 1);
-            joursRecherche++;
-          }
-        }
-        
-        const dateControleStr = dateControleValide.toISOString().split('T')[0];
-        
-        const agentDejaOccupe = await Planning.findOne({
-          where: {
-            matricule_agent: agent.matricule_agent,
-            date_visite: dateControleStr,
-            statut: 'Programmé',
-            visite_effectuee: false
-          }
-        });
-        
-        let dateControleFinale = dateControleValide;
-        let dateControleFinaleStr = dateControleStr;
-        
-        if (agentDejaOccupe) {
-          for (let i = 1; i <= 7; i++) {
-            const dateTest = new Date(dateControleValide);
-            dateTest.setDate(dateControleValide.getDate() + i);
-            if (await planningService.estJourOuvre(dateTest)) {
-              const dateTestStr = dateTest.toISOString().split('T')[0];
-              const occupe = await Planning.findOne({
-                where: { matricule_agent: agent.matricule_agent, date_visite: dateTestStr, statut: 'Programmé' }
-              });
-              if (!occupe) {
-                dateControleFinale = dateTest;
-                dateControleFinaleStr = dateTestStr;
-                break;
-              }
-            }
-          }
-        }
-        
-        const creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
-        let heureControle = null;
-        
-        for (const heure of creneaux) {
-          const creneauOccupe = await Planning.findOne({
-            where: { date_visite: dateControleFinaleStr, heure_visite: heure, statut: 'Programmé' }
-          });
-          const creneauBloque = await Planning.findOne({
-            where: { date_visite: dateControleFinaleStr, heure_visite: heure, creneau_bloque: true }
-          });
-          
-          if (!creneauOccupe && !creneauBloque) {
-            heureControle = heure;
-            break;
-          }
-        }
-        
-        if (!heureControle) {
-          heureControle = '09:00:00';
-        }
-        
-        await agent.update({
-          statut: 'maladie',
-          date_debut_reclassement: dateVisite,
-          date_fin_reclassement: dateFinStr,
-          date_prochaine_reclassement: dateControleFinaleStr
-        });
-        
-        const controlePlanning = await Planning.create({
-          matricule_agent: agent.matricule_agent,
-          date_visite: dateControleFinaleStr,
-          heure_visite: heureControle,
-          type_visite: 'Reclassement',
-          statut: 'Programmé',
-          priorite: 150,
-          semaine: planningService.getNumeroSemaine(dateControleFinale),
-          annee: dateControleFinale.getFullYear(),
-          created_by: req.user.id,
-          convocation_envoyee: false,
-          motif_reprogrammation: `Visite de contrôle automatique - Fin inaptitude le ${dateFinStr}`,
-          source_planification: 'auto',
-          visite_originale_id: planning.id_planning
-        });
-        
-        await Visite.create({
-          matricule_agent: agent.matricule_agent,
-          date_visite: dateControleFinaleStr,
-          heure_visite: heureControle,
-          type_visite: 'Reclassement',
-          medecin: 'Système',
-          observation: `Visite de contrôle automatique suite à inaptitude temporaire (fin le ${dateFinStr})`,
-          id_planning: controlePlanning.id_planning,
-          type_action: 'PROGRAMMATION',
-          nouveau_statut: 'Programmé',
-          motif_action: `Programmation automatique - Visite de contrôle post-inaptitude`,
-          details_action: JSON.stringify({
-            type: 'programmation_visite_controle',
-            visite_originale_id: planning.id_planning,
-            date_visite_originale: dateVisite,
-            date_debut_inaptitude: dateVisite,
-            date_fin_inaptitude: dateFinStr,
-            duree_inaptitude: duree,
-            date_visite_controle: dateControleFinaleStr,
-            heure_visite_controle: heureControle,
-            id_visite_controle: controlePlanning.id_planning
-          }),
-          source: 'PLANNING',
-          created_by: req.user.id,
-          source_originale: planning.source_originale || planning.source_planification
-        });
-        
-        detailsAction = {
-          type: 'reclassement_inapte_temp_avec_controle',
-          date_visite: dateVisite,
-          heure_visite: planning.heure_visite?.substring(0,5),
-          medecin: medecin || 'Dr. Mahmoud Khelifi',
-          observation: observation || '',
-          resultat: 'Inapte temporaire',
-          duree_inaptitude: duree,
-          date_fin_inaptitude: dateFinStr,
-          date_visite_controle: dateControleFinaleStr,
-          heure_visite_controle: heureControle.substring(0,5),
-          id_visite_controle: controlePlanning.id_planning,
-          message: `⚠️ Inapte temporaire pour ${duree} jours jusqu'au ${formatDate(dateFinStr)}. Visite de contrôle programmée le ${formatDate(dateControleFinaleStr)} à ${heureControle.substring(0,5)}.`
-        };
-        
-        console.log(`⚠️ Agent ${agent.nom} ${agent.prenom} : INAPTE TEMPORAIRE jusqu'au ${dateFinStr}`);
-        console.log(`📅 Visite de contrôle prévue le ${dateControleFinaleStr} à ${heureControle.substring(0,5)}`);
-      } 
-      else if (resultat === 'Apte') {
-        await agent.update({
-          date_debut_reclassement: null,
-          date_fin_reclassement: null,
-          date_prochaine_reclassement: null,
-          statut: 'actif'
-        });
-        
-        detailsAction = {
-          type: 'reclassement_apte',
-          date_visite: dateVisite,
-          heure_visite: planning.heure_visite?.substring(0,5),
-          medecin: medecin || 'Dr. Mahmoud Khelifi',
-          observation: observation || '',
-          resultat: 'Apte',
-          message: `✅ L'agent a été déclaré APTE lors de la visite de reclassement du ${formatDate(dateVisite)}. Retour à la situation normale.`
-        };
-        
-        console.log(`✅ Agent ${agent.nom} ${agent.prenom} : RECLASSEMENT - APTE`);
-      }
-    }
+// ========== RECLASSEMENT ==========
+else if (planning.type_visite === 'Reclassement') {
+  const dateVisite = planning.date_visite;
+  const [year, month, day] = dateVisite.split('-');
+  const dateDebut = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+  
+  if (resultat === 'Inapte définitif') {
+    const periodicite = planningService.calculerPeriodicite(agent);
+    const dateProchaine = new Date(dateDebut);
+    dateProchaine.setUTCDate(dateDebut.getUTCDate() + periodicite);
+    const dateProchaineStr = dateProchaine.toISOString().split('T')[0];
     
-    // ========== EMBAUCHE ==========
-    else if (planning.type_visite === 'Embauche') {
-      if (resultat === 'Apte') {
-        const periodicite = planningService.calculerPeriodicite(agent);
-        const dateVisite = planning.date_visite;
-        const [year, month, day] = dateVisite.split('-');
-        const dateDebut = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
-        const dateProchaine = new Date(dateDebut);
-        dateProchaine.setUTCDate(dateDebut.getUTCDate() + periodicite);
-        const dateProchaineStr = dateProchaine.toISOString().split('T')[0];
-        
-        await agent.update({
-          statut: 'actif',
-          date_derniere_visite: dateVisite,
-          date_prochaine_visite: dateProchaineStr,
-          date_embauche: dateVisite
-        });
-        
-        detailsAction = {
-          type: 'embauche_apte',
-          date_visite: dateVisite,
-          heure_visite: planning.heure_visite?.substring(0,5),
-          medecin: medecin || 'Dr. Mahmoud Khelifi',
-          observation: observation || '',
-          resultat: 'Apte',
-          periodicite_jours: periodicite,
-          periodicite_texte: periodicite === 180 ? '6 mois' : '1 an',
-          prochaine_visite: dateProchaineStr
-        };
-        console.log(`✅ Agent ${agent.nom} ${agent.prenom} : EMBAUCHE - APTE`);
-      } else if (resultat === 'Inapte définitif') {
-        await agent.update({ statut: 'inactif' });
-        detailsAction = {
-          type: 'embauche_inapte_definitif',
-          date_visite: planning.date_visite,
-          heure_visite: planning.heure_visite?.substring(0,5),
-          medecin: medecin || 'Dr. Mahmoud Khelifi',
-          observation: observation || '',
-          resultat: 'Inapte définitif'
-        };
-        console.log(`❌ Agent ${agent.nom} ${agent.prenom} : EMBAUCHE - INAPTE DÉFINITIF`);
-      } else if (resultat === 'Inapte temporaire') {
-        detailsAction = {
-          type: 'embauche_inapte_temporaire',
-          date_visite: planning.date_visite,
-          heure_visite: planning.heure_visite?.substring(0,5),
-          medecin: medecin || 'Dr. Mahmoud Khelifi',
-          observation: observation || '',
-          resultat: 'Inapte temporaire'
-        };
-        console.log(`⚠️ Agent ${agent.nom} ${agent.prenom} : EMBAUCHE - INAPTE TEMPORAIRE`);
-      }
-    }
-
-    // ========== RECHERCHER ET METTRE À JOUR LA VISITE EXISTANTE ==========
-    let visiteExistante = await Visite.findOne({
-      where: {
-        id_planning: planning.id_planning
-      }
+    await agent.update({
+      statut: 'inactif',
+      date_debut_reclassement: dateVisite,
+      date_fin_reclassement: null,
+      date_prochaine_reclassement: null,
+      date_derniere_visite: dateVisite,
+      date_prochaine_visite: dateProchaineStr,
+      date_debut_inaptitude: null,
+      date_fin_inaptitude: null
     });
-
-    if (visiteExistante) {
-      // ✅ METTRE À JOUR la ligne existante
-      await visiteExistante.update({
-        medecin: medecin || 'Dr. Mahmoud Khelifi',
-        observation: observation || '',
-        resultat: resultat,
-        type_action: 'EFFECTUEE',
-        ancien_statut: ancienStatut,
-        nouveau_statut: 'Effectué',
-        motif_action: `Visite effectuée — Résultat: ${resultat || 'Apte'}`,
-        details_action: JSON.stringify(detailsAction)
-      });
-      console.log(`✅ Visite existante mise à jour (id: ${visiteExistante.matricule_visite})`);
-    } else {
-      // ✅ Sinon, créer une nouvelle ligne
-      await Visite.create({
-        matricule_agent: planning.matricule_agent,
-        date_visite: planning.date_visite,
-        heure_visite: planning.heure_visite,
-        type_visite: planning.type_visite,
-        medecin: medecin || 'Dr. Mahmoud Khelifi',
-        observation: observation || '',
-        resultat: resultat,
-        id_planning: planning.id_planning,
-        type_action: 'EFFECTUEE',
-        ancien_statut: ancienStatut,
-        nouveau_statut: 'Effectué',
-        motif_action: `Visite effectuée — Résultat: ${resultat || 'Apte'}`,
-        details_action: JSON.stringify(detailsAction),
-        source: planning.source_planification === 'manuel' ? 'FORMULAIRE' : 'PLANNING',
-        created_by: req.user.id,
-        source_originale: planning.source_originale || planning.source_planification
-      });
-      console.log(`✅ Nouvelle visite créée pour le planning #${planning.id_planning}`);
+    
+    detailsAction = {
+      type: 'reclassement_inapte_definitif',
+      date_visite: dateVisite,
+      heure_visite: planning.heure_visite?.substring(0,5),
+      medecin: medecin || 'Dr. Mahmoud Khelifi',
+      observation: observation || '',
+      resultat: 'Inapte définitif',
+      periodicite_jours: periodicite,
+      periodicite_texte: periodicite === 180 ? '6 mois' : '1 an',
+      date_derniere_visite_mise_a_jour: dateVisite,
+      date_prochaine_visite_theorique: dateProchaineStr,
+      message: `⚠️ L'agent a été déclaré INAPTE DÉFINITIF lors de la visite de reclassement du ${formatDate(dateVisite)}.`
+    };
+    
+    console.log(`❌ Agent ${agent.nom} ${agent.prenom} : INAPTE DÉFINITIF`);
+  } 
+else if (resultat === 'Inapte temporaire') {
+  const duree = duree_inaptitude || 30;
+  const dateFin = new Date(dateDebut);
+  dateFin.setUTCDate(dateDebut.getUTCDate() + duree);
+  const dateFinStr = dateFin.toISOString().split('T')[0];
+  
+  const dateControle = new Date(dateFin);
+  dateControle.setUTCDate(dateFin.getUTCDate() - 3);
+  let dateControleValide = new Date(dateControle);
+  let joursRecherche = 0;
+  const maxJours = 10;
+  
+  while (!(await planningService.estJourOuvre(dateControleValide)) && joursRecherche < maxJours) {
+    dateControleValide.setDate(dateControle.getDate() - (joursRecherche + 1));
+    joursRecherche++;
+  }
+  
+  if (!(await planningService.estJourOuvre(dateControleValide))) {
+    dateControleValide = new Date(dateControle);
+    joursRecherche = 0;
+    while (!(await planningService.estJourOuvre(dateControleValide)) && joursRecherche < maxJours) {
+      dateControleValide.setDate(dateControle.getDate() + joursRecherche + 1);
+      joursRecherche++;
     }
+  }
+  
+  const dateControleStr = dateControleValide.toISOString().split('T')[0];
+  
+  const agentDejaOccupe = await Planning.findOne({
+    where: {
+      matricule_agent: agent.matricule_agent,
+      date_visite: dateControleStr,
+      statut: 'Programmé',
+      visite_effectuee: false
+    }
+  });
+  
+  let dateControleFinale = dateControleValide;
+  let dateControleFinaleStr = dateControleStr;
+  
+  if (agentDejaOccupe) {
+    for (let i = 1; i <= 7; i++) {
+      const dateTest = new Date(dateControleValide);
+      dateTest.setDate(dateControleValide.getDate() + i);
+      if (await planningService.estJourOuvre(dateTest)) {
+        const dateTestStr = dateTest.toISOString().split('T')[0];
+        const occupe = await Planning.findOne({
+          where: { matricule_agent: agent.matricule_agent, date_visite: dateTestStr, statut: 'Programmé' }
+        });
+        if (!occupe) {
+          dateControleFinale = dateTest;
+          dateControleFinaleStr = dateTestStr;
+          break;
+        }
+      }
+    }
+  }
+  
+  const creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
+  let heureControle = null;
+  
+  for (const heure of creneaux) {
+    const creneauOccupe = await Planning.findOne({
+      where: { date_visite: dateControleFinaleStr, heure_visite: heure, statut: 'Programmé' }
+    });
+    const creneauBloque = await Planning.findOne({
+      where: { date_visite: dateControleFinaleStr, heure_visite: heure, creneau_bloque: true }
+    });
+    
+    if (!creneauOccupe && !creneauBloque) {
+      heureControle = heure;
+      break;
+    }
+  }
+  
+  if (!heureControle) {
+    heureControle = '09:00:00';
+  }
+  
+  await agent.update({
+    statut: 'maladie',
+    date_debut_reclassement: dateVisite,
+    date_fin_reclassement: dateFinStr,
+    date_prochaine_reclassement: dateControleFinaleStr
+  });
+  
+  // ============================================================
+  // ✅ 1. CRÉER LA VISITE DE CONTRÔLE DANS LE PLANNING
+  // ============================================================
+  const controlePlanning = await Planning.create({
+    matricule_agent: agent.matricule_agent,
+    date_visite: dateControleFinaleStr,
+    heure_visite: heureControle,
+    type_visite: 'Reclassement',
+    statut: 'Programmé',
+    priorite: 150,
+    semaine: planningService.getNumeroSemaine(dateControleFinale),
+    annee: dateControleFinale.getFullYear(),
+    created_by: req.user.id,
+    convocation_envoyee: false,
+    motif_reprogrammation: `Visite de contrôle automatique - Fin inaptitude le ${dateFinStr}`,
+    source_planification: 'auto',
+    source_originale: 'auto',
+    visite_originale_id: planning.id_planning
+  });
+  
+  // ============================================================
+  // ✅ 2. CRÉER L'HISTORIQUE DE LA VISITE DE CONTRÔLE (CECI LA FAIT APPARAÎTRE)
+  // ============================================================
+  await Visite.create({
+    matricule_agent: agent.matricule_agent,
+    date_visite: dateControleFinaleStr,
+    heure_visite: heureControle,
+    type_visite: 'Reclassement',
+    medecin: 'Dr. Mahmoud Khelifi',
+    observation: `Visite de contrôle programmée suite à inaptitude temporaire (fin le ${dateFinStr})`,
+    id_planning: controlePlanning.id_planning,
+    type_action: 'PROGRAMMATION',
+    ancien_statut: null,
+    nouveau_statut: 'Programmé',
+    motif_action: `Programmation automatique - Visite de contrôle post-inaptitude (${duree} jours)`,
+    details_action: JSON.stringify({
+      type: 'programmation_visite_controle',
+      duree_inaptitude: duree,
+      date_fin_inaptitude: dateFinStr,
+      date_visite_controle: dateControleFinaleStr,
+      heure_visite_controle: heureControle,
+      visite_originale_id: planning.id_planning
+    }),
+    source: 'PLANNING',
+    created_by: req.user.id,
+    source_originale: 'manuel'  
+  });
+  
+  console.log(`✅ Visite de contrôle créée et historisée: ${dateControleFinaleStr} à ${heureControle.substring(0,5)}`);
+  console.log(`✅ ID Planning: ${controlePlanning.id_planning}`);
+  
+  detailsAction = {
+    type: 'reclassement_inapte_temp_avec_controle',
+    date_visite: dateVisite,
+    heure_visite: planning.heure_visite?.substring(0,5),
+    medecin: medecin || 'Dr. Mahmoud Khelifi',
+    observation: observation || '',
+    resultat: 'Inapte temporaire',
+    duree_inaptitude: duree,
+    date_fin_inaptitude: dateFinStr,
+    date_visite_controle: dateControleFinaleStr,
+    heure_visite_controle: heureControle.substring(0,5),
+    id_visite_controle: controlePlanning.id_planning,
+    message: `⚠️ Inapte temporaire pour ${duree} jours. Visite de contrôle le ${formatDate(dateControleFinaleStr)}.`
+  };
+}
+  else if (resultat === 'Apte') {
+    await agent.update({
+      date_debut_reclassement: null,
+      date_fin_reclassement: null,
+      date_prochaine_reclassement: null,
+      statut: 'actif'
+    });
+    
+    detailsAction = {
+      type: 'reclassement_apte',
+      date_visite: dateVisite,
+      heure_visite: planning.heure_visite?.substring(0,5),
+      medecin: medecin || 'Dr. Mahmoud Khelifi',
+      observation: observation || '',
+      resultat: 'Apte',
+      message: `✅ L'agent a été déclaré APTE lors de la visite de reclassement.`
+    };
+    
+    console.log(`✅ Agent ${agent.nom} ${agent.prenom} : RECLASSEMENT - APTE`);
+  }
+}
 
-    res.json({ success: true, message: 'Visite marquée comme effectuée', planning });
-  } catch (error) {
+// ========== EMBAUCHE ==========
+else if (planning.type_visite === 'Embauche') {
+  if (resultat === 'Apte') {
+    const periodicite = planningService.calculerPeriodicite(agent);
+    const dateVisite = planning.date_visite;
+    const [year, month, day] = dateVisite.split('-');
+    const dateDebut = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, parseInt(day)));
+    const dateProchaine = new Date(dateDebut);
+    dateProchaine.setUTCDate(dateDebut.getUTCDate() + periodicite);
+    const dateProchaineStr = dateProchaine.toISOString().split('T')[0];
+    
+    await agent.update({
+      statut: 'actif',
+      date_derniere_visite: dateVisite,
+      date_prochaine_visite: dateProchaineStr,
+      date_embauche: dateVisite
+    });
+    
+    detailsAction = {
+      type: 'embauche_apte',
+      date_visite: dateVisite,
+      heure_visite: planning.heure_visite?.substring(0,5),
+      medecin: medecin || 'Dr. Mahmoud Khelifi',
+      observation: observation || '',
+      resultat: 'Apte',
+      periodicite_jours: periodicite,
+      periodicite_texte: periodicite === 180 ? '6 mois' : '1 an',
+      prochaine_visite: dateProchaineStr
+    };
+    console.log(`✅ Agent ${agent.nom} ${agent.prenom} : EMBAUCHE - APTE`);
+  } else if (resultat === 'Inapte définitif') {
+    await agent.update({ statut: 'inactif' });
+    detailsAction = {
+      type: 'embauche_inapte_definitif',
+      date_visite: planning.date_visite,
+      heure_visite: planning.heure_visite?.substring(0,5),
+      medecin: medecin || 'Dr. Mahmoud Khelifi',
+      observation: observation || '',
+      resultat: 'Inapte définitif'
+    };
+    console.log(`❌ Agent ${agent.nom} ${agent.prenom} : EMBAUCHE - INAPTE DÉFINITIF`);
+  } else if (resultat === 'Inapte temporaire') {
+    detailsAction = {
+      type: 'embauche_inapte_temporaire',
+      date_visite: planning.date_visite,
+      heure_visite: planning.heure_visite?.substring(0,5),
+      medecin: medecin || 'Dr. Mahmoud Khelifi',
+      observation: observation || '',
+      resultat: 'Inapte temporaire'
+    };
+    console.log(`⚠️ Agent ${agent.nom} ${agent.prenom} : EMBAUCHE - INAPTE TEMPORAIRE`);
+  }
+}
+
+// ========== MISE À JOUR UNIQUE DE LA VISITE EXISTANTE ==========
+// Pour TOUS les types de visite (Périodique, Reprise, Reclassement, Embauche)
+let visiteExistante = await Visite.findOne({
+  where: { id_planning: planning.id_planning }
+});
+
+if (visiteExistante) {
+  // ✅ METTRE À JOUR la ligne existante
+  await visiteExistante.update({
+    medecin: medecin || 'Dr. Mahmoud Khelifi',
+    observation: observation || '',
+    resultat: resultat,
+    type_action: 'EFFECTUEE',
+    ancien_statut: ancienStatut,
+    nouveau_statut: 'Effectué',
+    motif_action: `Visite effectuée — Résultat: ${resultat || 'Apte'}`,
+    details_action: JSON.stringify(detailsAction)
+  });
+  console.log(`✅ Visite mise à jour (id: ${visiteExistante.matricule_visite})`);
+} else {
+  // Cas rare : créer la ligne
+  await Visite.create({
+    matricule_agent: planning.matricule_agent,
+    date_visite: planning.date_visite,
+    heure_visite: planning.heure_visite,
+    type_visite: planning.type_visite,
+    medecin: medecin || 'Dr. Mahmoud Khelifi',
+    observation: observation || '',
+    resultat: resultat,
+    id_planning: planning.id_planning,
+    type_action: 'EFFECTUEE',
+    ancien_statut: planning.statut,
+    nouveau_statut: 'Effectué',
+    motif_action: `Visite effectuée — Résultat: ${resultat || 'Apte'}`,
+    details_action: JSON.stringify(detailsAction),
+    source: planning.source_planification === 'manuel' ? 'FORMULAIRE' : 'PLANNING',
+    source_originale: planning.source_originale || planning.source_planification,
+    created_by: req.user.id
+  });
+}
+
+res.json({ success: true, message: 'Visite marquée comme effectuée', planning });
+} catch (error) {
     console.error('❌ Erreur effectuer visite:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
+  
 
 // ========== ANNULATION ==========
 router.patch('/planning/:id/annuler', protect, async (req, res) => {
@@ -2223,11 +2415,6 @@ router.post('/planning/:id/reprogrammer-auto', protect, async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 });
-// backend/routes/visiteRoutes.js
-// ========== REPROGRAMMATION POUR INDISPONIBILITÉ (COMPLÈTE) ==========
-
-// backend/routes/visiteRoutes.js
-// ========== REPROGRAMMATION POUR INDISPONIBILITÉ (COMPLÈTE AVEC VÉRIFICATIONS) ==========
 
 // Fonction de vérification complète des créneaux
 async function verifierDisponibiliteCreneauComplete(date, heure, matriculeAgent, idExclu = null) {
@@ -2324,7 +2511,7 @@ async function verifierDisponibiliteCreneauComplete(date, heure, matriculeAgent,
     raison: null
   };
 }
-// ========== REPROGRAMMATION POUR INDISPONIBILITÉ (COMPLÈTE + RÉAFFECTATION) ==========
+// ========== REPROGRAMMATION POUR INDISPONIBILITÉ (VERSION CORRIGÉE AVEC VÉRIFICATION COMPLÈTE) ==========
 router.post('/planning/:id/reprogrammer-indisponible', protect, async (req, res) => {
   try {
     const { id } = req.params;
@@ -2334,7 +2521,6 @@ router.post('/planning/:id/reprogrammer-indisponible', protect, async (req, res)
     console.log('🔄 INDISPONIBILITÉ - VÉRIFICATIONS + RÉAFFECTATION');
     console.log('='.repeat(70));
 
-    // ========== 1. RÉCUPÉRER LE PLANNING ORIGINAL ==========
     const planningOriginal = await Planning.findByPk(id);
     if (!planningOriginal) {
       return res.status(404).json({ success: false, message: 'Planning non trouvé' });
@@ -2346,7 +2532,6 @@ router.post('/planning/:id/reprogrammer-indisponible', protect, async (req, res)
     const typeVisite = planningOriginal.type_visite;
     const sourceOriginale = planningOriginal.source_originale || 'auto';
 
-    // ========== 2. RÉCUPÉRER L'AGENT INDISPONIBLE ==========
     const agentIndisponible = await Agent.findOne({
       where: { matricule_agent: ancienMatricule },
       attributes: ['matricule_agent', 'nom', 'prenom', 'code_affectation']
@@ -2355,71 +2540,40 @@ router.post('/planning/:id/reprogrammer-indisponible', protect, async (req, res)
     console.log(`👤 Agent indisponible: ${agentIndisponible?.nom} ${agentIndisponible?.prenom}`);
     console.log(`📅 Créneau original: ${ancienneDate} à ${ancienneHeure.substring(0,5)}`);
 
-    // ========== 3. FONCTION POUR VÉRIFIER SI UN CRÉNEAU EST LIBRE ==========
-    async function isCreneauLibre(date, heure, agentMatricule, idExclu = null) {
-      const creneau = await Planning.findOne({
-        where: {
-          date_visite: date,
-          heure_visite: heure,
-          id_planning: { [Op.ne]: idExclu || 0 }
-        }
-      });
-      
-      if (!creneau) return { libre: true, raison: null };
-      
-      if (creneau.visite_effectuee === true) {
-        return { libre: false, raison: 'a une visite EFFECTUÉE' };
-      }
-      if (creneau.creneau_bloque === true) {
-        return { libre: false, raison: 'est BLOQUÉ' };
-      }
-      if (creneau.statut === 'Annulé') {
-        return { libre: false, raison: 'a une visite ANNULÉE' };
-      }
-      if (creneau.statut === 'Reporté') {
-        return { libre: false, raison: 'a une visite REPORTÉE' };
-      }
-      if (creneau.statut === 'Effectué') {
-        return { libre: false, raison: 'est déjà EFFECTUÉ' };
-      }
-      if (creneau.statut === 'Programmé' && creneau.matricule_agent !== 0 && creneau.matricule_agent !== parseInt(agentMatricule)) {
-        const autreAgent = await Agent.findByPk(creneau.matricule_agent);
-        return { libre: false, raison: `est déjà occupé par ${autreAgent?.nom} ${autreAgent?.prenom}` };
-      }
-      
-      return { libre: true, raison: null };
-    }
-
-    // ========== 4. VÉRIFICATION MODE MANUEL ==========
+    // ========== VÉRIFICATION MODE MANUEL ==========
     if (mode === 'manuel' && nouvelle_date && nouvelle_heure) {
-      const { libre, raison } = await isCreneauLibre(nouvelle_date, nouvelle_heure, ancienMatricule, id);
-      if (!libre) {
-        return res.status(409).json({ 
-          success: false, 
-          message: `❌ Créneau ${nouvelle_date} à ${nouvelle_heure.substring(0,5)} ${raison}`
-        });
+      const [creneauOccupe] = await sequelizeLocal.query(`
+        SELECT p.*, a.nom, a.prenom 
+        FROM planning p
+        LEFT JOIN ${process.env.DB_GLOBAL_NAME}.agent a ON a.matricule_agent = p.matricule_agent
+        WHERE p.date_visite = :date 
+          AND p.heure_visite = :heure 
+          AND p.id_planning != :idExclu
+        LIMIT 1
+      `, {
+        replacements: { date: nouvelle_date, heure: nouvelle_heure, idExclu: id }
+      });
+
+      if (creneauOccupe && creneauOccupe.length > 0) {
+        const c = creneauOccupe[0];
+        if (c.visite_effectuee) {
+          return res.status(409).json({ success: false, message: `❌ Une visite a déjà été EFFECTUÉE sur ce créneau` });
+        }
+        if (c.creneau_bloque) {
+          return res.status(409).json({ success: false, message: `🔒 Ce créneau est BLOQUÉ` });
+        }
+        if (c.matricule_agent !== parseInt(ancienMatricule)) {
+          return res.status(409).json({ success: false, message: `❌ Créneau déjà occupé par ${c.nom} ${c.prenom}` });
+        }
       }
 
-      const agentADejaVisite = await Planning.findOne({
-        where: {
-          matricule_agent: ancienMatricule,
-          date_visite: nouvelle_date,
-          statut: 'Programmé',
-          visite_effectuee: false,
-          id_planning: { [Op.ne]: id }
-        }
-      });
-      if (agentADejaVisite) {
-        return res.status(409).json({ success: false, message: `❌ Agent a déjà une visite le ${nouvelle_date}` });
-      }
-      
       const dateObj = new Date(nouvelle_date);
       if (!(await planningService.estJourOuvre(dateObj))) {
         return res.status(400).json({ success: false, message: 'Date non ouvrable' });
       }
     }
 
-    // ========== 5. CRÉER LA NOUVELLE VISITE POUR L'AGENT INDISPONIBLE ==========
+    // ========== CRÉER LA NOUVELLE VISITE POUR L'AGENT INDISPONIBLE ==========
     let nouvelleVisiteIndisponible = null;
 
     if (mode === 'manuel' && nouvelle_date && nouvelle_heure) {
@@ -2445,32 +2599,73 @@ router.post('/planning/:id/reprogrammer-indisponible', protect, async (req, res)
       
     } else if (mode === 'auto') {
       const creneaux = ['08:00:00', '08:30:00', '09:00:00', '09:30:00'];
-      let prochainCreneau = null;
+      const maxJours = 14;
       const dateDepart = new Date(ancienneDate);
       dateDepart.setDate(dateDepart.getDate() + 1);
+      const dateFin = new Date(dateDepart);
+      dateFin.setDate(dateDepart.getDate() + maxJours);
       
-      for (let i = 0; i <= 30; i++) {
+      console.log(`🔍 Recherche créneau du ${dateDepart.toISOString().split('T')[0]} au ${dateFin.toISOString().split('T')[0]}`);
+      
+      const [tousPlannings] = await sequelizeLocal.query(`
+        SELECT date_visite, heure_visite, matricule_agent, statut, visite_effectuee, creneau_bloque
+        FROM planning 
+        WHERE date_visite BETWEEN :dateDebut AND :dateFin
+      `, {
+        replacements: { 
+          dateDebut: dateDepart.toISOString().split('T')[0],
+          dateFin: dateFin.toISOString().split('T')[0]
+        }
+      });
+      
+      const planningMap = new Map();
+      for (const p of tousPlannings) {
+        const key = `${p.date_visite}|${p.heure_visite}`;
+        planningMap.set(key, p);
+      }
+      
+      const [visitesAgent] = await sequelizeLocal.query(`
+        SELECT date_visite FROM planning 
+        WHERE matricule_agent = :matricule 
+          AND date_visite BETWEEN :dateDebut AND :dateFin
+          AND statut = 'Programmé'
+          AND visite_effectuee = 0
+      `, {
+        replacements: { 
+          matricule: ancienMatricule,
+          dateDebut: dateDepart.toISOString().split('T')[0],
+          dateFin: dateFin.toISOString().split('T')[0]
+        }
+      });
+      
+      const datesAgentOccupees = new Set(visitesAgent.map(v => v.date_visite));
+      
+      let prochainCreneau = null;
+      for (let i = 0; i <= maxJours; i++) {
         const dateTest = new Date(dateDepart);
         dateTest.setDate(dateDepart.getDate() + i);
         const dateStr = dateTest.toISOString().split('T')[0];
         
         if (!(await planningService.estJourOuvre(dateTest))) continue;
-        
-        const agentADejaVisite = await Planning.findOne({
-          where: {
-            matricule_agent: ancienMatricule,
-            date_visite: dateStr,
-            statut: 'Programmé',
-            visite_effectuee: false,
-            id_planning: { [Op.ne]: id }
-          }
-        });
-        if (agentADejaVisite) continue;
+        if (datesAgentOccupees.has(dateStr)) continue;
         
         for (const heure of creneaux) {
-          const { libre } = await isCreneauLibre(dateStr, heure, ancienMatricule, id);
+          const key = `${dateStr}|${heure}`;
+          const existing = planningMap.get(key);
+          
+          let libre = true;
+          if (existing) {
+            if (existing.visite_effectuee === true) libre = false;
+            else if (existing.creneau_bloque === true) libre = false;
+            else if (existing.statut === 'Annulé') libre = false;
+            else if (existing.statut === 'Reporté') libre = false;
+            else if (existing.statut === 'Effectué') libre = false;
+            else if (existing.statut === 'Programmé' && existing.matricule_agent !== 0 && existing.matricule_agent !== parseInt(ancienMatricule)) libre = false;
+          }
+          
           if (libre) {
             prochainCreneau = { date: dateStr, heure: heure };
+            console.log(`   ✅ Créneau trouvé: ${dateStr} à ${heure.substring(0,5)}`);
             break;
           }
         }
@@ -2478,7 +2673,7 @@ router.post('/planning/:id/reprogrammer-indisponible', protect, async (req, res)
       }
       
       if (!prochainCreneau) {
-        return res.status(409).json({ success: false, message: '❌ Aucun créneau disponible' });
+        return res.status(409).json({ success: false, message: '❌ Aucun créneau disponible dans les 14 jours' });
       }
       
       const semaine = planningService.getNumeroSemaine(new Date(prochainCreneau.date));
@@ -2501,7 +2696,7 @@ router.post('/planning/:id/reprogrammer-indisponible', protect, async (req, res)
       });
     }
 
-    // ========== 6. TRACABILITÉ ANNULATION ==========
+    // ========== TRACABILITÉ ==========
     await Visite.create({
       matricule_agent: ancienMatricule,
       date_visite: ancienneDate,
@@ -2518,7 +2713,6 @@ router.post('/planning/:id/reprogrammer-indisponible', protect, async (req, res)
       source_originale: sourceOriginale
     });
 
-    // ========== 7. TRACABILITÉ NOUVELLE PROGRAMMATION ==========
     if (nouvelleVisiteIndisponible) {
       await Visite.create({
         matricule_agent: ancienMatricule,
@@ -2529,7 +2723,7 @@ router.post('/planning/:id/reprogrammer-indisponible', protect, async (req, res)
         type_action: 'PROGRAMMATION',
         ancien_statut: null,
         nouveau_statut: 'Programmé',
-        motif_action: `Nouvelle programmation suite a l'indisponibilité- ${motif}`,
+        motif_action: `Nouvelle programmation suite indisponibilité - ${motif}`,
         details_action: JSON.stringify({ type: 'reprogrammation', nouvelle_date: nouvelleVisiteIndisponible.date_visite }),
         source: 'PLANNING',
         created_by: req.user.id,
@@ -2537,7 +2731,6 @@ router.post('/planning/:id/reprogrammer-indisponible', protect, async (req, res)
       });
     }
 
-    // ========== 8. SUPPRIMER L'ANCIEN PLANNING ==========
     const ancienneDateSave = planningOriginal.date_visite;
     const ancienneHeureSave = planningOriginal.heure_visite;
     const ancienMatriculeSave = planningOriginal.matricule_agent;
@@ -2545,122 +2738,140 @@ router.post('/planning/:id/reprogrammer-indisponible', protect, async (req, res)
     await db.local.Visite.destroy({ where: { id_planning: planningOriginal.id_planning } });
     await planningOriginal.destroy();
 
-    // ========== 9. RECHERCHE D'UN REMPLAÇANT ET RÉAFFECTATION ==========
+    // ========== RECHERCHE D'UN REMPLAÇANT AVEC VÉRIFICATION COMPLÈTE ==========
     let reaffectation = null;
     let nouveauPlanningRemplacement = null;
 
-// ========== 9. RECHERCHE D'UN REMPLAÇANT SIMPLIFIÉE ==========
-if (typeVisite === 'Périodique') {
-  console.log(`\n🔍 Recherche d'un remplaçant...`);
+    if (typeVisite === 'Périodique') {
+      console.log(`\n🔍 Recherche d'un remplaçant...`);
 
-  // 1. Vérifier que le créneau original est libre
-  const creneauOriginal = await Planning.findOne({
-    where: {
-      date_visite: ancienneDateSave,
-      heure_visite: ancienneHeureSave
-    }
-  });
+      const [creneauLibre] = await sequelizeLocal.query(`
+        SELECT 1 FROM planning 
+        WHERE date_visite = :date 
+          AND heure_visite = :heure 
+          AND (visite_effectuee = 1 OR creneau_bloque = 1 OR statut IN ('Annulé', 'Reporté'))
+        LIMIT 1
+      `, {
+        replacements: { date: ancienneDateSave, heure: ancienneHeureSave }
+      });
 
-  if (creneauOriginal && creneauOriginal.visite_effectuee === true) {
-    console.log(`⚠️ Créneau a une visite EFFECTUÉE - Réaffectation impossible`);
-  } else if (creneauOriginal && creneauOriginal.creneau_bloque === true) {
-    console.log(`⚠️ Créneau BLOQUÉ - Réaffectation impossible`);
-  } else {
-    console.log(`✅ Créneau libre`);
-
-    // 2. Récupérer TOUS les agents actifs (sauf l'indisponible)
-    const tousAgents = await Agent.findAll({
-      where: {
-        statut: 'actif',
-        matricule_agent: { [Op.ne]: parseInt(ancienMatriculeSave) }
-      },
-      raw: true
-    });
-
-    const agentsEligibles = [];
-
-    for (const agent of tousAgents) {
-      
-      // ✅ RÈGLE UNIQUE : L'agent ne doit avoir AUCUNE visite (passée, présente ou future)
-      const aDejaUneVisite = await Planning.findOne({
-        where: {
-          matricule_agent: agent.matricule_agent
+      if (!creneauLibre || creneauLibre.length === 0) {
+        console.log(`✅ Créneau libre, recherche de remplaçant...`);
+        
+        // ⚡ VÉRIFICATION COMPLÈTE : L'agent ne doit avoir AUCUNE visite programmée (ni aujourd'hui, ni dans le futur)
+        const [remplacants] = await sequelizeGlobal.query(`
+          SELECT 
+            a.matricule_agent as matricule,
+            a.nom,
+            a.prenom,
+            a.code_affectation,
+            a.code_agence,
+            a.date_derniere_visite,
+            a.periodicite_jours,
+            (
+              CASE WHEN a.date_derniere_visite IS NULL THEN 10000 ELSE 0 END +
+              CASE WHEN a.code_affectation = 3 THEN 500 ELSE 0 END +
+              GREATEST(0, DATEDIFF(CURDATE(), COALESCE(a.date_derniere_visite, '2000-01-01')) - 
+                COALESCE(a.periodicite_jours, CASE WHEN a.code_affectation = 3 THEN 180 ELSE 365 END)) * 10
+            ) as priorite
+          FROM ${process.env.DB_GLOBAL_NAME}.agent a
+          WHERE a.statut = 'actif'
+            AND a.matricule_agent != :matriculeExclu
+            
+            -- ⚡ VÉRIFICATION CRITIQUE : L'agent n'a AUCUNE visite programmée dans le futur
+            AND NOT EXISTS (
+              SELECT 1 FROM ${process.env.DB_LOCAL_NAME}.planning p 
+              WHERE p.matricule_agent = a.matricule_agent 
+                AND p.date_visite >= CURDATE()
+                AND p.statut = 'Programmé'
+                AND p.visite_effectuee = 0
+            )
+            
+            -- ⚡ Vérification supplémentaire : l'agent n'a PAS de visite CE JOUR précisément
+            AND NOT EXISTS (
+              SELECT 1 FROM ${process.env.DB_LOCAL_NAME}.planning p 
+              WHERE p.matricule_agent = a.matricule_agent 
+                AND p.date_visite = :dateCible
+                AND p.statut = 'Programmé'
+                AND p.visite_effectuee = 0
+            )
+            
+            -- Vérification : l'agent n'est PAS en inaptitude
+            AND (a.date_fin_inaptitude IS NULL OR a.date_fin_inaptitude < :dateCible)
+            
+          ORDER BY priorite DESC
+          LIMIT 5
+        `, {
+          replacements: { 
+            matriculeExclu: ancienMatriculeSave,
+            dateCible: ancienneDateSave
+          }
+        });
+        
+        if (remplacants && remplacants.length > 0) {
+          const meilleurRemplacant = remplacants[0];
+          console.log(`   🏆 MEILLEUR REMPLAÇANT: ${meilleurRemplacant.nom} ${meilleurRemplacant.prenom}`);
+          console.log(`   📊 Priorité: ${meilleurRemplacant.priorite}`);
+          console.log(`   🚌 Poste: ${meilleurRemplacant.code_affectation === 3 ? 'Chauffeur' : 'Contrôleur'}`);
+          console.log(`   📅 Dernière visite: ${meilleurRemplacant.date_derniere_visite || 'Jamais'}`);
+          
+          const semaine = planningService.getNumeroSemaine(new Date(ancienneDateSave));
+          const annee = new Date(ancienneDateSave).getFullYear();
+          
+          nouveauPlanningRemplacement = await Planning.create({
+            matricule_agent: meilleurRemplacant.matricule,
+            date_visite: ancienneDateSave,
+            heure_visite: ancienneHeureSave,
+            type_visite: typeVisite,
+            statut: 'Programmé',
+            priorite: meilleurRemplacant.priorite || 100,
+            semaine, annee,
+            created_by: req.user.id,
+            convocation_envoyee: false,
+            source_planification: 'auto',
+            source_originale: 'auto',
+            motif_reprogrammation: `Réaffectation auto - Créneau libéré`
+          });
+          
+          reaffectation = {
+            agent: { 
+              nom: meilleurRemplacant.nom, 
+              prenom: meilleurRemplacant.prenom, 
+              matricule: meilleurRemplacant.matricule,
+              poste: meilleurRemplacant.code_affectation === 3 ? 'Chauffeur' : 'Contrôleur'
+            }
+          };
+          
+          await Visite.create({
+            matricule_agent: meilleurRemplacant.matricule,
+            date_visite: ancienneDateSave,
+            heure_visite: ancienneHeureSave,
+            type_visite: typeVisite,
+            id_planning: nouveauPlanningRemplacement.id_planning,
+            type_action: 'REAFFECTEE',
+            ancien_statut: null,
+            nouveau_statut: 'Programmé',
+            motif_action: `Réaffectation auto - ${meilleurRemplacant.nom} ${meilleurRemplacant.prenom} remplace ${agentIndisponible?.nom} ${agentIndisponible?.prenom}`,
+            details_action: JSON.stringify({
+              agent_original: agentIndisponible?.nom,
+              nouvel_agent: meilleurRemplacant.nom,
+              date: ancienneDateSave,
+              verification: "AUCUNE_VISITE_DANS_LE_FUTUR"
+            }),
+            source: 'PLANNING',
+            created_by: req.user.id,
+            source_originale: 'auto'
+          });
+          
+          console.log(`✅ Réaffectation effectuée à ${meilleurRemplacant.nom} ${meilleurRemplacant.prenom}`);
+        } else {
+          console.log(`⚠️ Aucun remplaçant disponible (tous les agents ont déjà une visite programmée)`);
         }
-      });
-      
-      if (aDejaUneVisite) {
-        console.log(`   ❌ ${agent.nom} ${agent.prenom}: a déjà une visite (${aDejaUneVisite.date_visite})`);
-        continue;  // REFUSER
+      } else {
+        console.log(`⚠️ Créneau non libre, réaffectation impossible`);
       }
-      
-      // ✅ Si on arrive ici, l'agent n'a JAMAIS eu de visite
-      console.log(`   ✅ ${agent.nom} ${agent.prenom}: ÉLIGIBLE (aucune visite)`);
-      
-      // Calculer la priorité (ceux qui n'ont jamais eu de visite ont priorité maximale)
-      let priorite = 10000;
-      if (agent.code_affectation === 3) priorite += 500;  // Chauffeurs en priorité
-      
-      agentsEligibles.push({ ...agent, priorite });
     }
 
-    agentsEligibles.sort((a, b) => b.priorite - a.priorite);
-
-    if (agentsEligibles.length > 0) {
-      const remplacant = agentsEligibles[0];
-      console.log(`\n🏆 REMPLAÇANT: ${remplacant.nom} ${remplacant.prenom}`);
-
-      // Créer la nouvelle visite
-      const semaine = planningService.getNumeroSemaine(new Date(ancienneDateSave));
-      const annee = new Date(ancienneDateSave).getFullYear();
-
-      nouveauPlanningRemplacement = await Planning.create({
-        matricule_agent: remplacant.matricule_agent,
-        date_visite: ancienneDateSave,
-        heure_visite: ancienneHeureSave,
-        type_visite: typeVisite,
-        statut: 'Programmé',
-        priorite: remplacant.priorite,
-        semaine, annee,
-        created_by: req.user.id,
-        convocation_envoyee: false,
-        source_planification: 'auto',
-        source_originale: 'auto',
-        motif_reprogrammation: `Réaffectation auto - Créneau libéré`
-      });
-
-      reaffectation = {
-        agent: { nom: remplacant.nom, prenom: remplacant.prenom, matricule: remplacant.matricule_agent }
-      };
-
-      // Traçabilité
-      await Visite.create({
-        matricule_agent: remplacant.matricule_agent,
-        date_visite: ancienneDateSave,
-        heure_visite: ancienneHeureSave,
-        type_visite: typeVisite,
-        id_planning: nouveauPlanningRemplacement.id_planning,
-        type_action: 'REAFFECTEE',
-        ancien_statut: null,
-        nouveau_statut: 'Programmé',
-        motif_action: `Réaffectation - ${remplacant.nom} ${remplacant.prenom} remplace ${agentIndisponible?.nom} ${agentIndisponible?.prenom}`,
-        details_action: JSON.stringify({
-          agent_original: agentIndisponible?.nom,
-          nouvel_agent: remplacant.nom,
-          date: ancienneDateSave
-        }),
-        source: 'PLANNING',
-        created_by: req.user.id,
-        source_originale: 'auto'
-      });
-      
-      console.log(`✅ Réaffectation enregistrée`);
-    } else {
-      console.log(`⚠️ Aucun remplaçant trouvé (aucun agent sans visite)`);
-    }
-  }
-}
-
-    // ========== 10. RÉPONSE FINALE ==========
     let message = '';
     if (reaffectation) {
       message = `✅ Agent reprogrammé + Créneau réaffecté à ${reaffectation.agent.nom} ${reaffectation.agent.prenom}`;
@@ -2684,7 +2895,7 @@ if (typeVisite === 'Périodique') {
     console.error('❌ Erreur:', error);
     res.status(500).json({ success: false, message: error.message });
   }
-}); 
+});
 
 // ========== RÉAFFECTATION AUTOMATIQUE D'UN CRÉNEAU LIBÉRÉ ==========
 router.post('/planning/reaffecter-automatique', protect, async (req, res) => {
@@ -3432,24 +3643,62 @@ router.post('/planifier-embauche', protect, async (req, res) => {
   }
 });
 
+router.get('/planning/toutes-convocations', protect, async (req, res) => {
+  try {
+    const { page = 1, limit = 50, statut = 'all', type = 'all', dateDebut, dateFin } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    
+    let whereClause = {};
+    
+    if (statut === 'envoyee') {
+      whereClause.convocation_envoyee = true;
+    } else if (statut === 'non_envoyee') {
+      whereClause.convocation_envoyee = false;
+    }
+    
+    if (type !== 'all') {
+      whereClause.type_visite = type;
+    }
+    
+    if (dateDebut && dateFin) {
+      whereClause.date_visite = { [Op.between]: [dateDebut, dateFin] };
+    }
+    
+    const { count, rows } = await Planning.findAndCountAll({
+      where: whereClause,
+      include: [{
+        model: Agent,
+        as: 'planningAgent',
+        attributes: ['nom', 'prenom', 'matricule_agent', 'code_agence', 'code_affectation']
+      }],
+      order: [['date_visite', 'DESC'], ['heure_visite', 'ASC']],
+      limit: parseInt(limit),
+      offset: offset
+    });
+    
+    res.json({
+      success: true,
+      convocations: rows,
+      total: count,
+      page: parseInt(page),
+      totalPages: Math.ceil(count / parseInt(limit))
+    });
+  } catch (error) {
+    console.error('❌ Erreur:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ========== CONVOCATIONS ==========
 router.get('/planning/convocations-a-envoyer', protect, async (req, res) => {
   try {
-    const aujourdhui = new Date();
-    aujourdhui.setHours(0, 0, 0, 0);
-    const debutSemaineProchaine = new Date(aujourdhui);
-    debutSemaineProchaine.setDate(aujourdhui.getDate() + 7);
-    debutSemaineProchaine.setHours(0, 0, 0, 0);
-    const finSemaineProchaine = new Date(debutSemaineProchaine);
-    finSemaineProchaine.setDate(debutSemaineProchaine.getDate() + 6);
-    finSemaineProchaine.setHours(23, 59, 59, 999);
-    
     const plannings = await Planning.findAll({
       where: {
-        date_visite: { [Op.between]: [debutSemaineProchaine.toISOString().split('T')[0], finSemaineProchaine.toISOString().split('T')[0]] },
-        convocation_envoyee: false, statut: 'Programmé'
+        convocation_envoyee: false, 
+        statut: 'Programmé'
       },
-      order: [['date_visite', 'ASC'], ['heure_visite', 'ASC']], raw: true
+      order: [['date_visite', 'ASC'], ['heure_visite', 'ASC']], 
+      raw: true
     });
     
     if (plannings.length === 0) return res.json({ success: true, convocations: [], count: 0 });
@@ -3457,7 +3706,8 @@ router.get('/planning/convocations-a-envoyer', protect, async (req, res) => {
     const matricules = [...new Set(plannings.map(p => p.matricule_agent))];
     const agents = await Agent.findAll({
       where: { matricule_agent: { [Op.in]: matricules } },
-      attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence', 'code_affectation'], raw: true
+      attributes: ['matricule_agent', 'nom', 'prenom', 'code_agence', 'code_affectation'], 
+      raw: true
     });
     
     const agentsMap = new Map();
@@ -3524,7 +3774,7 @@ router.get('/planning/convocations-stats', protect, async (req, res) => {
     const [totalAEnvoyer] = await sequelizeLocal.query(`
       SELECT COUNT(*) as total FROM planning 
       WHERE convocation_envoyee = 0 
-        AND statut = 'Programmé' 
+        AND statut = 'Programmé'
         AND type_visite IN ('Périodique', 'Reprise')
         AND date_visite >= CURDATE()
     `);
@@ -3538,15 +3788,15 @@ router.get('/planning/convocations-stats', protect, async (req, res) => {
     `);
     
     const [envoyeesSemaine] = await sequelizeLocal.query(`
-      SELECT COUNT(*) as total FROM convocations_log 
+      SELECT COUNT(*) as total FROM convocations_log
       WHERE date_convocation >= DATE_SUB(NOW(), INTERVAL 7 DAY)
     `);
     
     const stats = {
-      total_envoyees: totalEnvoyees[0]?.total || 0,
+        total_envoyees: totalEnvoyees[0]?.total || 0,
       total_a_envoyer: totalAEnvoyer[0]?.total || 0,
       a_envoyer_j7: aEnvoyerJ7[0]?.total || 0,
-      total_envoyees_semaine: envoyeesSemaine[0]?.total || 0
+        total_envoyees_semaine: envoyeesSemaine[0]?.total || 0
     };
     
     console.log('📊 Stats:', stats);

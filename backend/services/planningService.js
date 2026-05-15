@@ -334,7 +334,7 @@ async genererPlanningSemaine(dateDebut, userId) {
     });
     
     console.log(`   📊 ${toutesVisitesExistantes.length} visite(s) existante(s) pour cette période`);
-    
+
     // ✅ Afficher les visites trouvées pour déboguer
     for (const v of toutesVisitesExistantes) {
       console.log(`      - ${v.date_visite} ${v.heure_visite} | Agent: ${v.matricule_agent} | Type: ${v.type_visite} | Source: ${v.source_planification}`);
@@ -380,7 +380,7 @@ async genererPlanningSemaine(dateDebut, userId) {
     const tousAgents = await this.Agent.findAll({ where: { statut: 'actif' } });
     const besoinsReprise = [];
     const besoinsPeriodique = [];
-
+    
     for (const agent of tousAgents) {
       // ✅ Vérifier si l'agent a déjà une visite dans la période
       const dejaPlanifie = toutesVisitesExistantes.some(v => v.matricule_agent === agent.matricule_agent);
@@ -461,7 +461,7 @@ async genererPlanningSemaine(dateDebut, userId) {
             const dateOptStr = moment.utc(agent.date_optimal).format('YYYY-MM-DD');
             if (dateOptStr !== dateStr) continue;
           }
-
+          
           agentChoisi = agent;
           break;
         }
@@ -481,7 +481,7 @@ async genererPlanningSemaine(dateDebut, userId) {
             source_planification: 'auto',
             source_originale: 'auto'
           });
-
+          
           agentsPlanifiesGlobal.add(agentChoisi.matricule_agent);
           agentsPlanifiesJour.push(agentChoisi.matricule_agent);
           agencesPlanifieesJour.push(agentChoisi.code_agence);

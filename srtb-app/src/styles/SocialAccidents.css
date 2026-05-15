@@ -311,7 +311,7 @@
   background: var(--sa2_surf-0);
   border: 1px solid var(--sa2_bd);
   border-radius: var(--sa2_r-md);
-  overflow: hidden;
+  overflow: visible !important;
   box-shadow: var(--sa2_sh-xs);
   margin-bottom: 18px;
   transition: all var(--sa2_t);
@@ -1280,4 +1280,35 @@
   .sa2_social-accidents .sa2_accidents-table td { padding: 10px 12px; }
   .sa2_social-accidents .sa2_agent-avatar { width: 32px; height: 32px; font-size: 0.72rem; }
   .sa2_social-accidents .sa2_row-actions { flex-wrap: wrap; }
+}
+
+.sa2_filter-agent {
+  position: relative;
+  z-index: 100;
+}
+
+.sa2_filter-agent .agent-search-input-dropdown,
+.sa2_filter-agent .agent-search-results,
+.sa2_filter-agent .dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-height: 250px;
+  overflow-y: auto;
+}
+
+
+.sa2_filters-grid {
+  overflow: visible !important;
+}
+
+.sa2_filter-group {
+  position: relative;
+  overflow: visible !important;
 }

@@ -20,6 +20,7 @@ const GestionVisitesPage = () => {
     aptes: 0,
     reserves: 0,
     inaptes: 0,
+    modifications: 0,
     parType: [],
     parResultat: [],
     planningSemaine: 0,
@@ -98,6 +99,16 @@ const GestionVisitesPage = () => {
     }
   }, [gvp_formData.date_visite, gvp_formData.matricule_agent, gvp_editMode]);
 
+    useEffect(() => {
+    const handleRefreshVisites = () => {
+      console.log('🔄 Rafraîchissement des visites manuelles');
+      gvp_fetchVisites();
+    };
+    
+    window.addEventListener('refresh-visites-manuelles', handleRefreshVisites);
+    return () => window.removeEventListener('refresh-visites-manuelles', handleRefreshVisites);
+  }, []);
+
   // ========== FONCTIONS DE CHARGEMENT ==========
   const gvp_chargerDonnees = async () => {
     setGvp_loading(true);
@@ -139,67 +150,89 @@ const GestionVisitesPage = () => {
     }
   };
 
-  const gvp_fetchVisites = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      let url = `${process.env.REACT_APP_API_URL}/api/visites?limit=2000&onlyManual=true`;
+const gvp_fetchVisites = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    let url = `${process.env.REACT_APP_API_URL}/api/visites?limit=2000&onlyManual=true`;
 
-      if (gvp_filters.search) url += `&search=${encodeURIComponent(gvp_filters.search)}`;
-      if (gvp_filters.type !== 'all') url += `&type=${encodeURIComponent(gvp_filters.type)}`;
-      if (gvp_filters.resultat !== 'all') url += `&resultat=${encodeURIComponent(gvp_filters.resultat)}`;
-      
-      if (gvp_moisFiltre !== 'all' && gvp_anneeFiltre) {
-        const dateDebut = `${gvp_anneeFiltre}-${String(gvp_moisFiltre).padStart(2, '0')}-01`;
-        const dernierJour = new Date(gvp_anneeFiltre, gvp_moisFiltre, 0).getDate();
-        const dateFin = `${gvp_anneeFiltre}-${String(gvp_moisFiltre).padStart(2, '0')}-${dernierJour}`;
-        url += `&dateDebut=${dateDebut}&dateFin=${dateFin}`;
-      }
-      
-      if (gvp_filters.agent !== 'all') url += `&agentId=${gvp_filters.agent}`;
-
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        let visitesData = data.visites || [];
-        
-        const visitesMap = new Map();
-        
-        for (const visite of visitesData) {
-          const key = visite.id_planning || visite.matricule_visite;
-          const existing = visitesMap.get(key);
-          
-          if (!existing || new Date(visite.created_at) > new Date(existing.created_at)) {
-            visitesMap.set(key, visite);
-          }
-        }
-        
-        const visitesUniques = Array.from(visitesMap.values());
-        
-        visitesUniques.sort((a, b) => new Date(b.date_visite) - new Date(a.date_visite));
-        
-        setGvp_visites(visitesUniques);
-        
-        const visitesEffectuees = visitesUniques.filter(v => v.type_action === 'EFFECTUEE');
-        const aptes = visitesEffectuees.filter(v => v.resultat === 'Apte').length;
-        const inaptes = visitesEffectuees.filter(v => 
-          v.resultat === 'Inapte temporaire' || v.resultat === 'Inapte définitif'
-        ).length;
-        
-        setGvp_stats({
-          total: visitesUniques.length,
-          aptes: aptes,
-          inaptes: inaptes
-        });
-        
-        setGvp_currentPage(1);
-      }
-    } catch (err) {
-      console.error('Erreur chargement visites:', err);
+    if (gvp_filters.search) url += `&search=${encodeURIComponent(gvp_filters.search)}`;
+    if (gvp_filters.type !== 'all') url += `&type=${encodeURIComponent(gvp_filters.type)}`;
+    if (gvp_filters.resultat !== 'all') url += `&resultat=${encodeURIComponent(gvp_filters.resultat)}`;
+    
+    if (gvp_moisFiltre !== 'all' && gvp_anneeFiltre) {
+      const dateDebut = `${gvp_anneeFiltre}-${String(gvp_moisFiltre).padStart(2, '0')}-01`;
+      const dernierJour = new Date(gvp_anneeFiltre, gvp_moisFiltre, 0).getDate();
+      const dateFin = `${gvp_anneeFiltre}-${String(gvp_moisFiltre).padStart(2, '0')}-${dernierJour}`;
+      url += `&dateDebut=${dateDebut}&dateFin=${dateFin}`;
     }
-  };
+    
+    if (gvp_filters.agent && gvp_filters.agent !== 'all' && gvp_filters.agent !== '') {
+  url += `&agentId=${gvp_filters.agent}`;
+}
+
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await response.json();
+    
+    if (data.success) {
+      let visitesData = data.visites || [];
+      
+      // ✅ PRIORISER les lignes avec type_action = 'EFFECTUEE'
+      const visitesMap = new Map();
+      
+      for (const visite of visitesData) {
+        const id = visite.id_planning || visite.matricule_visite;
+        const existing = visitesMap.get(id);
+        
+        // Si pas d'existant, on ajoute
+        if (!existing) {
+          visitesMap.set(id, visite);
+        } 
+        // Si l'existant n'a PAS de résultat mais la nouvelle SI, on remplace
+        else if ((!existing.resultat || existing.resultat === '') && visite.resultat && visite.resultat !== '') {
+          visitesMap.set(id, visite);
+        }
+        // Si l'existant n'est pas EFFECTUEE mais la nouvelle OUI, on remplace
+        else if (existing.type_action !== 'EFFECTUEE' && visite.type_action === 'EFFECTUEE') {
+          visitesMap.set(id, visite);
+        }
+      }
+      
+      const visitesUniques = Array.from(visitesMap.values());
+      
+      visitesUniques.sort((a, b) => new Date(b.date_visite) - new Date(a.date_visite));
+      
+      console.log('🔍 Visites finales (après déduplication):', visitesUniques.map(v => ({
+        id: v.id_planning,
+        resultat: v.resultat,
+        type_action: v.type_action,
+        date_visite: v.date_visite
+      })));
+      
+      setGvp_visites(visitesUniques);
+      
+      // Calculer les stats
+      const visitesEffectuees = visitesUniques.filter(v => v.type_action === 'EFFECTUEE' || (v.resultat && v.resultat !== ''));
+      const aptes = visitesEffectuees.filter(v => v.resultat === 'Apte').length;
+      const inaptes = visitesEffectuees.filter(v => 
+        v.resultat === 'Inapte temporaire' || v.resultat === 'Inapte définitif'
+      ).length;
+      const modifications = visitesUniques.filter(v => v.type_action === 'MODIFICATION').length;
+      
+      setGvp_stats({
+        total: visitesUniques.length,
+        aptes: aptes,
+        inaptes: inaptes,
+        modifications: modifications
+      });
+      
+      setGvp_currentPage(1);
+    }
+  } catch (err) {
+    console.error('Erreur chargement visites:', err);
+  }
+};
 
   // ========== CALENDRIER INTELLIGENT ==========
   const gvp_chargerJoursDisponibles = async (mois, annee) => {
@@ -365,37 +398,103 @@ const GestionVisitesPage = () => {
   };
 
   // ========== MODIFIER UNE VISITE ==========
-  const gvp_handleEdit = async (visite) => {
-    console.log('📝 Données de la visite à modifier:', visite);
-    
-    if (visite.source !== 'FORMULAIRE' && visite.type_action !== 'SAISIE_MANUELLE' && visite.source_originale !== 'manuel') {
-      gvp_showNotification({ 
-        type: 'warning', 
-        title: '⚠️ Modification impossible', 
-        message: 'Cette visite provient du planning automatique et ne peut pas être modifiée.' 
-      });
-      return;
-    }
-    
-    setGvp_selectedVisite(visite);
-    setGvp_editMode(true);
-    
-    setGvp_formData({
-      matricule_agent: visite.matricule_agent,
-      date_visite: visite.date_visite,
-      heure_visite: visite.heure_visite || '09:00:00',
-      type_visite: visite.type_visite || 'Périodique',
-      motif: visite.motif_reprogrammation || visite.motif_action || '',
-      medecin: visite.medecin || 'Dr. Mahmoud Khelifi',
-      observation: visite.observation || ''
+const gvp_handleEdit = async (visite) => {
+  console.log('📝 Tentative de modification de la visite:', visite);
+  
+  // ✅ VÉRIFIER SI UNE ACTION A DÉJÀ ÉTÉ EFFECTUÉE
+  if (visite.type_action === 'EFFECTUEE') {
+    gvp_showNotification({ 
+      type: 'warning', 
+      title: '⚠️ Modification impossible', 
+      message: 'Cette visite a déjà été EFFECTUÉE et ne peut plus être modifiée.',
+      duration: 5000
     });
-    
-    setGvp_showForm(true);
-    
-    if (visite.date_visite) {
-      gvp_chargerCreneauxDisponibles(visite.date_visite);
-    }
-  };
+    return;
+  }
+  
+  if (visite.type_action === 'REPROGRAMMEE') {
+    gvp_showNotification({ 
+      type: 'warning', 
+      title: '⚠️ Modification impossible', 
+      message: 'Cette visite a déjà été REPROGRAMMÉE et ne peut plus être modifiée.',
+      duration: 5000
+    });
+    return;
+  }
+  
+  if (visite.type_action === 'ANNULEE') {
+    gvp_showNotification({ 
+      type: 'warning', 
+      title: '⚠️ Modification impossible', 
+      message: 'Cette visite a déjà été ANNULÉE et ne peut plus être modifiée.',
+      duration: 5000
+    });
+    return;
+  }
+  
+  if (visite.type_action === 'REAFFECTEE') {
+    gvp_showNotification({ 
+      type: 'warning', 
+      title: '⚠️ Modification impossible', 
+      message: 'Cette visite a déjà été RÉAFFECTÉE et ne peut plus être modifiée.',
+      duration: 5000
+    });
+    return;
+  }
+  
+  // Vérifier si la visite a un résultat (donc effectuée)
+  if (visite.resultat && visite.resultat !== '' && visite.type_action !== 'MODIFICATION') {
+    gvp_showNotification({ 
+      type: 'warning', 
+      title: '⚠️ Modification impossible', 
+      message: `Cette visite a déjà été effectuée avec le résultat "${visite.resultat}" et ne peut plus être modifiée.`,
+      duration: 5000
+    });
+    return;
+  }
+  
+  if (visite.source !== 'FORMULAIRE' && visite.type_action !== 'SAISIE_MANUELLE' && visite.source_originale !== 'manuel') {
+    gvp_showNotification({ 
+      type: 'warning', 
+      title: '⚠️ Modification impossible', 
+      message: 'Cette visite provient du planning automatique et ne peut pas être modifiée.',
+      duration: 5000
+    });
+    return;
+  }
+  
+  // Vérifier si la visite a déjà une action (via historique)
+  const hasActions = await gvp_checkHasActions(visite.matricule_visite);
+  if (hasActions) {
+    gvp_showNotification({ 
+      type: 'warning', 
+      title: '⚠️ Modification impossible', 
+      message: 'Cette visite a déjà une action associée et ne peut plus être modifiée.',
+      duration: 5000
+    });
+    return;
+  }
+  
+  // Si tout est OK, on continue
+  setGvp_selectedVisite(visite);
+  setGvp_editMode(true);
+  
+  setGvp_formData({
+    matricule_agent: visite.matricule_agent,
+    date_visite: visite.date_visite,
+    heure_visite: visite.heure_visite || '09:00:00',
+    type_visite: visite.type_visite || 'Périodique',
+    motif: visite.motif_reprogrammation || visite.motif_action || '',
+    medecin: visite.medecin || 'Dr. Mahmoud Khelifi',
+    observation: visite.observation || ''
+  });
+  
+  setGvp_showForm(true);
+  
+  if (visite.date_visite) {
+    gvp_chargerCreneauxDisponibles(visite.date_visite);
+  }
+};
   
   // ========== SOUMISSION ==========
   const gvp_handleSubmit = async (e) => {
@@ -519,6 +618,10 @@ const GestionVisitesPage = () => {
         await gvp_fetchVisites();
         await gvp_fetchAgents();
         window.dispatchEvent(new CustomEvent('refresh-planning'));
+        window.dispatchEvent(new CustomEvent('refresh-visites-manuelles'));
+        setTimeout(() => {
+        gvp_fetchVisites();
+      }, 500);
       } else {
         gvp_showNotification({ type: 'error', title: '❌ Erreur', message: data.message });
       }
@@ -548,35 +651,50 @@ const GestionVisitesPage = () => {
     setGvp_creneauxDisponibles([]);
   };
 
-  const gvp_showNotification = ({ type, title, message }) => {
+  const gvp_showNotification = ({ type, title, message, duration = 5000 }) => {
+  // Fermer toute notification existante
+  setGvp_notification({ show: false, type: '', title: '', message: '' });
+  
+  // Petit délai pour s'assurer que l'ancienne est fermée
+  setTimeout(() => {
     setGvp_notification({ show: true, type, title, message });
-    setTimeout(() => setGvp_notification({ show: false, type: '', title: '', message: '' }), 5000);
-  };
+  }, 10);
+  
+  // Auto-fermeture
+  setTimeout(() => {
+    setGvp_notification(prev => {
+      if (prev.show && prev.message === message) {
+        return { show: false, type: '', title: '', message: '' };
+      }
+      return prev;
+    });
+  }, duration);
+};
 
   const gvp_getAgentNom = (matricule) => {
     const agent = gvp_agents.find(a => a.matricule_agent === matricule);
     return agent ? `${agent.nom} ${agent.prenom}` : `Agent ${matricule}`;
   };
 
-  const gvp_getResultatClass = (resultat) => {
-    switch(resultat) {
-      case 'Apte': return 'apte';
-      case 'Apte avec réserves': return 'reserves';
-      case 'Inapte temporaire': return 'temporaire';
-      case 'Inapte définitif': return 'definitif';
-      default: return '';
-    }
-  };
+const gvp_getResultatClass = (resultat) => {
+  if (!resultat) return '';
+  switch(resultat) {
+    case 'Apte': return 'apte';
+    case 'Inapte temporaire': return 'temporaire';
+    case 'Inapte définitif': return 'definitif';
+    default: return '';
+  }
+};
 
-  const gvp_getResultatIcon = (resultat) => {
-    switch(resultat) {
-      case 'Apte': return <CheckCircle size={14} color="#10b981" />;
-      case 'Apte avec réserves': return <AlertCircle size={14} color="#f59e0b" />;
-      case 'Inapte temporaire': return <AlertTriangle size={14} color="#f97316" />;
-      case 'Inapte définitif': return <XCircle size={14} color="#ef4444" />;
-      default: return <Info size={14} />;
-    }
-  };
+const gvp_getResultatIcon = (resultat) => {
+  if (!resultat) return <Info size={14} />;
+  switch(resultat) {
+    case 'Apte': return <CheckCircle size={14} color="#10b981" />;
+    case 'Inapte temporaire': return <AlertTriangle size={14} color="#f97316" />;
+    case 'Inapte définitif': return <XCircle size={14} color="#ef4444" />;
+    default: return <Info size={14} />;
+  }
+};
 
   const gvp_formatDate = (date) => {
     if (!date) return '';
@@ -600,26 +718,59 @@ const GestionVisitesPage = () => {
   // ========== RENDU ==========
   return (
     <div className="gvp_gestion-visites-page">
-      {/* NOTIFICATION */}
-      {gvp_notification.show && (
-        <div className={`gvp_notification-container ${gvp_notification.type}`}>
-          <div className="gvp_notification-content">
-            <div className="gvp_notification-icon">
-              {gvp_notification.type === 'success' && <CheckCircle size={24} />}
-              {gvp_notification.type === 'error' && <XCircle size={24} />}
-              {gvp_notification.type === 'warning' && <AlertCircle size={24} />}
-              {gvp_notification.type === 'info' && <Info size={24} />}
-            </div>
-            <div className="gvp_notification-text">
-              <h4>{gvp_notification.title}</h4>
-              <p>{gvp_notification.message}</p>
-            </div>
-            <button className="gvp_notification-close" onClick={() => setGvp_notification({...gvp_notification, show: false})}>
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      )}
+{/* NOTIFICATION AVEC STYLE INLINE POUR SÉCURITÉ */}
+{gvp_notification.show && (
+  <div 
+    className={`gvp_notification-container ${gvp_notification.type}`}
+    style={{
+      position: 'fixed',
+      top: '80px',
+      right: '20px',
+      zIndex: 99999,
+      backgroundColor: gvp_notification.type === 'warning' ? '#fffbeb' : 
+                      gvp_notification.type === 'error' ? '#fef2f2' : 
+                      gvp_notification.type === 'success' ? '#f0fdf4' : '#eff6ff',
+      borderLeft: `4px solid ${gvp_notification.type === 'warning' ? '#f59e0b' : 
+                                 gvp_notification.type === 'error' ? '#ef4444' : 
+                                 gvp_notification.type === 'success' ? '#22c55e' : '#3b82f6'}`,
+      borderRadius: '12px',
+      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+      minWidth: '350px',
+      maxWidth: '450px',
+      padding: '16px'
+    }}
+  >
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div style={{ 
+        color: gvp_notification.type === 'warning' ? '#f59e0b' : 
+               gvp_notification.type === 'error' ? '#ef4444' : 
+               gvp_notification.type === 'success' ? '#22c55e' : '#3b82f6'
+      }}>
+        {gvp_notification.type === 'success' && <CheckCircle size={24} />}
+        {gvp_notification.type === 'error' && <XCircle size={24} />}
+        {gvp_notification.type === 'warning' && <AlertCircle size={24} />}
+        {gvp_notification.type === 'info' && <Info size={24} />}
+      </div>
+      <div style={{ flex: 1 }}>
+        <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 'bold' }}>{gvp_notification.title}</h4>
+        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>{gvp_notification.message}</p>
+      </div>
+      <button 
+        onClick={() => setGvp_notification({ show: false, type: '', title: '', message: '' })}
+        style={{ 
+          background: 'none', 
+          border: 'none', 
+          cursor: 'pointer',
+          padding: '4px',
+          borderRadius: '4px',
+          color: '#94a3b8'
+        }}
+      >
+        <X size={16} />
+      </button>
+    </div>
+  </div>
+)}
 
       {/* HEADER */}
       <div className="gvp_gestion-header">
@@ -656,6 +807,24 @@ const GestionVisitesPage = () => {
 
       {/* FILTRES */}
       <div className="gvp_filters-section">
+          <div className="gvp_filter-agent" style={{ position: 'relative', flex: 1, minWidth: '250px' }}>
+    <User size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', zIndex: 1, color: '#94a3b8' }} />
+    <AgentSearchInput
+      value={gvp_filters.agent}
+      onChange={(matricule) => {
+        setGvp_filters({...gvp_filters, agent: matricule || 'all'});
+        setGvp_currentPage(1);
+      }}
+      onSelect={(agent) => {
+        setGvp_filters({...gvp_filters, agent: agent?.matricule_agent || 'all'});
+        setGvp_currentPage(1);
+      }}
+      placeholder="Rechercher un agent par nom, prénom ou matricule..."
+      style={{ paddingLeft: '32px' }}
+    />
+  </div>
+
+
         <div className="gvp_filters-header">
           <button
             className={`gvp_filter-toggle-btn ${gvp_showFilters ? 'active' : ''}`}
@@ -663,16 +832,6 @@ const GestionVisitesPage = () => {
           >
             <Filter size={16} /> Filtres avancés
           </button>
-
-          <div className="gvp_search-box">
-            <Search size={16} />
-            <input
-              type="text"
-              placeholder="Rechercher un agent..."
-              value={gvp_filters.search}
-              onChange={(e) => setGvp_filters({...gvp_filters, search: e.target.value})}
-            />
-          </div>
         </div>
 
         {gvp_showFilters && (
@@ -809,95 +968,87 @@ const GestionVisitesPage = () => {
         </div>
       ) : (
         <>
-          <div className="gvp_table-container">
-            <table className="gvp_visites-table">
-              <thead>
-                <tr>
-                  <th>Date & Heure</th>
-                  <th>Agent</th>
-                  <th>Type</th>
-                  <th>Médecin</th>
-                  <th>Résultat</th>
-                  <th>Observations</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {gvp_currentVisites.map(visite => (
-                  <tr key={visite.matricule_visite}>
-                    <td>
-                      <div className="gvp_date-cell">
-                        <Calendar size={12} />
-                        {visite.date_visite ? gvp_formatDateTime(visite.date_visite, visite.heure_visite) : 'Date non définie'}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="gvp_agent-cell">
-                        <div className="gvp_agent-avatar-small">
-                          {(visite.visiteAgent?.nom?.charAt(0) || visite.agent_nom?.charAt(0) || '?')}
-                          {(visite.visiteAgent?.prenom?.charAt(0) || visite.agent_prenom?.charAt(0) || '')}
-                        </div>
-                        <div className="gvp_agent-info">
-                          <span>{visite.visiteAgent?.nom || visite.agent_nom} {visite.visiteAgent?.prenom || visite.agent_prenom}</span>
-                          <small>#{visite.matricule_agent}</small>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      {visite.type_visite === 'Périodique' && (
-                        <span className="gvp_type-badge periodique">📋 Périodique</span>
-                      )}
-                      {visite.type_visite === 'Reclassement' && (
-                        <span className="gvp_type-badge reclassement">📝 Reclassement</span>
-                      )}
-                      {visite.type_visite === 'Embauche' && (
-                        <span className="gvp_type-badge embauche">👔 Embauche</span>
-                      )}
-                      {!visite.type_visite && (
-                        <span className="gvp_type-badge periodique">📋 Périodique</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="gvp_medecin-cell">
-                        <User size={12} />
-                        {visite.medecin || 'Dr. Mahmoud Khelifi'}
-                      </div>
-                    </td>
-                    <td>
-                      {visite.type_action === 'EFFECTUEE' ? (
-                        <span className={`gvp_resultat-badge ${gvp_getResultatClass(visite.resultat)}`}>
-                          {gvp_getResultatIcon(visite.resultat)}
-                          {visite.resultat || 'Non défini'}
-                        </span>
-                      ) : (
-                        <span className="gvp_resultat-badge non-effectue">
-                          <Clock size={12} /> En attente
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="gvp_observation-cell" title={visite.observation}>
-                        {visite.observation?.substring(0, 50) || '-'}
-                        {visite.observation?.length > 50 && '...'}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="gvp_row-actions">
-                        <button
-                          className={`gvp_action-btn edit ${visite.hasActions ? 'disabled' : ''}`}
-                          onClick={() => !visite.hasActions && gvp_handleEdit(visite)}
-                          title={visite.hasActions ? 'Modification impossible - Une action a déjà été effectuée' : 'Modifier la programmation'}
-                          disabled={visite.hasActions}
-                        >
-                          <Edit size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        
+{/* TABLEAU DES VISITES */}
+<div className="gvp_table-container">
+  <table className="gvp_visites-table">
+    <thead>
+      <tr>
+        <th>Date & Heure</th>
+        <th>Agent</th>
+        <th>Type</th>
+        <th>Médecin</th>
+        <th>Résultat</th>
+        <th>Observations</th>
+        <th>Modifications</th>
+      </tr>
+    </thead>
+    <tbody>
+      {gvp_currentVisites.map((visite) => (
+        <tr key={visite.matricule_visite}>
+          {/* Date & Heure */}
+          <td>{gvp_formatDateTime(visite.date_visite, visite.heure_visite)}</td>
+          
+          {/* Agent */}
+          <td>
+            <strong>{visite.visiteAgent?.nom || visite.agent_nom} {visite.visiteAgent?.prenom || visite.agent_prenom}</strong>
+            <br/>
+            <small>#{visite.matricule_agent}</small>
+          </td>
+          
+          {/* Type */}
+          <td>
+            {visite.type_visite === 'Périodique' && '📋 Périodique'}
+            {visite.type_visite === 'Reclassement' && '📝 Reclassement'}
+            {visite.type_visite === 'Embauche' && '👔 Embauche'}
+            {!visite.type_visite && '📋 Périodique'}
+          </td>
+          
+          {/* Médecin */}
+          <td>{visite.medecin || 'Dr. Mahmoud Khelifi'}</td>
+          
+          {/* ✅ RÉSULTAT - CORRIGÉ POUR AFFICHER LE RÉSULTAT */}
+          <td className="gvp_resultat-cell">
+  {visite.type_action === 'EFFECTUEE' || (visite.resultat && visite.resultat !== '') ? (
+    <span className={`gvp_resultat-badge ${gvp_getResultatClass(visite.resultat)}`}>
+      {gvp_getResultatIcon(visite.resultat)}
+      {visite.resultat || 'Non défini'}
+    </span>
+  ) : (
+    <span className="gvp_resultat-badge non-effectue">
+      <Clock size={12} /> En attente
+    </span>
+  )}
+</td>
+          
+          {/* Observations */}
+          <td>{visite.observation?.substring(0, 50) || '-'}</td>
+          
+          {/* ✅ MODIFICATIONS - BOUTON TOUJOURS VISIBLE */}
+          <td className="gvp_modifications-cell">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
+              {/* Bouton Modifier TOUJOURS VISIBLE */}
+              <button 
+                className="gvp_action-btn edit" 
+                onClick={() => gvp_handleEdit(visite)}
+                style={{ 
+                  opacity: (visite.resultat && visite.resultat !== '') ? 0.6 : 1,
+                  cursor: 'pointer'
+                }}
+                title={(visite.resultat && visite.resultat !== '') ? `Cette visite a déjà été effectuée avec le résultat "${visite.resultat}"` : 'Modifier la visite'}
+              >
+                <Edit size={14} /> Modifier
+              </button>
+              {visite.modifications_count > 0 && (
+                <span className="gvp_modifications-badge">📝 {visite.modifications_count} modif(s)</span>
+              )}
+            </div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
 
           {/* PAGINATION */}
           {gvp_visites.length > 0 && (
@@ -998,14 +1149,14 @@ const GestionVisitesPage = () => {
                       ) : (
                         <AgentSearchInput
                           value={gvp_formData.matricule_agent}
-                          onChange={(matricule) => {
+  onChange={(matricule) => {
                             setGvp_formData({...gvp_formData, matricule_agent: matricule, date_visite: '', heure_visite: ''});
                             setGvp_joursDisponibles([]);
                             setGvp_creneauxDisponibles([]);
-                          }}
+  }}
                           onSelect={(agent) => console.log('Agent sélectionné:', agent)}
                           placeholder="Tapez le nom, prénom ou matricule..."
-                        />
+/>
                       )}
                       {gvp_formErrors.matricule_agent && (
                         <div className="gvp_error-message">{gvp_formErrors.matricule_agent}</div>
