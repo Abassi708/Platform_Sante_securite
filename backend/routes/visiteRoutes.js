@@ -552,7 +552,7 @@ router.get('/agents', protect, async (req, res) => {
     const [agents] = await sequelizeGlobal.query(`
       SELECT 
         matricule_agent, nom, prenom, code_agence, code_affectation,
-        statut, date_derniere_visite, date_fin_inaptitude, date_prochaine_inaptitude,
+        statut, date_derniere_visite,date_prochaine_visite, date_fin_inaptitude, date_prochaine_inaptitude,
         date_naissance, direction, periodicite_jours, date_debut_inaptitude, created_at,
         date_debut_reclassement,
         date_fin_reclassement,

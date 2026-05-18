@@ -48,12 +48,12 @@ exports.getAgents = async (req, res) => {
     console.log('Filtres:', where);
     
     const { count, rows: agents } = await Agent.findAndCountAll({
-      where,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      order: [['nom', 'ASC'], ['prenom', 'ASC']],
-      raw: true
-    });
+  where,
+  limit: parseInt(limit),
+  offset: parseInt(offset),
+  order: [['nom', 'ASC'], ['prenom', 'ASC']],
+  raw: true
+});
     
     console.log(`✅ ${agents.length} agents trouvés sur ${count} total`);
     

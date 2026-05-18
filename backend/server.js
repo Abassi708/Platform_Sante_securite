@@ -1,6 +1,7 @@
 // backend/server.js
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 require('dotenv').config();
 const { sequelizeGlobal, sequelizeLocal, testConnections } = require('./config/database');
 
@@ -26,8 +27,8 @@ const documentRoutes = require('./routes/documentRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const creneauxRoutes = require('./routes/creneauxRoutes');
 const auditRoutes = require('./routes/auditRoutes');
-const initialisationService = require('./services/initialisationService');
 
+const initialisationService = require('./services/initialisationService');
 const planningService = require('./services/planningService');
 
 // ========== IMPORT DES CRONS ==========
@@ -58,7 +59,7 @@ app.use(cors({
     if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('server680404.ddns.net')) {
       callback(null, true);
     } else {
-      console.log('❌ CORS bloqué pour:', origin);
+      console.log(' CORS bloqué pour:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -66,6 +67,9 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// ========== HELMET (SÉCURITÉ DES EN-TÊTES HTTP) ==========
+app.use(helmet());
 
 // ========== MIDDLEWARES DE BASE ==========
 app.use(express.json({ limit: '10mb' }));
@@ -76,9 +80,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/otp', otpRoutes);
 app.use('/api/password', passwordRoutes);
 app.use('/api/health', (req, res) => {
-  res.json({ 
+  res.json({
     success: true,
-    status: 'OK', 
+    status: 'OK',
     message: 'Backend opérationnel',
     timestamp: new Date().toISOString(),
     version: '2.0.0',
@@ -99,9 +103,38 @@ app.use('/api/chatbot', protect, auditMiddleware, chatbotRoutes);
 app.use('/api/documents', protect, auditMiddleware, documentRoutes);
 app.use('/api/audit', protect, auditRoutes);
 
+// ========== ROUTE POUR L'ENVOI D'EMAIL DE SUPPORT DEPUIS L'AGENT ==========
+app.post('/api/support/agent-send', protect, async (req, res) => {
+  try {
+    const { sendAgentSupportEmail } = require('./services/emailService');
+    
+    const result = await sendAgentSupportEmail({
+      to: req.body.destinataireEmail,
+      toName: req.body.destinataireNom,
+      subject: req.body.objet,
+      message: req.body.message,
+      agentName: `${req.body.agent_nom} ${req.body.agent_prenom}`,
+      agentMatricule: req.body.agent_matricule,
+      agentEmail: req.body.agent_email,
+      agentTelephone: req.body.agent_telephone,
+      type: req.body.type,
+      urgence: req.body.urgence
+    });
+    
+    if (result.success) {
+      res.json({ success: true, message: 'Email envoyé avec succès' });
+    } else {
+      res.status(500).json({ success: false, message: result.error });
+    }
+  } catch (error) {
+    console.error('❌ Erreur route support:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // ========== LOG DE DÉBOGAGE ==========
 app.use((req, res, next) => {
-  console.log(`📡 ${req.method} ${req.url} - ${new Date().toLocaleTimeString()}`);
+  console.log(` ${req.method} ${req.url} - ${new Date().toLocaleTimeString()}`);
   next();
 });
 
@@ -123,44 +156,44 @@ function getLocalIp() {
 const PORT = process.env.PORT || 5000;
 
 const initialiserPlanningFutur = async () => {
-  console.log('\n📅 Initialisation des plannings futurs (4 semaines)...');
+  console.log('\n Initialisation des plannings futurs (4 semaines)...');
   const aujourdhui = new Date();
   let totalGenere = 0;
   let semainesGenerees = [];
-  
+
   for (let i = 1; i <= 4; i++) {
     const semaineCible = planningService.getNumeroSemaine(aujourdhui) + i;
     let anneeCible = aujourdhui.getFullYear();
     let semaineTemp = semaineCible;
-    
+
     if (semaineTemp > 52) {
       semaineTemp = 1;
       anneeCible++;
     }
-    
+
     try {
       const planningExistant = await planningService.Planning.findOne({
         where: { semaine: semaineTemp, annee: anneeCible }
       });
-      
+
       if (!planningExistant) {
         const lundiCible = planningService.getLundiSemaine(semaineTemp, anneeCible);
         const planning = await planningService.genererPlanningSemaine(new Date(lundiCible), 1);
         totalGenere += planning.length;
         semainesGenerees.push(`${semaineTemp}/${anneeCible}`);
-        console.log(`   ✅ Semaine ${semaineTemp}/${anneeCible}: ${planning.length} visite(s) générée(s)`);
+        console.log(`   Semaine ${semaineTemp}/${anneeCible}: ${planning.length} visite(s) générée(s)`);
       } else {
-        console.log(`   ⏭️ Semaine ${semaineTemp}/${anneeCible}: déjà existante`);
+        console.log(`   Semaine ${semaineTemp}/${anneeCible}: déjà existante`);
       }
     } catch (err) {
-      console.error(`   ❌ Erreur semaine ${semaineTemp}/${anneeCible}:`, err.message);
+      console.error(`   Erreur semaine ${semaineTemp}/${anneeCible}:`, err.message);
     }
   }
-  
+
   if (semainesGenerees.length > 0) {
-    console.log(`\n📊 ${totalGenere} visite(s) générée(s) pour les semaines: ${semainesGenerees.join(', ')}`);
+    console.log(`\n ${totalGenere} visite(s) générée(s) pour les semaines: ${semainesGenerees.join(', ')}`);
   } else {
-    console.log(`\n📊 Aucune nouvelle visite générée (planning déjà à jour)`);
+    console.log(`\n Aucune nouvelle visite générée (planning déjà à jour)`);
   }
 };
 
@@ -170,18 +203,17 @@ testConnections().then(async () => {
   await initialisationService.initialiser();
   await initialiserPlanningFutur();
 
-  
   // 2. Démarrer le serveur
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🚀 Serveur démarré sur http://localhost:${PORT}`);
+    console.log(`\n Serveur démarré sur http://localhost:${PORT}`);
     console.log(`   Accessible sur le réseau: http://${getLocalIp()}:${PORT}`);
     console.log(`   API publique: http://server680404.ddns.net:${PORT}/api/health`);
-    console.log('\n✅ Backend prêt !\n');
+    console.log('\n Backend prêt !\n');
   });
 }).catch(error => {
-  console.error('\n❌ Erreur de connexion aux bases de données:');
+  console.error('\n Erreur de connexion aux bases de données:');
   console.error(error);
-  console.log('\n💡 Vérifications:');
+  console.log('\n Vérifications:');
   console.log('   1. Le serveur MySQL est-il accessible depuis cette machine ?');
   console.log('   2. Le port 3368 est-il ouvert sur le serveur distant ?');
   console.log('   3. Les identifiants sont-ils corrects ?');

@@ -292,6 +292,31 @@ class IntelligentChatbot {
     
     const q = this._normaliserPhrase(correctedQuestion);
     
+    // ✅ MODIFICATION 1 : PRIORITÉ "type de visite future"
+    if ((q.includes('type') && (q.includes('future') || q.includes('prochaine'))) ||
+        (q.includes('quel type') && q.includes('visite'))) {
+      console.log(`🎯 Intention forcée: prochaineVisite`);
+      return { intention: 'prochaineVisite', score: 100 };
+    }
+    
+    // ✅ MODIFICATION 2 : PRIORITÉ Questions sur les contacts
+    if (q.includes('contacter') || q.includes('contact') || q.includes('telephone') || 
+        q.includes('appeler') || q.includes('numero') || q.includes('adresse') ||
+        q.includes('service hse') || q.includes('service sante') || q.includes('securite') ||
+        q.includes('comment joindre')) {
+      console.log(`🎯 Intention forcée: contact`);
+      return { intention: 'contact', score: 100 };
+    }
+    
+    // ✅ MODIFICATION 3 : PRIORITÉ "Pourquoi ce type de visite ?"
+    if ((q.includes('pourquoi') || q.includes('raison')) && 
+        (q.includes('periodique') || q.includes('reprise') || 
+         q.includes('reclassement') || q.includes('embauche')) &&
+        (q.includes('type') || q.includes('visite'))) {
+      console.log(`🎯 Intention forcée: pourquoiTypeVisite`);
+      return { intention: 'pourquoiTypeVisite', score: 100 };
+    }
+    
     // ✅ PRIORITÉ ABSOLUE : Questions "que faire en cas d'accident" (toutes formes)
     if ((q.includes('accident') && (q.includes('que faire') || q.includes('que dois je') || q.includes('dois je faire') || q.includes('que doit je') || q.includes('que faut il'))) ||
         (q.includes('accident') && q.includes('avant') && q.includes('visite')) ||
@@ -342,6 +367,9 @@ class IntelligentChatbot {
       oui: ['oui', 'ok', 'daccord', 'entendu', 'oui merci'],
       non: ['non', 'non merci', 'pas maintenant', 'non rien'],
       aide: ['aide', 'help', 'que peux tu faire', 'que faire', 'besoin aide'],
+      // ✅ MODIFICATION 5 : Ajout de contact et pourquoiTypeVisite
+      contact: ['contacter', 'contact', 'telephone', 'appeler', 'numero', 'adresse', 'service hse', 'service sante', 'securite', 'comment joindre'],
+      pourquoiTypeVisite: ['pourquoi periodique', 'pourquoi reprise', 'pourquoi reclassement', 'pourquoi embauche', 'raison de la visite periodique', 'pourquoi ce type de visite'],
       
       explication: ['explique', 'comment se fait il', 'quelle est la raison', 'pour quelle raison', 'explique moi', 'raison de', 'cause de'],
       
@@ -375,7 +403,7 @@ class IntelligentChatbot {
         'afficher mes visites', 'donne moi toutes mes visites', 'planning total'
       ],
       
-      prochainePeriodique: ['prochaine visite periodique', 'visite periodique', 'prochaine periodique', 'routine', 'visite de routine'],
+      prochainePeriodique: ['prochaine visite periodique', 'visite periodique', 'prochaine periodique', 'routine', 'visite de routine','prochaine visite programmé','visite future'],
       prochaineReprise: ['prochaine visite reprise', 'visite reprise', 'reprise apres arret', 'retour travail'],
       prochaineReclassement: ['prochaine visite reclassement', 'visite reclassement', 'reclassement', 'changement poste'],
       prochaineEmbauche: ['prochaine visite embauche', 'visite embauche', 'embauche', 'nouvel agent'],
@@ -422,6 +450,12 @@ class IntelligentChatbot {
         meilleurScore = score;
         meilleureIntention = intention;
       }
+    }
+    
+    // ✅ MODIFICATION 4 : Si le score est trop bas, retourner intention inconnue
+    if (meilleurScore < 5) {
+      console.log(`🎯 Score trop bas (${meilleurScore}), intention inconnue`);
+      return { intention: 'inconnue', score: 0 };
     }
     
     console.log(`🎯 Intention détectée: ${meilleureIntention} (score: ${meilleurScore})`);
@@ -594,7 +628,7 @@ Vous n'avez actuellement aucune visite programmée.
 
 🏥 **RÈGLES MÉTIER HSE**
 
-**Cas 1 : Accident SANS arrêt de travail** (jour_arret = 0)
+**Cas 1 : Accident SANS arrêt de trabalho** (jour_arret = 0)
 
 ✅ **Votre visite du ${dateFormatted} reste maintenue**
 📅 La date ne change pas
@@ -1666,110 +1700,58 @@ Réponds à la question de l'agent de manière complète, détaillée et personn
   }
 
   // Version détaillée du fallback pour les questions "pourquoi"
+    // ✅ MODIFICATION 13 : Version courte et professionnelle
   reponseExplicationDetaillee(question, agentData) {
     const q = question.toLowerCase();
     
-    if ((q.includes('visite') || q.includes('date')) && (q.includes('pourquoi') || q.includes('raison') || q.includes('pour quelle'))) {
+    // Questions sur la date de la prochaine visite
+    if ((q.includes('visite') || q.includes('date')) && 
+        (q.includes('pourquoi') || q.includes('raison') || q.includes('pour quelle'))) {
+      
       const prochaine = agentData.prochainesParType['Périodique'];
       if (prochaine) {
         const derniereVisite = agentData.derniereParType['Périodique'];
-        const periodicite = agentData.periodicite;
-        const dateProchaine = this._formaterDate(prochaine.date_visite);
-        const heureProchaine = this._formaterHeure(prochaine.heure_visite);
+        const periodicite = agentData.periodiciteJours;
         const estChauffeur = agentData.estChauffeur;
         
-        if (derniereVisite) {
-          const dateDerniere = this._formaterDate(derniereVisite.date_visite, false);
-          return `🔍 **POURQUOI VOTRE VISITE EST LE ${dateProchaine.toUpperCase()} ?**
-
-📊 **Calcul automatique basé sur votre historique médical :**
-
-• **Dernière visite périodique** : ${dateDerniere}
-• **Votre poste** : ${estChauffeur ? 'Chauffeur' : 'Contrôleur'} → périodicité de ${periodicite}
-• **Calcul** : ${dateDerniere} + ${periodicite} = ${this._formaterDate(prochaine.date_visite, false)}
-
-📌 **Rappel des règles SRTB :**
-• Chauffeurs : visite médicale tous les 6 mois
-• Contrôleurs : visite médicale tous les 1 an
-
-💡 **Pourquoi ${periodicite} pour les ${estChauffeur ? 'chauffeurs' : 'contrôleurs'} ?**
-${estChauffeur ? 'La réglementation impose une surveillance médicale renforcée pour les conducteurs professionnels (code de la route, arrêté du 21/12/2005).' : 'Périodicité standard pour les postes sédentaires, conformément à la médecine du travail.'}
-
-📅 **Détails de votre visite :**
-• Date : ${dateProchaine}
-• Heure : ${heureProchaine}
-• Lieu : Infirmerie SRTB - Bizerte
-• Médecin : Dr. Mahmoud Khelifi
-
-⚠️ **Que faire si cette date ne vous convient pas ?**
-• Contacter le service HSE au 71 123 456
-• Ou demander "reprogrammer ma visite"
-
-💡 **Conseil** : Présentez-vous 15 minutes avant avec votre carte d'identité et votre convocation.`;
-        } else {
-          return `🔍 **POURQUOI VOTRE VISITE EST LE ${dateProchaine.toUpperCase()} ?**
-
-📊 **Première visite programmée :**
-
-• C'est votre première visite médicale dans le système SRTB
-• Date définie selon votre poste : ${estChauffeur ? 'Chauffeur' : 'Contrôleur'}
-• Périodicité appliquée : ${periodicite}
-
-📅 **Détails de votre visite :**
-• Date : ${dateProchaine}
-• Heure : ${heureProchaine}
-• Lieu : Infirmerie SRTB - Bizerte
-• Médecin : Dr. Mahmoud Khelifi
-
-⚠️ **Que faire si cette date ne vous convient pas ?**
-• Contacter le service HSE au 71 123 456
-• Ou demander "reprogrammer ma visite"
-
-💡 **Conseil** : Présentez-vous 15 minutes avant avec votre carte d'identité.`;
-        }
+        let reponse = `🔍 **POURQUOI VOTRE PROCHAINE VISITE EST LE ${this._formaterDate(prochaine.date_visite, false)} ?**\n\n`;
+        reponse += `**Raison :** Calcul automatique basé sur votre historique médical.\n\n`;
+        reponse += `• **Dernière visite** : ${this._formaterDate(derniereVisite?.date_visite, false) || 'Non renseignée'}\n`;
+        reponse += `• **Votre poste** : ${estChauffeur ? 'Chauffeur' : 'Contrôleur'} → périodicité ${periodicite} jours\n`;
+        reponse += `• **Calcul** : ${this._formaterDate(derniereVisite?.date_visite, false)} + ${periodicite} jours = ${this._formaterDate(prochaine.date_visite, false)}\n\n`;
+        reponse += `📌 **Règle SRTB** : Les ${estChauffeur ? 'chauffeurs ont une visite tous les 6 mois' : 'contrôleurs ont une visite tous les 1 an'}.\n\n`;
+        reponse += `💡 **Si cette date ne vous convient pas** : Contactez le service HSE au 71 123 456 pour reprogrammer.`;
+        
+        return reponse;
       }
     }
     
+    // Questions sur les accidents
     if (q.includes('accident')) {
-      return `🔍 **EXPLICATION SUR VOS ACCIDENTS**
-
-📊 **D'après vos données** : vous avez déclaré ${agentData.accidents.length} accident(s) de travail, totalisant ${agentData.totalJoursArret} jour(s) d'arrêt.
-
-📋 **Détail des accidents** :
-${agentData.accidents.slice(0, 3).map((a, i) => `• ${i+1}. ${this._formaterDate(a.date_accident, false)} : ${a.gravite || 'gravité non définie'}${a.jour_arret > 0 ? ` (${a.jour_arret}j d'arrêt)` : ''}`).join('\n')}
-
-💡 **Pour plus de détails** : demandez "mes accidents" pour voir tous les détails.
-
-⚠️ **Rappel** : Signalez tout nouvel accident immédiatement à votre supérieur.`;
+      return `🔍 **POURQUOI CETTE DATE ?**\n\n` +
+             `📊 **Vos accidents** : ${agentData.accidents.length} accident(s), ${agentData.totalJoursArret} jours d'arrêt.\n\n` +
+             `💡 Pour plus de détails, demandez "mes accidents".`;
     }
     
+    // Questions sur l'inaptitude
     if (q.includes('inaptitude') || q.includes('inapte')) {
-      if (agentData.inaptitudeStatus && agentData.inaptitudeStatus.estEnCours) {
-        return `🔍 **EXPLICATION DE VOTRE INAPTITUDE**
-
-🏥 **Vous êtes actuellement en inaptitude temporaire**
-
-📅 **Période** : du ${this._formaterDate(agentData.inaptitudeStatus.dateDebut, false)} au ${this._formaterDate(agentData.inaptitudeStatus.dateFin, false)}
-⏱️ **Jours restants** : ${agentData.inaptitudeStatus.joursRestants} jours
-
-**Raison** : Cette période a été définie par le médecin du travail lors de votre dernière visite médicale.
-
-📋 **Prochaines étapes** :
-• Une visite de reprise sera automatiquement programmée avant la fin de cette période
-• Vous serez notifié par email et SMS de la date
-
-💡 **Recommandation** : Suivez bien les recommandations de votre médecin. En cas de question, contactez le service HSE au 71 123 456.`;
+      if (agentData.inaptitudeStatus?.estEnCours) {
+        return `🔍 **POURQUOI CETTE PÉRIODE D'INAPTITUDE ?**\n\n` +
+               `📅 **Début** : ${this._formaterDate(agentData.inaptitudeStatus.dateDebut, false)}\n` +
+               `📅 **Fin** : ${this._formaterDate(agentData.inaptitudeStatus.dateFin, false)}\n` +
+               `⏱️ **Jours restants** : ${agentData.inaptitudeStatus.joursRestants}\n\n` +
+               `**Raison** : Période définie par le médecin du travail lors de votre dernière visite.\n\n` +
+               `💡 Une visite de reprise sera programmée automatiquement avant la fin.`;
       }
     }
     
-    return `🔍 **QUESTIONS "POURQUOI"**
-
-Je peux vous expliquer :
-• "Pourquoi ma prochaine visite est le [date] ?" → Calcul basé sur votre dernière visite + périodicité
-• "Pourquoi suis-je en inaptitude ?" → Période définie par le médecin
-• "Pourquoi j'ai eu autant d'accidents ?" → Historique détaillé de vos accidents
-
-💡 Pour des réponses encore plus intelligentes, assurez-vous que votre clé API GROQ est configurée dans le fichier .env.`;
+    // Réponse par défaut courte
+    return `🔍 **POURQUOI ?**\n\n` +
+           `Je peux vous expliquer :\n` +
+           `• "Pourquoi ma prochaine visite est le [date] ?" → Calcul basé sur votre dernière visite + périodicité\n` +
+           `• "Pourquoi suis-je en inaptitude ?" → Période définie par le médecin\n` +
+           `• "Pourquoi j'ai eu autant d'accidents ?" → Historique détaillé\n\n` +
+           `💡 Pour une réponse précise, formulez une question complète.`;
   }
 
   // ========== GRAPHIQUES ==========
@@ -2459,6 +2441,84 @@ Questions possibles :
 💡 Dites "aide" pour plus d'options.`;
   }
 
+  // ✅ MODIFICATION 6 : MÉTHODE reponseContact
+  reponseContact(agentData) {
+    return `📞 **CONTACT SERVICE HSE SRTB**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Téléphone** : 71 123 456
+**Email** : hse@srtb.tn
+**Horaires** : Lundi - Vendredi, 8h00 - 16h00
+
+**Adresse** : Infirmerie Médicale du Travail
+             SRTB - Bizerte
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**Motif de contact** :
+
+| Besoin | Action |
+|--------|--------|
+| Reprogrammer visite | Appeler le 71 123 456 |
+| Question médicale | Email à hse@srtb.tn |
+| Documents | Via l'application |
+| Urgence médicale | Contacter votre médecin traitant |
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 Pour toute question, n'hésitez pas à nous contacter.`;
+  }
+
+  // ✅ MODIFICATION 7 : MÉTHODE reponsePourquoiTypeVisite
+  reponsePourquoiTypeVisite(question, agentData) {
+    const q = question.toLowerCase();
+    const estChauffeur = agentData.estChauffeur;
+    
+    let type = null;
+    if (q.includes('periodique')) type = 'Périodique';
+    else if (q.includes('reprise')) type = 'Reprise';
+    else if (q.includes('reclassement')) type = 'Reclassement';
+    else if (q.includes('embauche')) type = 'Embauche';
+    
+    const explications = {
+      'Périodique': {
+        titre: 'VISITE PÉRIODIQUE',
+        raison: `En tant que ${estChauffeur ? 'chauffeur professionnel' : 'agent de contrôle'}, la réglementation vous impose une visite médicale ${estChauffeur ? 'tous les 6 mois' : 'tous les 1 an'}.`,
+        regle: `Article R. 4624-16 du Code du travail : "Les travailleurs bénéficient d'un suivi médical individuel dont la périodicité est adaptée à leur poste."`,
+        pourquoi: `Pour les conducteurs professionnels, une surveillance médicale renforcée est obligatoire (arrêté du 21/12/2005).`
+      },
+      'Reprise': {
+        titre: 'VISITE DE REPRISE',
+        raison: `Vous avez eu un arrêt de travail de moins de 30 jours. La loi impose une visite médicale de reprise avant votre retour.`,
+        regle: `Article R. 4624-22 du Code du travail : "Une visite de reprise est obligatoire après un arrêt d'au moins 30 jours."`,
+        pourquoi: `Cette visite vérifie que vous êtes apte à reprendre votre poste en toute sécurité.`
+      },
+      'Reclassement': {
+        titre: 'VISITE DE RECLASSEMENT',
+        raison: `Votre arrêt a dépassé 30 jours ou votre médecin a émis un avis d'inaptitude partielle.`,
+        regle: `Article R. 4624-31 du Code du travail : "Le médecin du travail peut proposer un reclassement si l'agent n'est plus apte à son poste."`,
+        pourquoi: `Pour évaluer votre capacité à occuper un autre poste adapté à votre état de santé.`
+      },
+      'Embauche': {
+        titre: "VISITE D'EMBAUCHE",
+        raison: `Vous êtes un nouvel agent SRTB. La visite médicale d'embauche est obligatoire avant votre prise de poste.`,
+        regle: `Article R. 4624-10 du Code du travail : "Tout nouvel embauché bénéficie d'une visite d'information et de prévention."`,
+        pourquoi: `Pour s'assurer que vous êtes apte au poste et vous informer sur les risques professionnels.`
+      }
+    };
+    
+    const explication = explications[type] || explications['Périodique'];
+    
+    let reponse = `🔍 **POURQUOI CETTE ${explication.titre} ?**\n\n`;
+    reponse += `📌 **Raison** : ${explication.raison}\n\n`;
+    reponse += `⚖️ **Fondement réglementaire** : ${explication.regle}\n\n`;
+    reponse += `📖 **Explication** : ${explication.pourquoi}\n\n`;
+    reponse += `💡 **Dans votre cas** : ${estChauffeur ? 'Vous êtes chauffeur, donc visite tous les 6 mois.' : 'Vous êtes contrôleur, donc visite tous les 1 an.'}`;
+    
+    return reponse;
+  }
+
   // ========== MÉTHODE PRINCIPALE ==========
 
   async processMessage(message, userId, matricule) {
@@ -2537,6 +2597,14 @@ Questions possibles :
       reponse = this.reponseCommentCaVa();
     } else if (intention === 'aide') {
       reponse = this.formatAide();
+    }
+    // ✅ MODIFICATION 9 : Ajout du traitement contact
+    else if (intention === 'contact') {
+      reponse = this.reponseContact(agentData);
+    }
+    // ✅ MODIFICATION 9 : Ajout du traitement pourquoiTypeVisite
+    else if (intention === 'pourquoiTypeVisite') {
+      reponse = this.reponsePourquoiTypeVisite(sanitizedMessage, agentData);
     }
     // ✅ PROCÉDURE EN CAS D'ACCIDENT (PRIORITÉ ABSOLUE)
     else if (intention === 'procedureAccident') {
@@ -2682,4 +2750,4 @@ Questions possibles :
   }
 }
 
-module.exports = IntelligentChatbot;            
+module.exports = IntelligentChatbot; 

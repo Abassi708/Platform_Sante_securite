@@ -353,10 +353,112 @@ const sendConvocationEmail = async (grhEmail, sujet, planning, pdfBuffer = null)
     return { success: false, error: error.message };
   }
 };
+// ========== ENVOI EMAIL DE SUPPORT DEPUIS L'AGENT ==========
+const sendAgentSupportEmail = async (data) => {
+  try {
+    const { 
+      to, 
+      toName, 
+      subject, 
+      message, 
+      agentName, 
+      agentMatricule, 
+      agentEmail, 
+      agentTelephone,
+      type,
+      urgence
+    } = data;
+
+    const urgencyColors = {
+      'Normale': { bg: '#d1fae5', color: '#059669', emoji: '🟢' },
+      'Importante': { bg: '#fef3c7', color: '#d97706', emoji: '🟡' },
+      'Urgente': { bg: '#fee2e2', color: '#dc2626', emoji: '🔴' }
+    };
+    const urgencyStyle = urgencyColors[urgence] || urgencyColors['Normale'];
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
+          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #c4a962, #a8893a); color: white; padding: 25px; text-align: center; }
+          .header h1 { margin: 0; font-size: 22px; }
+          .header p { margin: 8px 0 0; opacity: 0.9; font-size: 13px; }
+          .content { padding: 25px; }
+          .info-box { background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid #c4a962; }
+          .info-box p { margin: 6px 0; font-size: 14px; }
+          .label { font-weight: bold; color: #c4a962; }
+          .urgency-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; background: ${urgencyStyle.bg}; color: ${urgencyStyle.color}; }
+          .message-box { background: #fefaf5; padding: 15px; border-radius: 12px; margin: 15px 0; border: 1px solid #e9ecef; }
+          .message-box p { margin: 10px 0; line-height: 1.6; white-space: pre-wrap; }
+          .footer { background: #f8f9fa; padding: 15px; text-align: center; font-size: 11px; color: #6c757d; border-top: 1px solid #e9ecef; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📬 SRTB - Plateforme Santé & Sécurité</h1>
+            <p>Nouvelle demande de l'espace agent</p>
+          </div>
+          <div class="content">
+            <div class="info-box">
+              <p><span class="label">👤 Demandeur :</span> ${agentName}</p>
+              <p><span class="label">🆔 Matricule :</span> ${agentMatricule}</p>
+              <p><span class="label">📧 Email :</span> <a href="mailto:${agentEmail}">${agentEmail}</a></p>
+              ${agentTelephone ? `<p><span class="label">📞 Téléphone :</span> ${agentTelephone}</p>` : ''}
+              <p><span class="label">📅 Date :</span> ${new Date().toLocaleString('fr-FR')}</p>
+            </div>
+            
+            <div class="info-box">
+              <p><span class="label">🏢 Service destinataire :</span> ${toName}</p>
+              <p><span class="label">📝 Type de demande :</span> ${type}</p>
+              <p><span class="label">⚡ Niveau d'urgence :</span> <span class="urgency-badge">${urgence}</span></p>
+              <p><span class="label">📌 Objet :</span> <strong>${subject}</strong></p>
+            </div>
+            
+            <div class="message-box">
+              <p><span class="label">💬 Message :</span></p>
+              <p>${message.replace(/\n/g, '<br>')}</p>
+            </div>
+            
+            <div style="background: #e8f4fd; padding: 10px; border-radius: 8px; text-align: center; font-size: 12px;">
+              🔒 Ce message a été envoyé depuis l'espace agent. Pour répondre, utilisez l'adresse email ci-dessus.
+            </div>
+          </div>
+          <div class="footer">
+            <p>SRTB - Société Régionale de Transport de Bizerte</p>
+            <p>Service Santé & Sécurité au Travail</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const mailOptions = {
+      from: `"SRTB - Espace Agent" <${process.env.EMAIL_USER}>`,
+      to: to,
+      subject: `[SRTB] ${type} - ${subject}`,
+      html: html,
+      replyTo: agentEmail
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ Email support envoyé à ${to} | ID: ${info.messageId}`);
+    return { success: true, messageId: info.messageId };
+
+  } catch (error) {
+    console.error('❌ Erreur envoi email support:', error);
+    return { success: false, error: error.message };
+  }
+};
 
 module.exports = {
   transporter,
   sendResetEmail,
   sendOtpEmail,
-  sendConvocationEmail
+  sendConvocationEmail,
+  sendAgentSupportEmail
 };
